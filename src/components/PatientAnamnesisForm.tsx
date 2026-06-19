@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
 import { CheckCircle2, AlertCircle, RefreshCw, Sparkles, Send } from 'lucide-react';
 
 const AFLogoSVG = ({ className = '' }: { className?: string }) => (
@@ -122,7 +123,7 @@ export default function PatientAnamnesisForm() {
     }
 
     if (!hasSigned) {
-      alert("Por favor, assine a ficha no campo de assinatura eletrônica antes de enviar.");
+      setErrorMessage("Por favor, assine a ficha no campo de assinatura eletrônica antes de enviar.");
       return;
     }
 
@@ -130,6 +131,16 @@ export default function PatientAnamnesisForm() {
     setErrorMessage('');
 
     try {
+      // Ensure anonymous authentication for public access
+      if (!auth.currentUser) {
+        try {
+          await signInAnonymously(auth);
+        } catch (authErr: any) {
+          console.warn('Anonymous auth failed, attempting direct write:', authErr);
+          // Continue anyway — Firestore rules may allow unauthenticated writes
+        }
+      }
+
       const canvas = canvasRef.current;
       const signatureBase64 = canvas ? canvas.toDataURL('image/png') : '';
 
@@ -158,7 +169,15 @@ export default function PatientAnamnesisForm() {
 
       setFormSubmitted(true);
     } catch (err: any) {
-      setErrorMessage(`Falha ao enviar dados de anamnese: ${err.message || err}`);
+      console.error('Anamnesis submit error:', err);
+      const code = err?.code || '';
+      if (code.includes('permission-denied') || code.includes('PERMISSION_DENIED')) {
+        setErrorMessage('Erro de permissão: As regras de segurança do Firestore precisam permitir escrita na coleção "public_anamnesis". Entre em contato com a clínica.');
+      } else if (code.includes('unavailable') || code.includes('network')) {
+        setErrorMessage('Sem conexão com a internet. Verifique sua rede e tente novamente.');
+      } else {
+        setErrorMessage(`Falha ao enviar dados de anamnese: ${err.message || err}`);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -207,9 +226,19 @@ export default function PatientAnamnesisForm() {
           </div>
 
           {errorMessage && (
-            <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-xl flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span className="text-xs font-semibold">{errorMessage}</span>
+            <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-600" />
+                <span className="text-xs font-semibold leading-relaxed">{errorMessage}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setErrorMessage(''); }}
+                className="w-full py-2 bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Fechar e Tentar Novamente
+              </button>
             </div>
           )}
 
