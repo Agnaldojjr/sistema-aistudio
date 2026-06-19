@@ -16,13 +16,17 @@ export default function PatientRegistrationTab({ proposal, setProposal }: Patien
   React.useEffect(() => {
     const name = proposal.patientName || 'Paciente';
     if (selectedTemplate === 'aniversario') {
-      setWhatsappMessage(`Olá, ${name}! A equipe do Dr. Agnaldo Ferreira deseja a você um feliz aniversário! Que seu dia seja iluminado e repleto de sorrisos! 🎂✨`);
+      const saved = localStorage.getItem('whatsapp_template_aniversario');
+      setWhatsappMessage(saved ? saved.replace('[NOME]', name) : `Olá, ${name}! A equipe do Dr. Agnaldo Ferreira deseja a você um feliz aniversário! Que seu dia seja iluminado e repleto de sorrisos! 🎂✨`);
     } else if (selectedTemplate === 'feriado') {
-      setWhatsappMessage(`Olá, ${name}! Desejamos a você e sua família um Feliz Natal e um Próspero Ano Novo! Que o novo ano traga muitas alegrias, saúde e motivos para sorrir! 🎄🎉 - Dr. Agnaldo Ferreira`);
+      const saved = localStorage.getItem('whatsapp_template_feriado');
+      setWhatsappMessage(saved ? saved.replace('[NOME]', name) : `Olá, ${name}! Desejamos a você e sua família um Feliz Natal e um Próspero Ano Novo! Que o novo ano traga muitas alegrias, saúde e motivos para sorrir! 🎄🎉 - Dr. Agnaldo Ferreira`);
     } else if (selectedTemplate === 'profilaxia') {
-      setWhatsappMessage(`Olá, ${name}! Faz 6 meses desde sua última profilaxia (limpeza) com o Dr. Agnaldo Ferreira. É hora de agendar sua revisão periódica para manter seu sorriso saudável! Vamos agendar? 🦷😊`);
+      const saved = localStorage.getItem('whatsapp_template_profilaxia');
+      setWhatsappMessage(saved ? saved.replace('[NOME]', name) : `Olá, ${name}! Faz 6 meses desde sua última profilaxia (limpeza) com o Dr. Agnaldo Ferreira. É hora de agendar sua revisão periódica para manter seu sorriso saudável! Vamos agendar? 🦷😊`);
     } else if (selectedTemplate === 'confirmacao') {
-      setWhatsappMessage(`Olá, ${name}! Gostaríamos de confirmar sua consulta com o Dr. Agnaldo Ferreira no dia [DATA] às [HORÁRIO]. Por favor, responda esta mensagem para confirmar. Qualquer dúvida, estamos à disposição!`);
+      const saved = localStorage.getItem('whatsapp_template_confirmacao');
+      setWhatsappMessage(saved ? saved.replace('[NOME]', name) : `Olá, ${name}! Gostaríamos de confirmar sua consulta com o Dr. Agnaldo Ferreira no dia [DATA] às [HORÁRIO]. Por favor, responda esta mensagem para confirmar. Qualquer dúvida, estamos à disposição!`);
     }
   }, [selectedTemplate, proposal.patientName]);
 

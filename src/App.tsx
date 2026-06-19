@@ -21,6 +21,7 @@ import {
   ExternalLink,
   Smartphone,
   Monitor,
+  Settings,
 } from 'lucide-react';
 import ProcedureManager from './components/ProcedureManager';
 import PhotoEditor from './components/PhotoEditor';
@@ -31,6 +32,7 @@ import CalendarView from './components/CalendarView';
 import PatientRegistrationTab from './components/PatientRegistrationTab';
 import PatientDocumentsTab from './components/PatientDocumentsTab';
 import DashboardView from './components/DashboardView';
+import SettingsView from './components/SettingsView';
 import ClinicalAttendanceManager from './components/ClinicalAttendanceManager';
 import MobileWorkspace from './components/MobileWorkspace';
 import DentalCRMView from './components/DentalCRMView';
@@ -80,13 +82,14 @@ const INITIAL_PROPOSAL: TreatmentProposal = {
 };
 
 // ─── Navigation Config ──────────────────────────────────────────────────────
-type AppView = 'dashboard' | 'calendar' | 'planning' | 'crm';
+type AppView = 'dashboard' | 'calendar' | 'planning' | 'crm' | 'settings';
 
 const NAV_ITEMS = [
   { id: 'dashboard' as AppView, label: 'Painel', icon: LayoutDashboard, section: 'principal' },
   { id: 'crm'       as AppView, label: 'Pacientes', icon: Users,           section: 'principal' },
   { id: 'calendar'  as AppView, label: 'Agenda',    icon: Calendar,        section: 'principal' },
   { id: 'planning'  as AppView, label: 'Planejamento', icon: ClipboardEdit, section: 'clinica' },
+  { id: 'settings'  as AppView, label: 'Ajustes',   icon: Settings,        section: 'principal' },
 ];
 
 // ─── Sidebar ────────────────────────────────────────────────────────────────
@@ -215,6 +218,7 @@ function TopBar({ currentView, proposal, activeTab, onOpenMobileMenu, isMobileOp
     crm: 'Gestão de Pacientes',
     calendar: 'Agenda',
     planning: 'Planejamento Clínico',
+    settings: 'Configurações',
   };
 
   return (
@@ -470,6 +474,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'registration' | 'editor' | 'negotiation' | 'documents'>('registration');
   const [showPatientsModal, setShowPatientsModal] = useState(false);
   const [currentAppView, setCurrentAppView] = useState<AppView>('dashboard');
+  const [currentTheme, setCurrentTheme] = useState(() => {
+    return localStorage.getItem('agnaldo_dent_theme') || 'padrao';
+  });
   const [appointmentPatientName, setAppointmentPatientName] = useState<string | undefined>(undefined);
   const [currentFileId, setCurrentFileId] = useState<string | null>(null);
 
@@ -502,6 +509,10 @@ export default function App() {
   useEffect(() => { localStorage.setItem('agnaldo_dent_proposal', JSON.stringify(proposal)); }, [proposal]);
   useEffect(() => { localStorage.setItem('agnaldo_dent_clinic_settings', JSON.stringify(clinicSettings)); }, [clinicSettings]);
   useEffect(() => { localStorage.setItem('agnaldo_dent_mobile_opt', isMobileOptimized.toString()); }, [isMobileOptimized]);
+  useEffect(() => {
+    localStorage.setItem('agnaldo_dent_theme', currentTheme);
+    document.body.className = currentTheme === 'padrao' ? '' : `theme-${currentTheme}`;
+  }, [currentTheme]);
 
   // --- ACTIONS ---
   const handleLogin = async () => {
@@ -726,6 +737,17 @@ export default function App() {
               onNewPatient={() => { handleResetAll(); setCurrentAppView('planning'); }}
               initialPatientName={appointmentPatientName}
               onClearInitialPatient={() => setAppointmentPatientName(undefined)}
+            />
+          </main>
+        )}
+
+        {/* ── Settings ────────────────────────────────────────── */}
+        {currentAppView === 'settings' && (
+          <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 max-w-7xl w-full mx-auto animate-fade-in-up">
+            <SettingsView
+              currentTheme={currentTheme}
+              onChangeTheme={setCurrentTheme}
+              clinicSettings={clinicSettings}
             />
           </main>
         )}

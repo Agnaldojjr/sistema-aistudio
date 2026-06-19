@@ -522,3 +522,160 @@ body {
     position: absolute !important;
   }
 }
+
+/* ============================================================
+   APP THEMES (DARK MODE OVERRIDES)
+   ============================================================ */
+
+/* 1. Tema Bordô Escuro */
+body.theme-bordo-escuro {
+  background-color: #120708 !important;
+  color: #f3eded !important;
+  --brand-cream: #120708;
+  --brand-leather: #1c0d0e;
+  --surface-white: #1c0d0e;
+  --surface-card: #1c0d0e;
+  --text-primary: #f3eded;
+  --text-secondary: #cfc2c4;
+  --text-muted: #9c8a8c;
+  --border-light: #3a1c1e;
+}
+
+body.theme-bordo-escuro .bg-white,
+body.theme-bordo-escuro .bg-\[\#FAF8F5\]\/30,
+body.theme-bordo-escuro .bg-\[\#FAF8F5\]\/35,
+body.theme-bordo-escuro .bg-zinc-50,
+body.theme-bordo-escuro .bg-zinc-50\/40,
+body.theme-bordo-escuro .bg-amber-50\/40,
+body.theme-bordo-escuro .bg-\[\#FAF8F5\]\/30\/30 {
+  background-color: #1c0d0e !important;
+}
+
+body.theme-bordo-escuro .text-zinc-800,
+body.theme-bordo-escuro .text-zinc-700,
+body.theme-bordo-escuro .text-zinc-950,
+body.theme-bordo-escuro .text-zinc-900,
+body.theme-bordo-escuro .text-zinc-600 {
+  color: #f3eded !important;
+}
+body.theme-bordo-escuro .text-zinc-500,
+body.theme-bordo-escuro .text-zinc-400 {
+  color: #cfc2c4 !important;
+}
+
+body.theme-bordo-escuro input,
+body.theme-bordo-escuro select,
+body.theme-bordo-escuro textarea {
+  background-color: #120708 !important;
+  color: #f3eded !important;
+  border-color: #3a1c1e !important;
+}
+
+body.theme-bordo-escuro .border-zinc-200,
+body.theme-bordo-escuro .border-zinc-300,
+body.theme-bordo-escuro .border-zinc-150,
+body.theme-bordo-escuro .border-zinc-100 {
+  border-color: #3a1c1e !important;
+}
+
+/* 2. Tema Preto & Ouro Premium */
+body.theme-preto-ouro {
+  background-color: #080808 !important;
+  color: #ffffff !important;
+  --brand-cream: #080808;
+  --brand-leather: #151515;
+  --surface-white: #151515;
+  --surface-card: #151515;
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --text-muted: #777777;
+  --border-light: #2a251c;
+}
+
+body.theme-preto-ouro .bg-white,
+body.theme-preto-ouro .bg-\[\#FAF8F5\]\/30,
+body.theme-preto-ouro .bg-\[\#FAF8F5\]\/35,
+body.theme-preto-ouro .bg-zinc-50,
+body.theme-preto-ouro .bg-zinc-50\/40,
+body.theme-preto-ouro .bg-amber-50\/40,
+body.theme-preto-ouro .bg-\[\#FAF8F5\]\/30\/30 {
+  background-color: #151515 !important;
+}
+
+body.theme-preto-ouro .text-zinc-800,
+body.theme-preto-ouro .text-zinc-700,
+body.theme-preto-ouro .text-zinc-950,
+body.theme-preto-ouro .text-zinc-900,
+body.theme-preto-ouro .text-zinc-600 {
+  color: #ffffff !important;
+}
+body.theme-preto-ouro .text-zinc-500,
+body.theme-preto-ouro .text-zinc-400 {
+  color: #cccccc !important;
+}
+
+body.theme-preto-ouro input,
+body.theme-preto-ouro select,
+body.theme-preto-ouro textarea {
+  background-color: #080808 !important;
+  color: #ffffff !important;
+  border-color: #2a251c !important;
+}
+
+body.theme-preto-ouro .border-zinc-200,
+body.theme-preto-ouro .border-zinc-300,
+body.theme-preto-ouro .border-zinc-150,
+body.theme-preto-ouro .border-zinc-100 {
+  border-color: #2a251c !important;
+}
+
+/* 3. Tema Azul Noturno */
+body.theme-azul-noturno {
+  background-color: #0a0f1d !important;
+  color: #f1f5f9 !important;
+  --brand-cream: #0a0f1d;
+  --brand-leather: #141b2d;
+  --surface-white: #141b2d;
+  --surface-card: #141b2d;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  --border-light: #242f4c;
+}
+
+body.theme-azul-noturno .bg-white,
+body.theme-azul-noturno .bg-\[\#FAF8F5\]\/30,
+body.theme-azul-noturno .bg-\[\#FAF8F5\]\/35,
+body.theme-azul-noturno .bg-zinc-50,
+body.theme-azul-noturno .bg-zinc-50\/40,
+body.theme-azul-noturno .bg-amber-50\/40,
+body.theme-azul-noturno .bg-\[\#FAF8F5\]\/30\/30 {
+  background-color: #141b2d !important;
+}
+
+body.theme-azul-noturno .text-zinc-800,
+body.theme-azul-noturno .text-zinc-700,
+body.theme-azul-noturno .text-zinc-950,
+body.theme-azul-noturno .text-zinc-900,
+body.theme-azul-noturno .text-zinc-600 {
+  color: #f1f5f9 !important;
+}
+body.theme-azul-noturno .text-zinc-500,
+body.theme-azul-noturno .text-zinc-400 {
+  color: #cbd5e1 !important;
+}
+
+body.theme-azul-noturno input,
+body.theme-azul-noturno select,
+body.theme-azul-noturno textarea {
+  background-color: #0a0f1d !important;
+  color: #f1f5f9 !important;
+  border-color: #242f4c !important;
+}
+
+body.theme-azul-noturno .border-zinc-200,
+body.theme-azul-noturno .border-zinc-300,
+body.theme-azul-noturno .border-zinc-150,
+body.theme-azul-noturno .border-zinc-100 {
+  border-color: #242f4c !important;
+}
