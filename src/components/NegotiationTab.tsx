@@ -53,6 +53,17 @@ export const TON_RATES = {
   }
 };
 
+export const DEBIT_RATES = {
+  under_3: {
+    visa_master: 1.79,
+    elo_amex: 2.98
+  },
+  between_3_6: {
+    visa_master: 1.39,
+    elo_amex: 2.39
+  }
+};
+
 const formatCurrency = (val: number) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -130,10 +141,16 @@ export default function NegotiationTab({
     return cached ? parseFloat(cached) : 500;
   });
 
-  // Index of the chosen simulation to apply in the final printed PDF (0 = 100% Card, 1 = Sim 1, 2 = Sim 2, 3 = Patient Offer)
+  // Local state for Option 1 à vista method ('pix' | 'debito' | 'credito_vista')
+  const [firstOptionMethod, setFirstOptionMethod] = useState<'pix' | 'debito' | 'credito_vista'>(() => {
+    const cached = localStorage.getItem('ag_neg_first_option_method');
+    return (cached as 'pix' | 'debito' | 'credito_vista') || 'pix';
+  });
+
+  // Index of the chosen simulation to apply in the final printed PDF (0 = À Vista, 1 = Sim 1, 2 = Sim 2, 3 = Patient Offer)
   const [selectedPlanIndex, setSelectedPlanIndex] = useState<number>(() => {
     const cached = localStorage.getItem('ag_neg_selected_plan');
-    return cached ? parseInt(cached) : 1; // Default to Sim 1 (30%)
+    return cached ? parseInt(cached) : 0; // Default to Option 0 (À Vista)
   });
 
   const [showInPatientScreen, setShowInPatientScreen] = useState<boolean[]>(() => {
@@ -142,10 +159,10 @@ export default function NegotiationTab({
       try {
         return JSON.parse(cached);
       } catch {
-        return [false, true, false, false];
+        return [true, false, false, false];
       }
     }
-    return [false, true, false, false];
+    return [true, false, false, false];
   });
 
   // Help iframe print alert state
@@ -163,12 +180,13 @@ export default function NegotiationTab({
     localStorage.setItem('ag_neg_offer_input', patientOfferInput.toString());
     localStorage.setItem('ag_neg_selected_plan', selectedPlanIndex.toString());
     localStorage.setItem('ag_neg_show_patient_sims', JSON.stringify(showInPatientScreen));
+    localStorage.setItem('ag_neg_first_option_method', firstOptionMethod);
     if (customNetDesired !== null) {
       localStorage.setItem('ag_neg_custom_net', customNetDesired.toString());
     } else {
       localStorage.removeItem('ag_neg_custom_net');
     }
-  }, [salesVolume, cardBrand, installments, percentSim1, percentSim2, patientOfferInput, selectedPlanIndex, customNetDesired, showInPatientScreen]);
+  }, [salesVolume, cardBrand, installments, percentSim1, percentSim2, patientOfferInput, selectedPlanIndex, customNetDesired, showInPatientScreen, firstOptionMethod]);
 
   // Is app in inside iframe constraint
   const isInsideIframe = useMemo(() => {
@@ -213,15 +231,46 @@ export default function NegotiationTab({
   const simulations = useMemo(() => {
     const isExceeded = installments > maxInstallmentsRule;
     const effectiveFeeDecimal = isExceeded ? machineFeeDecimal : 0;
+    const t0Ref = desiredNet / (1 - effectiveFeeDecimal);
 
-    // 1. Column index 0: 100% Card
-    const e0 = 0;
-    const r0 = desiredNet;
-    const ch0 = r0 / (1 - effectiveFeeDecimal);
-    const inst0 = ch0 / installments;
-    const t0 = e0 + ch0;
-    const taxa0 = ch0 - r0;
-    const taxaAbsorvida0 = !isExceeded ? r0 * machineFeeDecimal : 0;
+    // 1. Column index 0: À Vista (Pix / Débito / Crédito 1x)
+    let name0 = 'À Vista no Pix';
+    let label0 = 'PIX';
+    let pctLabel0 = '100%';
+    let e0 = desiredNet;
+    let r0 = 0;
+    let ch0 = 0;
+    let taxa0 = 0;
+    let taxaAbsorvida0 = 0;
+    let inst0 = desiredNet;
+    let t0 = desiredNet;
+    let option0FeeDecimal = 0;
+
+    if (firstOptionMethod === 'debito') {
+      const debitRate = (DEBIT_RATES[salesVolume]?.[cardBrand] || 0) / 100;
+      name0 = 'À Vista no Débito';
+      label0 = 'DÉBITO';
+      e0 = 0;
+      r0 = desiredNet;
+      ch0 = desiredNet;
+      taxaAbsorvida0 = desiredNet * debitRate;
+      inst0 = desiredNet;
+      t0 = desiredNet;
+      option0FeeDecimal = debitRate;
+    } else if (firstOptionMethod === 'credito_vista') {
+      const credit1xRate = (TON_RATES[salesVolume]?.[cardBrand]?.[0] || 0) / 100;
+      name0 = 'Crédito à Vista';
+      label0 = 'CRÉDITO 1X';
+      e0 = 0;
+      r0 = desiredNet;
+      ch0 = desiredNet;
+      taxaAbsorvida0 = desiredNet * credit1xRate;
+      inst0 = desiredNet;
+      t0 = desiredNet;
+      option0FeeDecimal = credit1xRate;
+    }
+
+    const recebimentoLiquido0 = e0 + ch0 * (1 - option0FeeDecimal);
 
     // 2. Column index 1: Simulação 1 %
     const e1 = (desiredNet * percentSim1) / 100;
@@ -231,6 +280,7 @@ export default function NegotiationTab({
     const t1 = e1 + ch1;
     const taxa1 = ch1 - r1;
     const taxaAbsorvida1 = !isExceeded ? r1 * machineFeeDecimal : 0;
+    const recebimentoLiquido1 = e1 + ch1 * (1 - machineFeeDecimal);
 
     // 3. Column index 2: Simulação 2 %
     const e2 = (desiredNet * percentSim2) / 100;
@@ -240,6 +290,7 @@ export default function NegotiationTab({
     const t2 = e2 + ch2;
     const taxa2 = ch2 - r2;
     const taxaAbsorvida2 = !isExceeded ? r2 * machineFeeDecimal : 0;
+    const recebimentoLiquido2 = e2 + ch2 * (1 - machineFeeDecimal);
 
     // 4. Column index 3: Oferta Paciente
     const e3 = Math.min(desiredNet, Math.max(0, patientOfferInput));
@@ -249,21 +300,23 @@ export default function NegotiationTab({
     const t3 = e3 + ch3;
     const taxa3 = ch3 - r3;
     const taxaAbsorvida3 = !isExceeded ? r3 * machineFeeDecimal : 0;
+    const recebimentoLiquido3 = e3 + ch3 * (1 - machineFeeDecimal);
 
     return [
       {
-        name: '100% no Cartão',
-        label: 'Sem Entrada',
-        pctLabel: '0%',
+        name: name0,
+        label: label0,
+        pctLabel: pctLabel0,
         entrada: e0,
         restanteNet: r0,
         cobradoCard: ch0,
         valorTaxa: taxa0,
         taxaAbsorvida: taxaAbsorvida0,
-        isExceeded,
+        isExceeded: false,
         valorParcela: inst0,
         custoTotal: t0,
-        economia: 0,
+        economia: Math.max(0, t0Ref - t0),
+        recebimentoLiquido: recebimentoLiquido0,
       },
       {
         name: 'Simulação 1',
@@ -277,7 +330,8 @@ export default function NegotiationTab({
         isExceeded,
         valorParcela: inst1,
         custoTotal: t1,
-        economia: Math.max(0, t0 - t1),
+        economia: Math.max(0, t0Ref - t1),
+        recebimentoLiquido: recebimentoLiquido1,
       },
       {
         name: 'Simulação 2',
@@ -291,7 +345,8 @@ export default function NegotiationTab({
         isExceeded,
         valorParcela: inst2,
         custoTotal: t2,
-        economia: Math.max(0, t0 - t2),
+        economia: Math.max(0, t0Ref - t2),
+        recebimentoLiquido: recebimentoLiquido2,
       },
       {
         name: 'Oferta Paciente',
@@ -305,10 +360,11 @@ export default function NegotiationTab({
         isExceeded,
         valorParcela: inst3,
         custoTotal: t3,
-        economia: Math.max(0, t0 - t3),
+        economia: Math.max(0, t0Ref - t3),
+        recebimentoLiquido: recebimentoLiquido3,
       }
     ];
-  }, [desiredNet, machineFeeDecimal, installments, percentSim1, percentSim2, patientOfferInput, maxInstallmentsRule]);
+  }, [desiredNet, machineFeeDecimal, installments, percentSim1, percentSim2, patientOfferInput, maxInstallmentsRule, firstOptionMethod, salesVolume, cardBrand]);
 
   const chosenSim = simulations[selectedPlanIndex] || simulations[1];
   
@@ -536,9 +592,25 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
       doc.setFontSize(8);
       doc.setTextColor(60, 60, 60);
-      doc.text(`Opção Selecionada: ${chosenSim.name} (Entrada de ${formatCurrency(chosenSim.entrada)})`, 20, currentY + 20);
-      doc.text(`Valor Restante Parcelado: ${formatCurrency(chosenSim.cobradoCard)}`, 20, currentY + 26);
-      doc.text(`Parcelamento Sugerido: ${installments}x de ${formatCurrency(chosenSim.valorParcela)} sem juros no cartão`, 20, currentY + 32);
+      
+      if (selectedPlanIndex === 0) {
+        let methodText = "";
+        if (firstOptionMethod === 'pix') methodText = "PIX";
+        else if (firstOptionMethod === 'debito') methodText = "Débito";
+        else methodText = "Crédito à vista (1x)";
+
+        doc.text(`Opção Selecionada: À Vista no ${methodText}`, 20, currentY + 20);
+        if (firstOptionMethod === 'pix') {
+          doc.text(`Pagamento Único: ${formatCurrency(chosenSim.entrada)} via Pix`, 20, currentY + 26);
+        } else {
+          doc.text(`Pagamento Único: ${formatCurrency(chosenSim.cobradoCard)} via Cartão`, 20, currentY + 26);
+        }
+        doc.text(`Prazo: À Vista`, 20, currentY + 32);
+      } else {
+        doc.text(`Opção Selecionada: ${chosenSim.name} (Entrada de ${formatCurrency(chosenSim.entrada)})`, 20, currentY + 20);
+        doc.text(`Valor Restante Parcelado: ${formatCurrency(chosenSim.cobradoCard)}`, 20, currentY + 26);
+        doc.text(`Parcelamento Sugerido: ${installments}x de ${formatCurrency(chosenSim.valorParcela)} sem juros no cartão`, 20, currentY + 32);
+      }
 
       // Big font for total
       doc.setFontSize(12);
@@ -1065,6 +1137,19 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                   <div className="text-center font-sans">
                     <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase block">{sim.label}</span>
                     <strong className="text-sm font-serif text-[#8B0000] block mt-0.5">{sim.name}</strong>
+                    {index === 0 && (
+                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={firstOptionMethod}
+                          onChange={(e) => setFirstOptionMethod(e.target.value as 'pix' | 'debito' | 'credito_vista')}
+                          className="w-full bg-[#FAF8F5] border border-[#D5CBB3] rounded-lg p-2 text-xs font-semibold text-zinc-700 focus:outline-none focus:border-[#8B0000]"
+                        >
+                          <option value="pix">À Vista: PIX</option>
+                          <option value="debito">À Vista: Débito</option>
+                          <option value="credito_vista">À Vista: Crédito 1x</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="divide-y divide-zinc-100 font-sans text-xs">
@@ -1101,17 +1186,32 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                     )}
 
                     {/* Parcellation value detail */}
-                    <div className="py-2 text-center bg-zinc-50 border border-zinc-100/50 rounded-lg my-1">
-                      <span className="text-[10px] text-zinc-400 uppercase tracking-wide block">Valor da Parcela ({installments}x)</span>
-                      <strong className="text-sm font-bold text-[#8B0000] block font-mono mt-0.5">
-                        {installments}x de {formatCurrency(sim.valorParcela)}
-                      </strong>
-                    </div>
+                    {index === 0 ? (
+                      <div className="py-2 text-center bg-zinc-50 border border-zinc-100/50 rounded-lg my-1">
+                        <span className="text-[10px] text-zinc-400 uppercase tracking-wide block">Forma de Pagamento</span>
+                        <strong className="text-sm font-bold text-[#8B0000] block font-mono mt-0.5">
+                          Pagamento Único à Vista
+                        </strong>
+                      </div>
+                    ) : (
+                      <div className="py-2 text-center bg-zinc-50 border border-zinc-100/50 rounded-lg my-1">
+                        <span className="text-[10px] text-zinc-400 uppercase tracking-wide block">Valor da Parcela ({installments}x)</span>
+                        <strong className="text-sm font-bold text-[#8B0000] block font-mono mt-0.5">
+                          {installments}x de {formatCurrency(sim.valorParcela)}
+                        </strong>
+                      </div>
+                    )}
 
                     {/* Total paid by Patient */}
                     <div className="py-1.5 flex justify-between items-center bg-[#F5EFE3]/30 px-1 rounded">
                       <span className="text-[#8B0000] font-bold text-[10px] uppercase tracking-wide">CUSTO DO PACIENTE:</span>
                       <strong className="text-zinc-900 font-mono font-bold text-xs">{formatCurrency(sim.custoTotal)}</strong>
+                    </div>
+
+                    {/* Payout Received Net */}
+                    <div className="py-1.5 flex justify-between items-center bg-emerald-50/60 border border-emerald-100/50 px-1.5 rounded mt-1.5">
+                      <span className="text-emerald-700 font-bold text-[9.5px] uppercase tracking-wider">Líquido Profissional:</span>
+                      <strong className="text-emerald-800 font-mono font-bold text-xs">{formatCurrency(sim.recebimentoLiquido)}</strong>
                     </div>
 
                     {/* Savings column */}
@@ -1416,27 +1516,47 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           {/* Core breakdown (Left 7 Columns) */}
           <div className="md:col-span-8 grid grid-cols-2 gap-3 text-xs">
             <div className="bg-white border text-center p-2 rounded-lg">
-              <span className="text-[9px] text-zinc-400 uppercase tracking-widest block font-bold">Valor de Entrada</span>
+              <span className="text-[9px] text-zinc-400 uppercase tracking-widest block font-bold">
+                {selectedPlanIndex === 0 && firstOptionMethod === 'pix' ? 'Pagamento À Vista (PIX)' : 'Valor de Entrada'}
+              </span>
               <span className="text-[#B48C4D] font-mono font-extrabold text-sm block mt-1">
                 {formatCurrency(chosenSim.entrada)}
               </span>
-              <span className="text-[8.5px] text-zinc-400 block mt-0.5">PIX ou Dinheiro em espécie</span>
+              <span className="text-[8.5px] text-zinc-400 block mt-0.5">
+                {selectedPlanIndex === 0 && firstOptionMethod === 'pix' ? 'Transferência instantânea Pix' : 'PIX ou Dinheiro em espécie'}
+              </span>
             </div>
 
             <div className="bg-white border text-center p-2 rounded-lg">
-              <span className="text-[9px] text-zinc-400 uppercase tracking-widest block font-bold">Saldo do Financiamento</span>
+              <span className="text-[9px] text-zinc-400 uppercase tracking-widest block font-bold">
+                {selectedPlanIndex === 0 
+                  ? (firstOptionMethod === 'debito' 
+                      ? 'Pagamento no Débito' 
+                      : (firstOptionMethod === 'credito_vista' 
+                          ? 'Pagamento Crédito 1x' 
+                          : 'Saldo do Financiamento'))
+                  : 'Saldo do Financiamento'}
+              </span>
               <span className="text-zinc-800 font-mono font-extrabold text-sm block mt-1">
                 {formatCurrency(chosenSim.cobradoCard)}
               </span>
-              <span className="text-[8.5px] text-zinc-400 block mt-0.5">Financiado na Maquininha Ton</span>
+              <span className="text-[8.5px] text-zinc-400 block mt-0.5">
+                {selectedPlanIndex === 0 
+                  ? (firstOptionMethod === 'pix' 
+                      ? 'Nenhum saldo financiado' 
+                      : 'Cobrado à vista no cartão')
+                  : 'Financiado na Maquininha Ton'}
+              </span>
             </div>
 
             <div className="col-span-2 bg-[#F5EFE3] border border-[#D5CBB3] p-2.5 rounded-lg flex justify-between items-center">
               <span className="text-[#8B0000] font-bold text-[10.5px] uppercase tracking-wider block">
-                Acordo de Desembolso Mensal:
+                {selectedPlanIndex === 0 ? 'Acordo de Pagamento:' : 'Acordo de Desembolso Mensal:'}
               </span>
               <span className="text-sm font-bold text-[#8B0000] font-mono whitespace-nowrap bg-white border border-[#D5CBB3] px-2 py-0.5 rounded-md">
-                {installments}x de {formatCurrency(chosenSim.valorParcela)}
+                {selectedPlanIndex === 0 
+                  ? `Pagamento Único à Vista (${formatCurrency(chosenSim.custoTotal)})` 
+                  : `${installments}x de ${formatCurrency(chosenSim.valorParcela)}`}
               </span>
             </div>
           </div>

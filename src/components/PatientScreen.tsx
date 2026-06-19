@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Coins, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { PhotoSection, Procedure, TreatmentProposal } from '../types';
-import { TON_RATES } from './NegotiationTab';
+import { TON_RATES, DEBIT_RATES } from './NegotiationTab';
 
 const formatCurrency = (val: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -77,8 +77,9 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
   const percentSim1 = useReactiveLocalStorage<number>('ag_neg_pct_sim1', 30);
   const percentSim2 = useReactiveLocalStorage<number>('ag_neg_pct_sim2', 50);
   const patientOfferInput = useReactiveLocalStorage<number>('ag_neg_offer_input', 500);
-  const selectedPlanIndex = useReactiveLocalStorage<number>('ag_neg_selected_plan', 1);
-  const showInPatientScreen = useReactiveLocalStorage<boolean[]>('ag_neg_show_patient_sims', [false, true, false, false]);
+  const firstOptionMethod = useReactiveLocalStorage<'pix' | 'debito' | 'credito_vista'>('ag_neg_first_option_method', 'pix');
+  const selectedPlanIndex = useReactiveLocalStorage<number>('ag_neg_selected_plan', 0);
+  const showInPatientScreen = useReactiveLocalStorage<boolean[]>('ag_neg_show_patient_sims', [true, false, false, false]);
   const customNetDesiredRaw = useReactiveLocalStorage<string | null>('ag_neg_custom_net', null);
   const customNetDesired = customNetDesiredRaw !== null ? parseFloat(customNetDesiredRaw as string) : null;
 
@@ -135,12 +136,33 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
   const simulations = useMemo(() => {
     const isExceeded = installments > maxInstallmentsRule;
     const effectiveFeeDecimal = isExceeded ? machineFeeDecimal : 0;
+    const t0Ref = desiredNet / (1 - effectiveFeeDecimal);
 
-    const e0 = 0;
-    const r0 = desiredNet;
-    const ch0 = r0 / (1 - effectiveFeeDecimal);
-    const inst0 = ch0 / installments;
-    const t0 = e0 + ch0;
+    // 1. Column index 0: À Vista (Pix / Débito / Crédito 1x)
+    let name0 = 'À Vista no Pix';
+    let label0 = 'PIX';
+    let e0 = desiredNet;
+    let ch0 = 0;
+    let inst0 = desiredNet;
+    let t0 = desiredNet;
+
+    if (firstOptionMethod === 'debito') {
+      const debitRate = (DEBIT_RATES[salesVolume]?.[cardBrand] || 0) / 100;
+      name0 = 'À Vista no Débito';
+      label0 = 'DÉBITO';
+      e0 = 0;
+      ch0 = desiredNet;
+      inst0 = desiredNet;
+      t0 = desiredNet;
+    } else if (firstOptionMethod === 'credito_vista') {
+      const credit1xRate = (TON_RATES[salesVolume]?.[cardBrand]?.[0] || 0) / 100;
+      name0 = 'Crédito à Vista';
+      label0 = 'CRÉDITO 1X';
+      e0 = 0;
+      ch0 = desiredNet;
+      inst0 = desiredNet;
+      t0 = desiredNet;
+    }
 
     const e1 = (desiredNet * percentSim1) / 100;
     const r1 = desiredNet - e1;
@@ -162,13 +184,13 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
 
     return [
       {
-        name: '100% no Cartão',
-        label: 'Sem Entrada',
+        name: name0,
+        label: label0,
         entrada: e0,
         cobradoCard: ch0,
         valorParcela: inst0,
         custoTotal: t0,
-        economia: 0,
+        economia: Math.max(0, t0Ref - t0),
       },
       {
         name: 'Simulação 1',
@@ -177,7 +199,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
         cobradoCard: ch1,
         valorParcela: inst1,
         custoTotal: t1,
-        economia: Math.max(0, t0 - t1),
+        economia: Math.max(0, t0Ref - t1),
       },
       {
         name: 'Simulação 2',
@@ -186,7 +208,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
         cobradoCard: ch2,
         valorParcela: inst2,
         custoTotal: t2,
-        economia: Math.max(0, t0 - t2),
+        economia: Math.max(0, t0Ref - t2),
       },
       {
         name: 'Oferta Paciente',
@@ -195,10 +217,10 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
         cobradoCard: ch3,
         valorParcela: inst3,
         custoTotal: t3,
-        economia: Math.max(0, t0 - t3),
+        economia: Math.max(0, t0Ref - t3),
       }
     ];
-  }, [desiredNet, machineFeeDecimal, installments, percentSim1, percentSim2, patientOfferInput, maxInstallmentsRule]);
+  }, [desiredNet, machineFeeDecimal, installments, percentSim1, percentSim2, patientOfferInput, maxInstallmentsRule, firstOptionMethod, salesVolume, cardBrand]);
 
   const visibleSimulationsCount = useMemo(() => {
     const array = Array.isArray(showInPatientScreen) ? showInPatientScreen : [false, true, false, false];
@@ -577,17 +599,39 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
                       </div>
 
                       <div className="divide-y divide-zinc-100 font-sans text-sm">
-                        <div className="py-2 flex justify-between items-center">
-                          <span className="text-zinc-500 font-medium text-xs">Entrada (PIX/Dinheiro):</span>
-                          <strong className="text-[#896A39] font-mono font-bold text-sm bg-[#FAF8F5] border border-[#E6DEC9] px-2 py-0.5 rounded-md">{formatCurrency(sim.entrada)}</strong>
-                        </div>
+                        {index === 0 ? (
+                          <>
+                            <div className="py-2 flex justify-between items-center">
+                              <span className="text-zinc-500 font-medium text-xs">
+                                {firstOptionMethod === 'pix' ? 'Pagamento PIX:' : 'Pagamento Cartão:'}
+                              </span>
+                              <strong className="text-[#896A39] font-mono font-bold text-sm bg-[#FAF8F5] border border-[#E6DEC9] px-2 py-0.5 rounded-md">
+                                {formatCurrency(firstOptionMethod === 'pix' ? sim.entrada : sim.cobradoCard)}
+                              </strong>
+                            </div>
 
-                        <div className="py-3 text-center bg-zinc-50 border border-zinc-100 rounded-xl my-2">
-                          <span className="text-xs text-zinc-400 uppercase tracking-wide block font-semibold mb-1">Restante na Maquininha</span>
-                          <strong className="text-lg font-bold text-[#4E1119] block font-mono">
-                            {installments}x de <span className="text-[#B48C4D]">{formatCurrency(sim.valorParcela)}</span>
-                          </strong>
-                        </div>
+                            <div className="py-3 text-center bg-zinc-50 border border-zinc-100 rounded-xl my-2">
+                              <span className="text-xs text-zinc-400 uppercase tracking-wide block font-semibold mb-1">Forma de Pagamento</span>
+                              <strong className="text-sm font-bold text-[#4E1119] block font-mono">
+                                Pagamento Único à Vista
+                              </strong>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="py-2 flex justify-between items-center">
+                              <span className="text-zinc-500 font-medium text-xs">Entrada (PIX/Dinheiro):</span>
+                              <strong className="text-[#896A39] font-mono font-bold text-sm bg-[#FAF8F5] border border-[#E6DEC9] px-2 py-0.5 rounded-md">{formatCurrency(sim.entrada)}</strong>
+                            </div>
+
+                            <div className="py-3 text-center bg-zinc-50 border border-zinc-100 rounded-xl my-2">
+                              <span className="text-xs text-zinc-400 uppercase tracking-wide block font-semibold mb-1">Restante na Maquininha</span>
+                              <strong className="text-lg font-bold text-[#4E1119] block font-mono">
+                                {installments}x de <span className="text-[#B48C4D]">{formatCurrency(sim.valorParcela)}</span>
+                              </strong>
+                            </div>
+                          </>
+                        )}
 
                         <div className="py-2.5 flex justify-between items-center bg-[#F5EFE3]/50 px-2 rounded-lg mt-2">
                           <span className="text-[#4E1119] font-bold text-xs uppercase tracking-wide">CUSTO TOTAL:</span>
