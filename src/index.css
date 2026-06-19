@@ -524,158 +524,185 @@ body {
 }
 
 /* ============================================================
-   APP THEMES (DARK MODE OVERRIDES)
+   APP THEMES (BURGUNDY & BEIGE VARIANTS)
    ============================================================ */
 
-/* 1. Tema Bordô Escuro */
-body.theme-bordo-escuro {
-  background-color: #120708 !important;
-  color: #f3eded !important;
-  --brand-cream: #120708;
-  --brand-leather: #1c0d0e;
-  --surface-white: #1c0d0e;
-  --surface-card: #1c0d0e;
-  --text-primary: #f3eded;
-  --text-secondary: #cfc2c4;
-  --text-muted: #9c8a8c;
-  --border-light: #3a1c1e;
+/* 1. Tema Bordô Nobre (Fundo Bordô profundo, com cartões Bege e detalhes em ouro) */
+body.theme-bordo-nobre {
+  background-color: #3A0F15 !important;
+  color: #FAF3EA !important;
+  --brand-cream: #3A0F15;
+  --brand-leather: #FAF3EA;
+  --surface-white: #FAF3EA;
+  --surface-card: #FAF3EA;
+  --text-primary: #FAF3EA;
+  --text-secondary: #EADBC8;
+  --text-muted: #BCA397;
+  --border-light: #521D25;
 }
 
-body.theme-bordo-escuro .bg-white,
-body.theme-bordo-escuro .bg-\[\#FAF8F5\]\/30,
-body.theme-bordo-escuro .bg-\[\#FAF8F5\]\/35,
-body.theme-bordo-escuro .bg-zinc-50,
-body.theme-bordo-escuro .bg-zinc-50\/40,
-body.theme-bordo-escuro .bg-amber-50\/40,
-body.theme-bordo-escuro .bg-\[\#FAF8F5\]\/30\/30 {
-  background-color: #1c0d0e !important;
+body.theme-bordo-nobre .bg-white,
+body.theme-bordo-nobre .bg-\[\#FAF8F5\]\/30,
+body.theme-bordo-nobre .bg-\[\#FAF8F5\]\/35,
+body.theme-bordo-nobre .bg-zinc-50,
+body.theme-bordo-nobre .bg-zinc-50\/40,
+body.theme-bordo-nobre .bg-amber-50\/40,
+body.theme-bordo-nobre .bg-\[\#FAF8F5\]\/30\/30 {
+  background-color: #FAF3EA !important;
 }
 
-body.theme-bordo-escuro .text-zinc-800,
-body.theme-bordo-escuro .text-zinc-700,
-body.theme-bordo-escuro .text-zinc-950,
-body.theme-bordo-escuro .text-zinc-900,
-body.theme-bordo-escuro .text-zinc-600 {
-  color: #f3eded !important;
-}
-body.theme-bordo-escuro .text-zinc-500,
-body.theme-bordo-escuro .text-zinc-400 {
-  color: #cfc2c4 !important;
-}
-
-body.theme-bordo-escuro input,
-body.theme-bordo-escuro select,
-body.theme-bordo-escuro textarea {
-  background-color: #120708 !important;
-  color: #f3eded !important;
-  border-color: #3a1c1e !important;
-}
-
-body.theme-bordo-escuro .border-zinc-200,
-body.theme-bordo-escuro .border-zinc-300,
-body.theme-bordo-escuro .border-zinc-150,
-body.theme-bordo-escuro .border-zinc-100 {
-  border-color: #3a1c1e !important;
+/* Card and Topbar content texts */
+body.theme-bordo-nobre .bg-white .text-zinc-800,
+body.theme-bordo-nobre .bg-white .text-zinc-700,
+body.theme-bordo-nobre .bg-white .text-zinc-950,
+body.theme-bordo-nobre .bg-white .text-zinc-900,
+body.theme-bordo-nobre .bg-white .text-zinc-600,
+body.theme-bordo-nobre .bg-white .text-zinc-500,
+body.theme-bordo-nobre .card .text-zinc-800,
+body.theme-bordo-nobre .card .text-zinc-700,
+body.theme-bordo-nobre .card .text-zinc-950,
+body.theme-bordo-nobre .card .text-zinc-900,
+body.theme-bordo-nobre .card .text-zinc-600,
+body.theme-bordo-nobre .card .text-zinc-500,
+body.theme-bordo-nobre .topbar .text-zinc-800,
+body.theme-bordo-nobre .topbar .text-zinc-700,
+body.theme-bordo-nobre .topbar .text-zinc-600,
+body.theme-bordo-nobre .topbar .text-zinc-500,
+body.theme-bordo-nobre table .text-zinc-800,
+body.theme-bordo-nobre table .text-zinc-700,
+body.theme-bordo-nobre table .text-zinc-600 {
+  color: #2C0A0E !important;
 }
 
-/* 2. Tema Preto & Ouro Premium */
-body.theme-preto-ouro {
-  background-color: #080808 !important;
-  color: #ffffff !important;
-  --brand-cream: #080808;
-  --brand-leather: #151515;
-  --surface-white: #151515;
-  --surface-card: #151515;
-  --text-primary: #ffffff;
-  --text-secondary: #cccccc;
-  --text-muted: #777777;
-  --border-light: #2a251c;
+body.theme-bordo-nobre h2.text-\[\#4E1119\] {
+  color: #C09553 !important;
 }
 
-body.theme-preto-ouro .bg-white,
-body.theme-preto-ouro .bg-\[\#FAF8F5\]\/30,
-body.theme-preto-ouro .bg-\[\#FAF8F5\]\/35,
-body.theme-preto-ouro .bg-zinc-50,
-body.theme-preto-ouro .bg-zinc-50\/40,
-body.theme-preto-ouro .bg-amber-50\/40,
-body.theme-preto-ouro .bg-\[\#FAF8F5\]\/30\/30 {
-  background-color: #151515 !important;
+body.theme-bordo-nobre input,
+body.theme-bordo-nobre select,
+body.theme-bordo-nobre textarea {
+  background-color: #FAF3EA !important;
+  color: #2C0A0E !important;
+  border-color: #C09553 !important;
 }
 
-body.theme-preto-ouro .text-zinc-800,
-body.theme-preto-ouro .text-zinc-700,
-body.theme-preto-ouro .text-zinc-950,
-body.theme-preto-ouro .text-zinc-900,
-body.theme-preto-ouro .text-zinc-600 {
-  color: #ffffff !important;
-}
-body.theme-preto-ouro .text-zinc-500,
-body.theme-preto-ouro .text-zinc-400 {
-  color: #cccccc !important;
+body.theme-bordo-nobre .border-zinc-200,
+body.theme-bordo-nobre .border-zinc-300,
+body.theme-bordo-nobre .border-zinc-150,
+body.theme-bordo-nobre .border-zinc-100 {
+  border-color: #E6DEC9 !important;
 }
 
-body.theme-preto-ouro input,
-body.theme-preto-ouro select,
-body.theme-preto-ouro textarea {
-  background-color: #080808 !important;
-  color: #ffffff !important;
-  border-color: #2a251c !important;
+/* 2. Tema Bege Real (Fundo Bege areia elegante, cartões brancos e elementos Bordô) */
+body.theme-bege-real {
+  background-color: #E5DACB !important;
+  color: #4A121A !important;
+  --brand-cream: #E5DACB;
+  --brand-leather: #FAF8F5;
+  --surface-white: #FFFFFF;
+  --surface-card: #FFFFFF;
+  --text-primary: #4A121A;
+  --text-secondary: #6B5145;
+  --text-muted: #8F766C;
+  --border-light: #C09553;
 }
 
-body.theme-preto-ouro .border-zinc-200,
-body.theme-preto-ouro .border-zinc-300,
-body.theme-preto-ouro .border-zinc-150,
-body.theme-preto-ouro .border-zinc-100 {
-  border-color: #2a251c !important;
+body.theme-bege-real .bg-white,
+body.theme-bege-real .bg-\[\#FAF8F5\]\/30,
+body.theme-bege-real .bg-\[\#FAF8F5\]\/35,
+body.theme-bege-real .bg-zinc-50,
+body.theme-bege-real .bg-zinc-50\/40,
+body.theme-bege-real .bg-amber-50\/40,
+body.theme-bege-real .bg-\[\#FAF8F5\]\/30\/30 {
+  background-color: #FFFFFF !important;
 }
 
-/* 3. Tema Azul Noturno */
-body.theme-azul-noturno {
-  background-color: #0a0f1d !important;
-  color: #f1f5f9 !important;
-  --brand-cream: #0a0f1d;
-  --brand-leather: #141b2d;
-  --surface-white: #141b2d;
-  --surface-card: #141b2d;
-  --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
-  --text-muted: #64748b;
-  --border-light: #242f4c;
+body.theme-bege-real .text-zinc-800,
+body.theme-bege-real .text-zinc-700,
+body.theme-bege-real .text-zinc-950,
+body.theme-bege-real .text-zinc-900,
+body.theme-bege-real .text-zinc-600,
+body.theme-bege-real .text-zinc-500 {
+  color: #4A121A !important;
 }
 
-body.theme-azul-noturno .bg-white,
-body.theme-azul-noturno .bg-\[\#FAF8F5\]\/30,
-body.theme-azul-noturno .bg-\[\#FAF8F5\]\/35,
-body.theme-azul-noturno .bg-zinc-50,
-body.theme-azul-noturno .bg-zinc-50\/40,
-body.theme-azul-noturno .bg-amber-50\/40,
-body.theme-azul-noturno .bg-\[\#FAF8F5\]\/30\/30 {
-  background-color: #141b2d !important;
+body.theme-bege-real input,
+body.theme-bege-real select,
+body.theme-bege-real textarea {
+  background-color: #FAF8F5 !important;
+  color: #4A121A !important;
+  border-color: #C09553 !important;
 }
 
-body.theme-azul-noturno .text-zinc-800,
-body.theme-azul-noturno .text-zinc-700,
-body.theme-azul-noturno .text-zinc-950,
-body.theme-azul-noturno .text-zinc-900,
-body.theme-azul-noturno .text-zinc-600 {
-  color: #f1f5f9 !important;
-}
-body.theme-azul-noturno .text-zinc-500,
-body.theme-azul-noturno .text-zinc-400 {
-  color: #cbd5e1 !important;
+body.theme-bege-real .border-zinc-200,
+body.theme-bege-real .border-zinc-300,
+body.theme-bege-real .border-zinc-150,
+body.theme-bege-real .border-zinc-100 {
+  border-color: #C09553 !important;
 }
 
-body.theme-azul-noturno input,
-body.theme-azul-noturno select,
-body.theme-azul-noturno textarea {
-  background-color: #0a0f1d !important;
-  color: #f1f5f9 !important;
-  border-color: #242f4c !important;
+/* 3. Tema Bordô Imperial (Fundo Bordô médio requintado, cartões Bege Escuro e ouro) */
+body.theme-bordo-imperial {
+  background-color: #5C1D24 !important;
+  color: #EADFC9 !important;
+  --brand-cream: #5C1D24;
+  --brand-leather: #EADFC9;
+  --surface-white: #EADFC9;
+  --surface-card: #EADFC9;
+  --text-primary: #FAF6EE;
+  --text-secondary: #E3D5C1;
+  --text-muted: #BCA397;
+  --border-light: #732D35;
 }
 
-body.theme-azul-noturno .border-zinc-200,
-body.theme-azul-noturno .border-zinc-300,
-body.theme-azul-noturno .border-zinc-150,
-body.theme-azul-noturno .border-zinc-100 {
-  border-color: #242f4c !important;
+body.theme-bordo-imperial .bg-white,
+body.theme-bordo-imperial .bg-\[\#FAF8F5\]\/30,
+body.theme-bordo-imperial .bg-\[\#FAF8F5\]\/35,
+body.theme-bordo-imperial .bg-zinc-50,
+body.theme-bordo-imperial .bg-zinc-50\/40,
+body.theme-bordo-imperial .bg-amber-50\/40,
+body.theme-bordo-imperial .bg-\[\#FAF8F5\]\/30\/30 {
+  background-color: #EADFC9 !important;
+}
+
+/* Card and Topbar content texts */
+body.theme-bordo-imperial .bg-white .text-zinc-800,
+body.theme-bordo-imperial .bg-white .text-zinc-700,
+body.theme-bordo-imperial .bg-white .text-zinc-950,
+body.theme-bordo-imperial .bg-white .text-zinc-900,
+body.theme-bordo-imperial .bg-white .text-zinc-600,
+body.theme-bordo-imperial .bg-white .text-zinc-500,
+body.theme-bordo-imperial .card .text-zinc-800,
+body.theme-bordo-imperial .card .text-zinc-700,
+body.theme-bordo-imperial .card .text-zinc-950,
+body.theme-bordo-imperial .card .text-zinc-900,
+body.theme-bordo-imperial .card .text-zinc-600,
+body.theme-bordo-imperial .card .text-zinc-500,
+body.theme-bordo-imperial .topbar .text-zinc-800,
+body.theme-bordo-imperial .topbar .text-zinc-700,
+body.theme-bordo-imperial .topbar .text-zinc-600,
+body.theme-bordo-imperial .topbar .text-zinc-500,
+body.theme-bordo-imperial table .text-zinc-800,
+body.theme-bordo-imperial table .text-zinc-700,
+body.theme-bordo-imperial table .text-zinc-600 {
+  color: #3A080D !important;
+}
+
+body.theme-bordo-imperial h2.text-\[\#4E1119\] {
+  color: #C09553 !important;
+}
+
+body.theme-bordo-imperial input,
+body.theme-bordo-imperial select,
+body.theme-bordo-imperial textarea {
+  background-color: #FAF3EA !important;
+  color: #3A080D !important;
+  border-color: #C09553 !important;
+}
+
+body.theme-bordo-imperial .border-zinc-200,
+body.theme-bordo-imperial .border-zinc-300,
+body.theme-bordo-imperial .border-zinc-150,
+body.theme-bordo-imperial .border-zinc-100 {
+  border-color: #C09553 !important;
 }

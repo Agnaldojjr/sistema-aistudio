@@ -475,7 +475,11 @@ export default function App() {
   const [showPatientsModal, setShowPatientsModal] = useState(false);
   const [currentAppView, setCurrentAppView] = useState<AppView>('dashboard');
   const [currentTheme, setCurrentTheme] = useState(() => {
-    return localStorage.getItem('agnaldo_dent_theme') || 'padrao';
+    const saved = localStorage.getItem('agnaldo_dent_theme') || 'padrao';
+    if (saved === 'bordo-escuro') return 'bordo-nobre';
+    if (saved === 'preto-ouro') return 'bege-real';
+    if (saved === 'azul-noturno') return 'bordo-imperial';
+    return saved;
   });
   const [appointmentPatientName, setAppointmentPatientName] = useState<string | undefined>(undefined);
   const [currentFileId, setCurrentFileId] = useState<string | null>(null);

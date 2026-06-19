@@ -118,72 +118,72 @@ export default function SettingsView({ currentTheme, onChangeTheme, clinicSettin
                 </div>
               </button>
 
-              {/* Theme Dark Burgundy */}
+              {/* Theme Bordô Nobre */}
               <button
                 type="button"
-                onClick={() => onChangeTheme('bordo-escuro')}
+                onClick={() => onChangeTheme('bordo-nobre')}
                 className={`p-4 rounded-xl border text-left flex flex-col gap-2 transition-all cursor-pointer ${
-                  currentTheme === 'bordo-escuro'
-                    ? 'border-[#C09553] bg-zinc-900 ring-2 ring-[#C09553]/30 shadow-md'
+                  currentTheme === 'bordo-nobre'
+                    ? 'border-[#C09553] bg-[#FAF3EA] ring-2 ring-[#C09553]/30 shadow-md'
                     : 'border-zinc-200 bg-white hover:border-[#8B0000]'
                 }`}
               >
-                <div className="w-full h-12 rounded-lg bg-[#120708] border border-zinc-800 flex overflow-hidden">
-                  <div className="w-1/3 bg-[#8B0000]" />
-                  <div className="w-2/3 bg-[#1c0d0e] p-1 flex flex-col justify-between">
-                    <span className="w-full h-1 bg-zinc-800 rounded-xs" />
+                <div className="w-full h-12 rounded-lg bg-[#3A0F15] border border-[#521D25] flex overflow-hidden">
+                  <div className="w-1/3 bg-[#FAF3EA]" />
+                  <div className="w-2/3 bg-[#3A0F15] p-1 flex flex-col justify-between">
+                    <span className="w-full h-1 bg-[#FAF3EA]/40 rounded-xs" />
                     <span className="w-3 h-3 rounded-full bg-[#C09553] self-end" />
                   </div>
                 </div>
                 <div>
-                  <span className="font-bold text-zinc-800 text-xs block">Bordô Escuro</span>
-                  <span className="text-[10px] text-zinc-400">Escuro acolhedor</span>
+                  <span className="font-bold text-zinc-800 text-xs block">Bordô Nobre</span>
+                  <span className="text-[10px] text-zinc-400">Fundo Bordô & Cards Bege</span>
                 </div>
               </button>
 
-              {/* Theme Black & Gold */}
+              {/* Theme Bege Real */}
               <button
                 type="button"
-                onClick={() => onChangeTheme('preto-ouro')}
+                onClick={() => onChangeTheme('bege-real')}
                 className={`p-4 rounded-xl border text-left flex flex-col gap-2 transition-all cursor-pointer ${
-                  currentTheme === 'preto-ouro'
-                    ? 'border-[#C09553] bg-zinc-950 ring-2 ring-[#C09553]/30 shadow-md'
+                  currentTheme === 'bege-real'
+                    ? 'border-[#C09553] bg-[#FAF8F5] ring-2 ring-[#C09553]/30 shadow-md'
                     : 'border-zinc-200 bg-white hover:border-[#8B0000]'
                 }`}
               >
-                <div className="w-full h-12 rounded-lg bg-[#080808] border border-zinc-900 flex overflow-hidden">
-                  <div className="w-1/3 bg-[#151515]" />
-                  <div className="w-2/3 bg-[#151515] p-1 flex flex-col justify-between">
-                    <span className="w-full h-1 bg-zinc-850 rounded-xs" />
+                <div className="w-full h-12 rounded-lg bg-[#E5DACB] border border-[#C09553] flex overflow-hidden">
+                  <div className="w-1/3 bg-[#4A121A]" />
+                  <div className="w-2/3 bg-[#FFFFFF] p-1 flex flex-col justify-between">
+                    <span className="w-full h-1 bg-zinc-200 rounded-xs" />
                     <span className="w-3 h-3 rounded-full bg-[#C09553] self-end" />
                   </div>
                 </div>
                 <div>
-                  <span className="font-bold text-zinc-800 text-xs block">Preto & Ouro Premium</span>
-                  <span className="text-[10px] text-zinc-400">Escuro alto contraste</span>
+                  <span className="font-bold text-zinc-800 text-xs block">Bege Real</span>
+                  <span className="text-[10px] text-zinc-400">Fundo Bege & Cards Brancos</span>
                 </div>
               </button>
 
-              {/* Theme Night Blue */}
+              {/* Theme Bordô Imperial */}
               <button
                 type="button"
-                onClick={() => onChangeTheme('azul-noturno')}
+                onClick={() => onChangeTheme('bordo-imperial')}
                 className={`p-4 rounded-xl border text-left flex flex-col gap-2 transition-all cursor-pointer ${
-                  currentTheme === 'azul-noturno'
-                    ? 'border-[#C09553] bg-slate-900 ring-2 ring-[#C09553]/30 shadow-md'
+                  currentTheme === 'bordo-imperial'
+                    ? 'border-[#C09553] bg-[#FAF3EA] ring-2 ring-[#C09553]/30 shadow-md'
                     : 'border-zinc-200 bg-white hover:border-[#8B0000]'
                 }`}
               >
-                <div className="w-full h-12 rounded-lg bg-[#0a0f1d] border border-slate-800 flex overflow-hidden">
-                  <div className="w-1/3 bg-[#1e293b]" />
-                  <div className="w-2/3 bg-[#141b2d] p-1 flex flex-col justify-between">
-                    <span className="w-full h-1 bg-slate-800 rounded-xs" />
+                <div className="w-full h-12 rounded-lg bg-[#5C1D24] border border-[#732D35] flex overflow-hidden">
+                  <div className="w-1/3 bg-[#EADFC9]" />
+                  <div className="w-2/3 bg-[#5C1D24] p-1 flex flex-col justify-between">
+                    <span className="w-full h-1 bg-[#FAF6EE]/40 rounded-xs" />
                     <span className="w-3 h-3 rounded-full bg-[#C09553] self-end" />
                   </div>
                 </div>
                 <div>
-                  <span className="font-bold text-zinc-800 text-xs block">Azul Noturno</span>
-                  <span className="text-[10px] text-zinc-400">Escuro corporativo</span>
+                  <span className="font-bold text-zinc-800 text-xs block">Bordô Imperial</span>
+                  <span className="text-[10px] text-zinc-400">Fundo Bordô Médio & Cards Bege</span>
                 </div>
               </button>
             </div>
