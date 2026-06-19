@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Search, FileText, Loader2, CalendarPlus, FolderOpen, ChevronLeft, ImageIcon, MessageCircle, Phone, Trash2, ShieldAlert, Pencil, Check, User, Camera, Upload, RefreshCw, Cake, CalendarClock, AlertCircle } from 'lucide-react';
-import { listPatientsFromDrive, loadPatientFromDrive, listPatientImagesFromDrive, deletePatientFolderFromDrive, deleteDummyPatientsFromDrive, listPatientProposalsFromDrive, renameFileInDrive, uploadPatientImageToDrive, deleteFileFromDrive } from '../lib/drive';
+import { X, Search, FileText, Loader2, CalendarPlus, FolderOpen, ChevronLeft, ImageIcon, MessageCircle, Phone, Trash2, ShieldAlert, Pencil, Check, User, Camera, Upload, RefreshCw, Cake, CalendarClock, AlertCircle, Zap, ZapOff, Focus, LayoutGrid } from 'lucide-react';
+import { listPatientsFromDrive, loadPatientFromDrive, listPatientImagesFromDrive, deletePatientFolderFromDrive, deleteDummyPatientsFromDrive, listPatientProposalsFromDrive, renameFileInDrive, uploadPatientImageToDrive, deleteFileFromDrive, downloadFileAsDataUrl } from '../lib/drive';
 import { ClinicSettings } from '../types';
+import ImageMarkupEditor from './ImageMarkupEditor';
 
 function dataURLtoBlob(dataUrl: string) {
   const arr = dataUrl.split(',');
@@ -67,6 +68,19 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  const [cameraZoom, setCameraZoom] = useState<1 | 2>(1);
+  const [cameraExposure, setCameraExposure] = useState<number>(1.0);
+  const [focusLocked, setFocusLocked] = useState(false);
+  const [showCameraGuide, setShowCameraGuide] = useState(true);
+  const [flashOn, setFlashOn] = useState(false);
+  const [hasFlash, setHasFlash] = useState(false);
+  const [cameraGuideType, setCameraGuideType] = useState<'smile' | 'upper' | 'lower'>('smile');
+
+  // Photo Editor edit states
+  const [editingImageId, setEditingImageId] = useState<string | null>(null);
+  const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
+  const [isDownloadingForEdit, setIsDownloadingForEdit] = useState<string | null>(null);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
@@ -74,6 +88,10 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
   const startCamera = async (mode = facingMode) => {
     setCameraError(null);
     setIsCameraActive(true);
+    setCameraZoom(1);
+    setCameraExposure(1.0);
+    setFocusLocked(false);
+    setFlashOn(false);
     setTimeout(async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
@@ -81,6 +99,14 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.play();
+          
+          try {
+            const track = stream.getVideoTracks()[0];
+            const capabilities = track.getCapabilities ? track.getCapabilities() : {} as any;
+            setHasFlash(!!capabilities.torch);
+          } catch (e) {
+            console.warn('Flash capability check failed in PatientsModal', e);
+          }
         }
       } catch (err) {
         console.error(err);
@@ -98,6 +124,8 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
       videoRef.current.srcObject = null;
     }
     setIsCameraActive(false);
+    setFlashOn(false);
+    setHasFlash(false);
   };
 
   const switchCamera = () => {
@@ -106,6 +134,69 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
     if (isCameraActive) {
       stopCamera();
       startCamera(newMode);
+    }
+  };
+
+  const toggleCameraZoom = async () => {
+    const nextZoom: 1 | 2 = cameraZoom === 1 ? 2 : 1;
+    setCameraZoom(nextZoom);
+    if (activeStreamRef.current) {
+      const track = activeStreamRef.current.getVideoTracks()[0];
+      try {
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {} as any;
+        if (capabilities.zoom) {
+          const val = nextZoom === 2 ? Math.min(capabilities.zoom.max || 2.0, 2.0) : 1.0;
+          await track.applyConstraints({ advanced: [{ zoom: val }] } as any);
+        }
+      } catch (e) {
+        console.warn('Hardware zoom adjustment failed in PatientsModal', e);
+      }
+    }
+  };
+
+  const handleExposureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    setCameraExposure(val);
+    if (activeStreamRef.current) {
+      const track = activeStreamRef.current.getVideoTracks()[0];
+      try {
+        const expCompensation = (val - 1.0) * 4.0;
+        await track.applyConstraints({
+          advanced: [{ exposureMode: 'manual', exposureCompensation: expCompensation }]
+        } as any);
+      } catch (err) {
+        // Fallback is CSS filter
+      }
+    }
+  };
+
+  const toggleFocusLock = async () => {
+    if (activeStreamRef.current) {
+      const track = activeStreamRef.current.getVideoTracks()[0];
+      const nextFocusLock = !focusLocked;
+      setFocusLocked(nextFocusLock);
+      try {
+        await track.applyConstraints({
+          advanced: [{ focusMode: nextFocusLock ? 'manual' : 'continuous' }]
+        } as any);
+      } catch (e) {
+        console.warn('Focus lock constraint not supported by hardware/browser in PatientsModal', e);
+      }
+    }
+  };
+
+  const toggleFlash = async () => {
+    if (activeStreamRef.current) {
+      const track = activeStreamRef.current.getVideoTracks()[0];
+      const newFlashState = !flashOn;
+      try {
+        await track.applyConstraints({
+          advanced: [{ torch: newFlashState }]
+        } as any);
+        setFlashOn(newFlashState);
+      } catch (e) {
+        console.error('Failed to toggle flash in PatientsModal', e);
+      }
     }
   };
 
@@ -118,7 +209,42 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          ctx.save();
+          ctx.filter = `brightness(${cameraExposure})`;
+
+          // Mirror frame if user camera is active
+          if (facingMode === 'user') {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+          }
+
+          const track = activeStreamRef.current?.getVideoTracks()[0];
+          const capabilities = track?.getCapabilities ? track.getCapabilities() : {} as any;
+          const isHardwareZoomActive = capabilities.zoom && cameraZoom > 1;
+
+          if (facingMode === 'user') {
+            if (cameraZoom === 2 && !isHardwareZoomActive) {
+              const sw = video.videoWidth / 2;
+              const sh = video.videoHeight / 2;
+              const sx = (video.videoWidth - sw) / 2;
+              const sy = (video.videoHeight - sh) / 2;
+              ctx.drawImage(video, sx, sy, sw, sh, -video.videoWidth, 0, video.videoWidth, video.videoHeight);
+            } else {
+              ctx.drawImage(video, -video.videoWidth, 0, video.videoWidth, video.videoHeight);
+            }
+          } else {
+            if (cameraZoom === 2 && !isHardwareZoomActive) {
+              const sw = video.videoWidth / 2;
+              const sh = video.videoHeight / 2;
+              const sx = (video.videoWidth - sw) / 2;
+              const sy = (video.videoHeight - sh) / 2;
+              ctx.drawImage(video, sx, sy, sw, sh, 0, 0, video.videoWidth, video.videoHeight);
+            } else {
+              ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+            }
+          }
+
+          ctx.restore();
           const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
           stopCamera();
           
@@ -138,6 +264,40 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
           }
         }
       }
+    }
+  };
+
+  const handleEditGalleryImage = async (imgId: string) => {
+    try {
+      setIsDownloadingForEdit(imgId);
+      const dataUrl = await downloadFileAsDataUrl(imgId);
+      setEditingImageId(imgId);
+      setEditingImageUrl(dataUrl);
+    } catch (err: any) {
+      alert('Erro ao carregar imagem para edição: ' + err.message);
+    } finally {
+      setIsDownloadingForEdit(null);
+    }
+  };
+
+  const handleSaveEditedImage = async (editedImage: string) => {
+    if (!selectedPatient) return;
+    try {
+      setIsUploading(true);
+      setEditingImageUrl(null);
+      setEditingImageId(null);
+      
+      const blob = dataURLtoBlob(editedImage);
+      const filename = `edited-${new Date().getTime()}.jpg`;
+      await uploadPatientImageToDrive(selectedPatient.id, blob, filename);
+      
+      // Refresh patient images list
+      const updatedImages = await listPatientImagesFromDrive(selectedPatient.id);
+      setPatientImages(updatedImages);
+    } catch (err: any) {
+      alert('Erro ao enviar imagem editada para o Google Drive: ' + err.message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -881,26 +1041,154 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
 
                   {/* Camera Viewport Section */}
                   {isCameraActive && (
-                    <div className="bg-zinc-950 p-4 rounded-2xl relative shadow-inner flex flex-col items-center">
+                    <div className="bg-zinc-950 p-4 rounded-2xl relative shadow-inner flex flex-col items-center w-full">
                       <div className="relative w-full max-w-md aspect-[4/3] bg-zinc-900 rounded-xl overflow-hidden flex items-center justify-center border border-zinc-800">
                         {cameraError ? (
                           <p className="text-red-400 text-xs text-center p-6">{cameraError}</p>
                         ) : (
                           <video
                             ref={videoRef}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-all duration-200"
                             playsInline
                             muted
+                            style={{ 
+                              transform: `scale(${cameraZoom}) ${facingMode === 'user' ? 'scaleX(-1)' : ''}`,
+                              filter: `brightness(${cameraExposure})`
+                            }}
                           />
                         )}
                         
-                        <div className="absolute top-3 left-3 bg-zinc-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] text-zinc-400 font-mono tracking-wider uppercase flex items-center gap-1.5">
+                        {/* Alignment guides overlay */}
+                        {showCameraGuide && !cameraError && (
+                          <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+                            {cameraGuideType === 'smile' && (
+                              <svg viewBox="0 0 400 300" className="w-full h-full text-yellow-500/35 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5">
+                                <ellipse cx="200" cy="150" rx="95" ry="48" />
+                                <text x="200" y="85" fill="currentColor" fontSize="10" textAnchor="middle" fontWeight="bold" letterSpacing="1">GUIA: ESTÉTICA / SORRISO</text>
+                              </svg>
+                            )}
+                            {cameraGuideType === 'upper' && (
+                              <svg viewBox="0 0 400 300" className="w-full h-full text-yellow-500/35 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5">
+                                <path d="M 80 220 C 80 80, 320 80, 320 220" />
+                                <text x="200" y="45" fill="currentColor" fontSize="10" textAnchor="middle" fontWeight="bold" letterSpacing="1">GUIA: ARCADA SUPERIOR</text>
+                              </svg>
+                            )}
+                            {cameraGuideType === 'lower' && (
+                              <svg viewBox="0 0 400 300" className="w-full h-full text-yellow-500/35 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5">
+                                <path d="M 80 80 C 80 220, 320 220, 320 80" />
+                                <text x="200" y="270" fill="currentColor" fontSize="10" textAnchor="middle" fontWeight="bold" letterSpacing="1">GUIA: ARCADA INFERIOR</text>
+                              </svg>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="absolute top-3 left-3 bg-zinc-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] text-zinc-400 font-mono tracking-wider uppercase flex items-center gap-1.5 z-20">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                           Modo Câmera ({facingMode === 'environment' ? 'Traseira' : 'Frontal'})
                         </div>
+
+                        {/* Top-Right overlays for Camera Options */}
+                        {!cameraError && (
+                          <div className="absolute top-3 right-3 flex flex-col gap-2 z-20">
+                            <button
+                              type="button"
+                              onClick={switchCamera}
+                              className="w-9 h-9 rounded-full flex items-center justify-center bg-zinc-900/85 hover:bg-zinc-800 text-white border border-white/10 shadow-lg transition-all active:scale-95 cursor-pointer"
+                              title="Alternar Câmera"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </button>
+
+                            {hasFlash && (
+                              <button
+                                type="button"
+                                onClick={toggleFlash}
+                                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer border ${flashOn ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-zinc-900/85 text-white border-white/10'}`}
+                                title="Lanterna/Flash"
+                              >
+                                {flashOn ? <Zap className="w-4 h-4" /> : <ZapOff className="w-4 h-4" />}
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={toggleCameraZoom}
+                              className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all active:scale-95 cursor-pointer border ${cameraZoom === 2 ? 'bg-[#C09553] text-black border-[#C09553]' : 'bg-zinc-900/85 text-white border-white/10'}`}
+                              title="Zoom (1x / 2x)"
+                            >
+                              {cameraZoom}x
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={toggleFocusLock}
+                              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer border ${focusLocked ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-zinc-900/85 text-white border-white/10'}`}
+                              title="Travar Foco"
+                            >
+                              <Focus className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setShowCameraGuide(prev => !prev)}
+                              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer border ${showCameraGuide ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-zinc-900/85 text-zinc-400 border-white/10'}`}
+                              title="Mostrar/Ocultar Marcador de Arcada"
+                            >
+                              <LayoutGrid className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Camera Controls */}
+                      {/* Camera Guide Type Selector and Exposure Control */}
+                      {!cameraError && (
+                        <div className="w-full max-w-md mt-3 space-y-2.5">
+                          {/* Guide selection button cycle */}
+                          {showCameraGuide && (
+                            <div className="flex items-center justify-center gap-1.5 bg-zinc-900/90 p-1 rounded-xl border border-zinc-800">
+                              <span className="text-[9px] text-zinc-500 uppercase font-bold px-2">Tipo de Guia:</span>
+                              <button
+                                type="button"
+                                onClick={() => setCameraGuideType('smile')}
+                                className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${cameraGuideType === 'smile' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'text-zinc-400 hover:text-white'}`}
+                              >
+                                Sorriso
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCameraGuideType('upper')}
+                                className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${cameraGuideType === 'upper' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'text-zinc-400 hover:text-white'}`}
+                              >
+                                Superior
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCameraGuideType('lower')}
+                                className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${cameraGuideType === 'lower' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'text-zinc-400 hover:text-white'}`}
+                              >
+                                Inferior
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Exposure/Brightness adjustment overlay slider */}
+                          <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl px-3 py-1.5 flex items-center gap-3 w-full">
+                            <span className="text-[9px] text-zinc-400 font-bold uppercase min-w-[45px]">Brilho</span>
+                            <input 
+                              type="range" 
+                              min="0.5" 
+                              max="1.5" 
+                              step="0.05" 
+                              value={cameraExposure} 
+                              onChange={handleExposureChange}
+                              className="flex-1 accent-[#C09553] h-1 rounded-lg cursor-pointer"
+                            />
+                            <span className="text-[9px] text-zinc-400 font-mono w-8 text-right">{Math.round(cameraExposure * 100)}%</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Camera Capture/Cancel Actions */}
                       <div className="flex items-center justify-center gap-4 mt-4 w-full">
                         <button
                           onClick={stopCamera}
@@ -918,14 +1206,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                             <span className="sr-only">Capturar</span>
                           </button>
                         )}
-
-                        <button
-                          onClick={switchCamera}
-                          className="p-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition-all cursor-pointer"
-                          title="Alternar Câmera"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                        </button>
+                        <div className="w-14" /> {/* spacer for symmetry */}
                       </div>
                     </div>
                   )}
@@ -966,6 +1247,27 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                               <p className="text-[10px] text-zinc-500">{new Date(img.createdTime).toLocaleDateString('pt-BR')}</p>
                             </div>
                           </a>
+
+                          {/* Edit Photo Button Overlay */}
+                          <div className="absolute top-2 left-2 z-10">
+                            {isDownloadingForEdit === img.id ? (
+                              <div className="w-8 h-8 rounded-xl bg-white/95 text-zinc-600 flex items-center justify-center shadow-md border border-zinc-200/80">
+                                <Loader2 className="w-4 h-4 animate-spin text-[#C09553]" />
+                              </div>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  handleEditGalleryImage(img.id);
+                                }}
+                                className="w-8 h-8 rounded-xl bg-white/95 text-[#B48C4D] hover:text-[#4E1119] flex items-center justify-center shadow-md transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 cursor-pointer border border-zinc-200/80"
+                                title="Editar imagem (Marcações/Adesivos)"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
 
                           {/* Delete Photo Button Overlay */}
                           <div className="absolute top-2 right-2 z-10">
@@ -1163,6 +1465,18 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
               </div>
             </div>
           </div>
+        )}
+
+        {editingImageUrl && (
+          <ImageMarkupEditor
+            image={editingImageUrl}
+            onSave={handleSaveEditedImage}
+            onClose={() => {
+              setEditingImageUrl(null);
+              setEditingImageId(null);
+            }}
+            title="Editor Clínico - Foto da Linha do Tempo"
+          />
         )}
       </div>
     </div>

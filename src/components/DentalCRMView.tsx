@@ -30,7 +30,11 @@ import {
   FolderOpen,
   X,
   Pencil,
-  Check
+  Check,
+  Zap,
+  ZapOff,
+  Focus,
+  LayoutGrid
 } from 'lucide-react';
 import { getGoogleDriveCRMDatabase, saveGoogleDriveCRMDatabase } from '../lib/driveCrm';
 import { db } from '../firebase';
@@ -247,6 +251,14 @@ export default function DentalCRMView({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
+
+  const [cameraZoom, setCameraZoom] = useState<1 | 2>(1);
+  const [cameraExposure, setCameraExposure] = useState<number>(1.0);
+  const [focusLocked, setFocusLocked] = useState(false);
+  const [showCameraGuide, setShowCameraGuide] = useState(true);
+  const [flashOn, setFlashOn] = useState(false);
+  const [hasFlash, setHasFlash] = useState(false);
+  const [cameraGuideType, setCameraGuideType] = useState<'general' | 'smile' | 'upper' | 'lower'>('general');
 
   // Global search & filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -677,6 +689,10 @@ export default function DentalCRMView({
   const startCamera = async () => {
     setCameraError(null);
     setIsCameraActive(true);
+    setCameraZoom(1);
+    setCameraExposure(1.0);
+    setFocusLocked(false);
+    setFlashOn(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: facingMode }
@@ -685,6 +701,14 @@ export default function DentalCRMView({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
+
+        try {
+          const track = stream.getVideoTracks()[0];
+          const capabilities = track.getCapabilities ? track.getCapabilities() : {} as any;
+          setHasFlash(!!capabilities.torch);
+        } catch (e) {
+          console.warn('Flash capability check failed in CRM', e);
+        }
       }
     } catch (err: any) {
       console.error("Camera access error", err);
@@ -697,12 +721,16 @@ export default function DentalCRMView({
       activeStreamRef.current.getTracks().forEach((track) => track.stop());
       activeStreamRef.current = null;
     }
+    setFlashOn(false);
+    setHasFlash(false);
   };
 
   const toggleCameraFacingMode = async () => {
     const nextMode = facingMode === 'user' ? 'environment' : 'user';
     setFacingMode(nextMode);
     stopCameraStream();
+    setFlashOn(false);
+    setHasFlash(false);
     // Restart stream
     setTimeout(async () => {
       try {
@@ -713,11 +741,82 @@ export default function DentalCRMView({
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.play();
+
+          try {
+            const track = stream.getVideoTracks()[0];
+            const capabilities = track.getCapabilities ? track.getCapabilities() : {} as any;
+            setHasFlash(!!capabilities.torch);
+          } catch (e) {
+            console.warn('Flash capability check failed in CRM switch', e);
+          }
         }
       } catch (err) {
         setCameraError("Falha ao inverter câmera");
       }
     }, 100);
+  };
+
+  const toggleCameraZoom = async () => {
+    const nextZoom: 1 | 2 = cameraZoom === 1 ? 2 : 1;
+    setCameraZoom(nextZoom);
+    if (activeStreamRef.current) {
+      const track = activeStreamRef.current.getVideoTracks()[0];
+      try {
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {} as any;
+        if (capabilities.zoom) {
+          const val = nextZoom === 2 ? Math.min(capabilities.zoom.max || 2.0, 2.0) : 1.0;
+          await track.applyConstraints({ advanced: [{ zoom: val }] } as any);
+        }
+      } catch (e) {
+        console.warn('Hardware zoom adjustment failed in CRM', e);
+      }
+    }
+  };
+
+  const handleExposureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    setCameraExposure(val);
+    if (activeStreamRef.current) {
+      const track = activeStreamRef.current.getVideoTracks()[0];
+      try {
+        const expCompensation = (val - 1.0) * 4.0;
+        await track.applyConstraints({
+          advanced: [{ exposureMode: 'manual', exposureCompensation: expCompensation }]
+        } as any);
+      } catch (err) {
+        // Fallback is CSS filter
+      }
+    }
+  };
+
+  const toggleFocusLock = async () => {
+    if (activeStreamRef.current) {
+      const track = activeStreamRef.current.getVideoTracks()[0];
+      const nextFocusLock = !focusLocked;
+      setFocusLocked(nextFocusLock);
+      try {
+        await track.applyConstraints({
+          advanced: [{ focusMode: nextFocusLock ? 'manual' : 'continuous' }]
+        } as any);
+      } catch (e) {
+        console.warn('Focus lock constraint not supported by hardware/browser in CRM', e);
+      }
+    }
+  };
+
+  const toggleFlash = async () => {
+    if (activeStreamRef.current) {
+      const track = activeStreamRef.current.getVideoTracks()[0];
+      const newFlashState = !flashOn;
+      try {
+        await track.applyConstraints({
+          advanced: [{ torch: newFlashState }]
+        } as any);
+        setFlashOn(newFlashState);
+      } catch (e) {
+        console.error('Failed to toggle flash in CRM', e);
+      }
+    }
   };
 
   const captureCameraSnapshot = async () => {
@@ -733,9 +832,37 @@ export default function DentalCRMView({
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        // Simple scale horizontal flip for user preview correctness
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, -width, 0, width, height);
+        ctx.save();
+        ctx.filter = `brightness(${cameraExposure})`;
+        
+        const track = activeStreamRef.current?.getVideoTracks()[0];
+        const capabilities = track?.getCapabilities ? track.getCapabilities() : {} as any;
+        const isHardwareZoomActive = capabilities.zoom && cameraZoom > 1;
+
+        if (facingMode === 'user') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+          if (cameraZoom === 2 && !isHardwareZoomActive) {
+            const sw = width / 2;
+            const sh = height / 2;
+            const sx = (width - sw) / 2;
+            const sy = (height - sh) / 2;
+            ctx.drawImage(video, sx, sy, sw, sh, -width, 0, width, height);
+          } else {
+            ctx.drawImage(video, -width, 0, width, height);
+          }
+        } else {
+          if (cameraZoom === 2 && !isHardwareZoomActive) {
+            const sw = width / 2;
+            const sh = height / 2;
+            const sx = (width - sw) / 2;
+            const sy = (height - sh) / 2;
+            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
+          } else {
+            ctx.drawImage(video, 0, 0, width, height);
+          }
+        }
+        ctx.restore();
       }
       
       const blob: Blob = await new Promise((resolve) => {
@@ -3922,10 +4049,10 @@ export default function DentalCRMView({
                             <button
                               type="button"
                               onClick={isCameraActive ? () => { setIsCameraActive(false); stopCameraStream(); } : startCamera}
-                              className="px-3.5 py-2 bg-[#8B0000] hover:bg-[#a32c3d] text-white font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                              className={`px-3.5 py-2 text-[10px] uppercase font-bold tracking-wider rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 border ${isCameraActive ? 'bg-zinc-800 text-white border-zinc-700 hover:bg-zinc-700' : 'bg-white hover:bg-zinc-100 text-zinc-750 border-zinc-350'}`}
                             >
-                              <Camera className="w-3.5 h-3.5" />
-                              {isCameraActive ? 'Desligar Câmera' : 'Adquirir via Webcam'}
+                              <Camera className="w-3.5 h-3.5 text-[#B48C4D]" />
+                              {isCameraActive ? 'Desativar Câmera' : 'Tirar Foto'}
                             </button>
                           </div>
                         </div>
@@ -3949,11 +4076,140 @@ export default function DentalCRMView({
                             <div className="relative aspect-video bg-black rounded-xl overflow-hidden ring-1 ring-white/15">
                               <video 
                                 ref={videoRef} 
-                                className="w-full h-full object-cover transform scale-x-[-1]" 
+                                className="w-full h-full object-cover transition-all duration-200" 
                                 playsInline 
-                                muted
+                                  muted
+                                style={{ 
+                                  transform: `scale(${cameraZoom}) ${facingMode === 'user' ? 'scaleX(-1)' : ''}`,
+                                  filter: `brightness(${cameraExposure})`
+                                }}
                               />
+
+                              {/* SVG Alignment Guide (Generic Diagnostic guide for clinical photo upload) */}
+                              {showCameraGuide && (
+                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                  {cameraGuideType === 'general' && (
+                                    <svg viewBox="0 0 400 300" className="w-full h-full text-yellow-500/40 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5">
+                                      <ellipse cx="200" cy="150" rx="100" ry="75" />
+                                      <line x1="200" y1="10" x2="200" y2="290" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
+                                      <line x1="10" y1="150" x2="390" y2="150" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
+                                      <text x="200" y="40" fill="currentColor" fontSize="10" textAnchor="middle" fontWeight="bold" letterSpacing="1">GUIA DE ALINHAMENTO GERAL</text>
+                                    </svg>
+                                  )}
+                                  {cameraGuideType === 'smile' && (
+                                    <svg viewBox="0 0 400 300" className="w-full h-full text-yellow-500/35 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5">
+                                      <ellipse cx="200" cy="150" rx="95" ry="48" />
+                                      <text x="200" y="85" fill="currentColor" fontSize="10" textAnchor="middle" fontWeight="bold" letterSpacing="1">GUIA: ESTÉTICA / SORRISO</text>
+                                    </svg>
+                                  )}
+                                  {cameraGuideType === 'upper' && (
+                                    <svg viewBox="0 0 400 300" className="w-full h-full text-yellow-500/35 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5">
+                                      <path d="M 80 220 C 80 80, 320 80, 320 220" />
+                                      <text x="200" y="45" fill="currentColor" fontSize="10" textAnchor="middle" fontWeight="bold" letterSpacing="1">GUIA: ARCADA SUPERIOR</text>
+                                    </svg>
+                                  )}
+                                  {cameraGuideType === 'lower' && (
+                                    <svg viewBox="0 0 400 300" className="w-full h-full text-yellow-500/35 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5">
+                                      <path d="M 80 80 C 80 220, 320 220, 320 80" />
+                                      <text x="200" y="270" fill="currentColor" fontSize="10" textAnchor="middle" fontWeight="bold" letterSpacing="1">GUIA: ARCADA INFERIOR</text>
+                                    </svg>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* Lock focus and zoom indicators */}
+                              {focusLocked && (
+                                <div className="absolute top-3 left-3 bg-indigo-600 text-white text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1">
+                                  <Focus className="w-3 h-3" /> Foco Travado
+                                </div>
+                              )}
+
                               <canvas ref={canvasRef} className="hidden" />
+                            </div>
+
+                            {/* Camera Guide Type Selector */}
+                            {showCameraGuide && (
+                              <div className="flex items-center justify-center gap-1.5 bg-zinc-900/90 p-1.5 rounded-xl border border-zinc-800 max-w-sm mx-auto">
+                                <span className="text-[9px] text-zinc-500 uppercase font-bold px-1.5">Guia:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setCameraGuideType('general')}
+                                  className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${cameraGuideType === 'general' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'text-zinc-400 hover:text-white'}`}
+                                >
+                                  Geral
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCameraGuideType('smile')}
+                                  className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${cameraGuideType === 'smile' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'text-zinc-400 hover:text-white'}`}
+                                >
+                                  Sorriso
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCameraGuideType('upper')}
+                                  className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${cameraGuideType === 'upper' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'text-zinc-400 hover:text-white'}`}
+                                >
+                                  Superior
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCameraGuideType('lower')}
+                                  className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase transition-all ${cameraGuideType === 'lower' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'text-zinc-400 hover:text-white'}`}
+                                >
+                                  Inferior
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Camera parameter tuning overlays */}
+                            <div className="flex flex-wrap justify-center gap-2 pt-2 pb-1 border-t border-zinc-900 border-dashed">
+                              <button
+                                type="button"
+                                onClick={toggleCameraZoom}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${cameraZoom === 2 ? 'bg-[#C09553] text-black' : 'bg-zinc-800 text-white hover:bg-zinc-700'}`}
+                              >
+                                Zoom {cameraZoom}x
+                              </button>
+                              {hasFlash && (
+                                <button
+                                  type="button"
+                                  onClick={toggleFlash}
+                                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 ${flashOn ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-white hover:bg-zinc-700'}`}
+                                >
+                                  {flashOn ? <Zap className="w-3.5 h-3.5" strokeWidth={3} /> : <ZapOff className="w-3.5 h-3.5" strokeWidth={3} />}
+                                  <span>Flash</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={toggleFocusLock}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${focusLocked ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-white hover:bg-zinc-700'}`}
+                              >
+                                {focusLocked ? 'Foco Travado' : 'Travar Foco'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowCameraGuide(prev => !prev)}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${showCameraGuide ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                              >
+                                {showCameraGuide ? 'Guia Ativo' : 'Sem Guia'}
+                              </button>
+                            </div>
+
+                            {/* Exposure range slider */}
+                            <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 rounded-xl max-w-xs mx-auto gap-3">
+                              <span className="text-[10px] text-zinc-400 font-bold uppercase">Brilho</span>
+                              <input 
+                                type="range" 
+                                min="0.5" 
+                                max="1.5" 
+                                step="0.05" 
+                                value={cameraExposure} 
+                                onChange={handleExposureChange}
+                                className="flex-1 accent-[#C09553] h-1 rounded-lg cursor-pointer"
+                              />
+                              <span className="text-[10px] text-zinc-500 font-mono">{Math.round(cameraExposure * 100)}%</span>
                             </div>
 
                             {cameraError && (

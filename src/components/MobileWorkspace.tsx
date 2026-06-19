@@ -21,7 +21,9 @@ import {
   FileText,
   BookmarkCheck,
   AlertCircle,
-  Scissors
+  Scissors,
+  Focus,
+  LayoutGrid
 } from 'lucide-react';
 import { createCalendarEvent } from '../lib/calendar';
 import { saveTreatmentPlanToDrive, uploadPatientImageToDrive, getOrCreatePatientFolderByName } from '../lib/drive';
@@ -173,6 +175,11 @@ export default function MobileWorkspace({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
 
+  const [cameraZoom, setCameraZoom] = useState<1 | 2>(1);
+  const [cameraExposure, setCameraExposure] = useState<number>(1.0);
+  const [focusLocked, setFocusLocked] = useState(false);
+  const [showCameraGuide, setShowCameraGuide] = useState(true);
+
   // Refs for tracking streams
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -182,6 +189,9 @@ export default function MobileWorkspace({
     setCameraError(null);
     setIsCameraActive(true);
     setTorchOn(false);
+    setCameraZoom(1);
+    setCameraExposure(1.0);
+    setFocusLocked(false);
 
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
@@ -230,6 +240,54 @@ export default function MobileWorkspace({
     }
   };
 
+  const toggleCameraZoom = async () => {
+    const nextZoom: 1 | 2 = cameraZoom === 1 ? 2 : 1;
+    setCameraZoom(nextZoom);
+    if (streamRef.current) {
+      const track = streamRef.current.getVideoTracks()[0];
+      try {
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {} as any;
+        if (capabilities.zoom) {
+          const val = nextZoom === 2 ? Math.min(capabilities.zoom.max || 2.0, 2.0) : 1.0;
+          await track.applyConstraints({ advanced: [{ zoom: val }] } as any);
+        }
+      } catch (e) {
+        console.warn('Hardware zoom adjustment failed on mobile', e);
+      }
+    }
+  };
+
+  const handleExposureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    setCameraExposure(val);
+    if (streamRef.current) {
+      const track = streamRef.current.getVideoTracks()[0];
+      try {
+        const expCompensation = (val - 1.0) * 4.0;
+        await track.applyConstraints({
+          advanced: [{ exposureMode: 'manual', exposureCompensation: expCompensation }]
+        } as any);
+      } catch (err) {
+        // Fallback is CSS filter
+      }
+    }
+  };
+
+  const toggleFocusLock = async () => {
+    if (streamRef.current) {
+      const track = streamRef.current.getVideoTracks()[0];
+      const nextFocusLock = !focusLocked;
+      setFocusLocked(nextFocusLock);
+      try {
+        await track.applyConstraints({
+          advanced: [{ focusMode: nextFocusLock ? 'manual' : 'continuous' }]
+        } as any);
+      } catch (e) {
+        console.warn('Focus lock constraint not supported by hardware/browser on mobile', e);
+      }
+    }
+  };
+
   const handleCapturePhoto = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
@@ -240,12 +298,42 @@ export default function MobileWorkspace({
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          ctx.save();
+          ctx.filter = `brightness(${cameraExposure})`;
+
           // Mirror frame if user camera is active
           if (facingMode === 'user') {
             ctx.translate(canvas.width, 0);
             ctx.scale(-1, 1);
           }
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          const track = streamRef.current?.getVideoTracks()[0];
+          const capabilities = track?.getCapabilities ? track.getCapabilities() : {} as any;
+          const isHardwareZoomActive = capabilities.zoom && cameraZoom > 1;
+
+          if (facingMode === 'user') {
+            if (cameraZoom === 2 && !isHardwareZoomActive) {
+              const sw = video.videoWidth / 2;
+              const sh = video.videoHeight / 2;
+              const sx = (video.videoWidth - sw) / 2;
+              const sy = (video.videoHeight - sh) / 2;
+              ctx.drawImage(video, sx, sy, sw, sh, -video.videoWidth, 0, video.videoWidth, video.videoHeight);
+            } else {
+              ctx.drawImage(video, -video.videoWidth, 0, video.videoWidth, video.videoHeight);
+            }
+          } else {
+            if (cameraZoom === 2 && !isHardwareZoomActive) {
+              const sw = video.videoWidth / 2;
+              const sh = video.videoHeight / 2;
+              const sx = (video.videoWidth - sw) / 2;
+              const sy = (video.videoHeight - sh) / 2;
+              ctx.drawImage(video, sx, sy, sw, sh, 0, 0, video.videoWidth, video.videoHeight);
+            } else {
+              ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+            }
+          }
+          
+          ctx.restore();
           const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
           
           // Locate section and update image
@@ -748,32 +836,49 @@ export default function MobileWorkspace({
                     ref={videoRef}
                     playsInline
                     muted
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-all duration-200"
+                    style={{ 
+                      transform: `scale(${cameraZoom}) ${facingMode === 'user' ? 'scaleX(-1)' : ''}`,
+                      filter: `brightness(${cameraExposure})`
+                    }}
                   />
 
-                  {/* HIGH VALUE CUSTOM AUXILIARY CENTER LINES FOR DENTAL ALIGNMENT */}
-                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    {/* Elliptical ring representing dental arch outline */}
-                    <div className="w-[80%] h-[75%] border-2 border-dashed border-[#FAF8F5]/35 rounded-[50%] flex items-center justify-center shadow-xs">
-                      <div className="text-[9px] text-[#FAF8F5]/50 bg-zinc-900/50 px-2 py-0.5 rounded-full font-mono tracking-widest uppercase">
-                        Enquadrar Arcada
-                      </div>
+                  {/* SVG Alignment Guides based on showCameraGuide */}
+                  {showCameraGuide && (
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+                      {activeCameraSection === 'upper' && (
+                        <svg viewBox="0 0 400 300" className="w-full h-full text-yellow-500/35 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5">
+                          <path d="M 80 220 C 80 80, 320 80, 320 220" />
+                        </svg>
+                      )}
+                      {activeCameraSection === 'lower' && (
+                        <svg viewBox="0 0 400 300" className="w-full h-full text-yellow-500/35 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5">
+                          <path d="M 80 80 C 80 220, 320 220, 320 80" />
+                        </svg>
+                      )}
+                      {activeCameraSection === 'smile' && (
+                        <svg viewBox="0 0 400 300" className="w-full h-full text-yellow-500/35 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="5 5">
+                          <ellipse cx="200" cy="150" rx="95" ry="48" />
+                        </svg>
+                      )}
                     </div>
-                    {/* Horizontal center notch */}
-                    <div className="absolute left-0 right-0 h-[1px] bg-red-400/25" />
-                    {/* Vertical center notch */}
-                    <div className="absolute top-0 bottom-0 w-[1px] bg-red-400/25" />
+                  )}
+
+                  {/* Horizontal and vertical center notches */}
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div className="absolute left-0 right-0 h-[1px] bg-red-400/20" />
+                    <div className="absolute top-0 bottom-0 w-[1px] bg-red-400/20" />
                   </div>
 
                   {/* Camera overlay tools panel */}
-                  <div className="absolute top-3 right-3 flex flex-col gap-2">
+                  <div className="absolute top-3 right-3 flex flex-col gap-2 z-20">
                     <button
                       type="button"
                       onClick={handleToggleTorch}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center bg-zinc-900/60 shadow-lg text-white border border-[#EAE4D9]/20 transition-all ${torchOn ? 'text-amber-400 bg-zinc-950/95' : 'text-zinc-200'}`}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center bg-zinc-900/60 shadow-lg text-white border border-[#EAE4D9]/20 transition-all ${torchOn ? 'text-amber-400 bg-zinc-950/95' : 'text-zinc-200'}`}
                       title="Ativar Lanterna Flash"
                     >
-                      <Zap className={`w-5 h-5 ${torchOn ? 'fill-current' : ''}`} />
+                      <Zap className={`w-4.5 h-4.5 ${torchOn ? 'fill-current' : ''}`} />
                     </button>
                     <button
                       type="button"
@@ -782,11 +887,55 @@ export default function MobileWorkspace({
                         setFacingMode(nextMod);
                         startLiveCamera(nextMod);
                       }}
-                      className="w-10 h-10 rounded-full flex items-center justify-center bg-zinc-900/60 shadow-lg text-white border border-[#EAE4D9]/20 transition-all"
-                      title="Inverter Letes"
+                      className="w-9 h-9 rounded-full flex items-center justify-center bg-zinc-900/60 shadow-lg text-white border border-[#EAE4D9]/20 transition-all"
+                      title="Inverter Câmera"
                     >
-                      <SwitchCamera className="w-5 h-5" />
+                      <SwitchCamera className="w-4.5 h-4.5" />
                     </button>
+
+                    {/* Zoom preset */}
+                    <button
+                      type="button"
+                      onClick={toggleCameraZoom}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center bg-zinc-900/60 shadow-lg border border-[#EAE4D9]/20 text-white font-bold text-xs transition-all cursor-pointer ${cameraZoom === 2 ? 'bg-[#C09553] text-black border-[#C09553]' : ''}`}
+                      title="Alternar Zoom"
+                    >
+                      {cameraZoom}x
+                    </button>
+
+                    {/* Focus Lock */}
+                    <button
+                      type="button"
+                      onClick={toggleFocusLock}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center bg-zinc-900/60 shadow-lg border border-[#EAE4D9]/20 text-white transition-all cursor-pointer ${focusLocked ? 'bg-indigo-600 text-white border-indigo-600' : ''}`}
+                      title="Travar Foco"
+                    >
+                      <Focus className="w-4 h-4" />
+                    </button>
+
+                    {/* Guide Lines */}
+                    <button
+                      type="button"
+                      onClick={() => setShowCameraGuide(prev => !prev)}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center bg-zinc-900/60 shadow-lg border border-[#EAE4D9]/20 transition-all cursor-pointer ${showCameraGuide ? 'bg-emerald-600 text-white border-emerald-600' : 'text-zinc-400'}`}
+                      title="Guia de Alinhamento"
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Exposure/Brightness adjustment overlay slider */}
+                  <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-20 bg-black/60 backdrop-blur rounded-2xl px-4 py-1.5 border border-white/10 flex items-center gap-3 w-[80%] max-w-[280px]">
+                    <span className="text-[9px] text-zinc-300 font-bold uppercase tracking-wider min-w-[40px]">Brilho</span>
+                    <input 
+                      type="range" 
+                      min="0.5" 
+                      max="1.5" 
+                      step="0.05" 
+                      value={cameraExposure} 
+                      onChange={handleExposureChange}
+                      className="flex-1 accent-[#C09553] h-1 cursor-pointer"
+                    />
                   </div>
 
                   {/* BOTTOM ACTION RAIL */}

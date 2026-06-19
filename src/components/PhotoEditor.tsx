@@ -4,10 +4,11 @@
  */
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Info, Camera, X, SwitchCamera, Zap, ZapOff, ZoomIn, Loader2, ImageIcon } from 'lucide-react';
+import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Info, Camera, X, SwitchCamera, Zap, ZapOff, ZoomIn, Loader2, ImageIcon, Focus } from 'lucide-react';
 import { PhotoSection, ToothMarker, Procedure } from '../types';
 import { DEMO_SVG_PLACEHOLDERS } from '../constants';
 import { listPatientImagesByName, downloadFileAsDataUrl, getOrCreatePatientFolderByName, uploadPatientImageToDrive } from '../lib/drive';
+import ImageMarkupEditor from './ImageMarkupEditor';
 
 interface PhotoEditorProps {
   section: PhotoSection;
@@ -42,6 +43,15 @@ export default function PhotoEditor({
   const [zoom, setZoom] = useState(1);
   const [zoomCapabilities, setZoomCapabilities] = useState<{min: number, max: number, step: number} | null>(null);
   const [hasFlash, setHasFlash] = useState(false);
+
+  // Markup Editor Modal State
+  const [isMarkupEditorOpen, setIsMarkupEditorOpen] = useState(false);
+
+  // New advanced camera controls state
+  const [cameraZoom, setCameraZoom] = useState<1 | 2>(1);
+  const [cameraExposure, setCameraExposure] = useState<number>(1.0);
+  const [focusLocked, setFocusLocked] = useState(false);
+  const [showCameraGuide, setShowCameraGuide] = useState(true);
 
   // Patient Gallery Selector States
   const [showGallerySelector, setShowGallerySelector] = useState(false);
@@ -90,6 +100,9 @@ export default function PhotoEditor({
     setIsCameraActive(true);
     setCameraError(null);
     setFlashOn(false);
+    setCameraZoom(1);
+    setCameraExposure(1.0);
+    setFocusLocked(false);
 
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
@@ -161,6 +174,59 @@ export default function PhotoEditor({
     }
   };
 
+  const toggleCameraZoom = async () => {
+    const nextZoom: 1 | 2 = cameraZoom === 1 ? 2 : 1;
+    setCameraZoom(nextZoom);
+    
+    if (videoRef.current && videoRef.current.srcObject && zoomCapabilities) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      const track = stream.getVideoTracks()[0];
+      try {
+        const val = nextZoom === 2 ? Math.min(zoomCapabilities.max, 2.0) : 1.0;
+        await track.applyConstraints({
+          advanced: [{ zoom: val }]
+        } as any);
+        setZoom(val);
+      } catch (e) {
+        console.warn('Hardware zoom adjustment failed', e);
+      }
+    }
+  };
+
+  const handleExposureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    setCameraExposure(val);
+    
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      const track = stream.getVideoTracks()[0];
+      try {
+        const expCompensation = (val - 1.0) * 4.0;
+        await track.applyConstraints({
+          advanced: [{ exposureMode: 'manual', exposureCompensation: expCompensation }]
+        } as any);
+      } catch (err) {
+        // Falls back to CSS brightness filter automatically
+      }
+    }
+  };
+
+  const toggleFocusLock = async () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      const track = stream.getVideoTracks()[0];
+      const nextFocusLock = !focusLocked;
+      setFocusLocked(nextFocusLock);
+      try {
+        await track.applyConstraints({
+          advanced: [{ focusMode: nextFocusLock ? 'manual' : 'continuous' }]
+        } as any);
+      } catch (e) {
+        console.warn('Focus lock constraint not supported by hardware/browser', e);
+      }
+    }
+  };
+
   const switchCamera = () => {
     const newMode = facingMode === 'environment' ? 'user' : 'environment';
     setFacingMode(newMode);
@@ -185,7 +251,31 @@ export default function PhotoEditor({
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          ctx.save();
+          
+          // Apply exposure / brightness filter
+          ctx.filter = `brightness(${cameraExposure})`;
+          
+          // Mirror frame if user camera is active
+          if (facingMode === 'user') {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+          }
+          
+          // Software crop zoom 2x fallback
+          const isHardwareZoomActive = zoomCapabilities && zoom > 1.1;
+          if (cameraZoom === 2 && !isHardwareZoomActive) {
+            const sw = video.videoWidth / 2;
+            const sh = video.videoHeight / 2;
+            const sx = (video.videoWidth - sw) / 2;
+            const sy = (video.videoHeight - sh) / 2;
+            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+          } else {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          }
+          
+          ctx.restore();
+          
           const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
           onUpdateSection({ ...section, image: dataUrl, markers: [] });
           stopCamera();
@@ -206,6 +296,34 @@ export default function PhotoEditor({
             }, 'image/jpeg', 0.9);
           }
         }
+      }
+    }
+  };
+
+  const handleSaveMarkup = async (editedImage: string) => {
+    onUpdateSection({
+      ...section,
+      image: editedImage
+    });
+    setIsMarkupEditorOpen(false);
+
+    if (patientName) {
+      try {
+        const folderId = await getOrCreatePatientFolderByName(patientName);
+        const arr = editedImage.split(',');
+        const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        const filename = `${section.id}_edited_${Date.now()}.jpg`;
+        await uploadPatientImageToDrive(folderId, blob, filename);
+        console.log(`Edited quadrant saved to patient ${patientName} on Drive`);
+      } catch (err) {
+        console.warn("Failed to upload edited quadrant to Drive:", err);
       }
     }
   };
@@ -484,45 +602,101 @@ export default function PhotoEditor({
               <>
                 <video 
                   ref={videoRef} 
-                  className="w-full h-full object-contain bg-zinc-950"
+                  className="w-full h-full object-contain bg-zinc-950 transition-all duration-200"
                   playsInline
                   muted
-                  style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
+                  style={{ 
+                    transform: `scale(${cameraZoom}) ${facingMode === 'user' ? 'scaleX(-1)' : ''}`,
+                    filter: `brightness(${cameraExposure})`
+                  }}
                 />
+
+                {/* SVG Alignment Guides */}
+                {showCameraGuide && (
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-15">
+                    {section.id === 'upper' && (
+                      <svg viewBox="0 0 400 300" className="w-full max-w-xl h-auto text-yellow-500/40 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="6 6">
+                        <path d="M 80 225 C 80 85, 320 85, 320 225" />
+                        <text x="200" y="45" fill="currentColor" fontSize="10" textAnchor="middle" fontWeight="bold" letterSpacing="1">GUIA: ARCADA SUPERIOR</text>
+                      </svg>
+                    )}
+                    {section.id === 'lower' && (
+                      <svg viewBox="0 0 400 300" className="w-full max-w-xl h-auto text-yellow-500/40 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="6 6">
+                        <path d="M 80 75 C 80 215, 320 215, 320 75" />
+                        <text x="200" y="270" fill="currentColor" fontSize="10" textAnchor="middle" fontWeight="bold" letterSpacing="1">GUIA: ARCADA INFERIOR</text>
+                      </svg>
+                    )}
+                    {section.id === 'smile' && (
+                      <svg viewBox="0 0 400 300" className="w-full max-w-xl h-auto text-yellow-500/40 fill-none" stroke="currentColor" strokeWidth="2" strokeDasharray="6 6">
+                        <ellipse cx="200" cy="150" rx="90" ry="45" />
+                        <text x="200" y="85" fill="currentColor" fontSize="10" textAnchor="middle" fontWeight="bold" letterSpacing="1">GUIA: ESTÉTICA / SORRISO</text>
+                      </svg>
+                    )}
+                  </div>
+                )}
                 
                 {/* Camera Controls Overlay */}
-                <div className="absolute top-20 right-4 flex flex-col gap-4 z-20">
+                <div className="absolute top-20 right-4 flex flex-col gap-3 z-20">
                   <button 
                     onClick={switchCamera}
-                    className="w-12 h-12 rounded-full bg-black/50 backdrop-blur border border-white/20 flex items-center justify-center text-white"
+                    title="Alternar Câmera"
+                    className="w-11 h-11 rounded-full bg-black/60 backdrop-blur border border-white/20 flex items-center justify-center text-white hover:bg-zinc-800 transition-colors active:scale-95"
                   >
-                    <SwitchCamera className="w-6 h-6" />
+                    <SwitchCamera className="w-5 h-5" />
                   </button>
                   
                   {hasFlash && (
                     <button 
                       onClick={toggleFlash}
-                      className={`w-12 h-12 rounded-full backdrop-blur border border-white/20 flex items-center justify-center ${flashOn ? 'bg-yellow-500 text-black' : 'bg-black/50 text-white'}`}
+                      title="Lanterna/Flash"
+                      className={`w-11 h-11 rounded-full backdrop-blur border border-white/20 flex items-center justify-center transition-colors active:scale-95 ${flashOn ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-black/60 text-white hover:bg-zinc-800'}`}
                     >
-                      {flashOn ? <Zap className="w-6 h-6" /> : <ZapOff className="w-6 h-6" />}
+                      {flashOn ? <Zap className="w-5 h-5" /> : <ZapOff className="w-5 h-5" />}
                     </button>
                   )}
+
+                  {/* Custom Zoom toggle button */}
+                  <button
+                    onClick={toggleCameraZoom}
+                    title="Zoom (1x / 2x)"
+                    className={`w-11 h-11 rounded-full backdrop-blur border border-white/20 flex items-center justify-center font-bold text-xs transition-colors active:scale-95 ${cameraZoom === 2 ? 'bg-[#C09553] text-black border-[#C09553]' : 'bg-black/60 text-white hover:bg-zinc-800'}`}
+                  >
+                    {cameraZoom}x
+                  </button>
+
+                  {/* Focus Lock control */}
+                  <button
+                    onClick={toggleFocusLock}
+                    title="Travar Foco"
+                    className={`w-11 h-11 rounded-full backdrop-blur border border-white/20 flex items-center justify-center transition-colors active:scale-95 ${focusLocked ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-black/60 text-white hover:bg-zinc-800'}`}
+                  >
+                    <Focus className="w-5 h-5" />
+                  </button>
+
+                  {/* Guide lines toggle */}
+                  <button
+                    onClick={() => setShowCameraGuide(prev => !prev)}
+                    title="Mostrar/Ocultar Guia da Arcada"
+                    className={`w-11 h-11 rounded-full backdrop-blur border border-white/20 flex items-center justify-center transition-colors active:scale-95 ${showCameraGuide ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-black/60 text-zinc-400 hover:bg-zinc-800'}`}
+                  >
+                    <LayoutGrid className="w-5 h-5" />
+                  </button>
                 </div>
                 
-                {zoomCapabilities && (
-                  <div className="absolute bottom-32 left-8 right-8 z-20 flex items-center gap-4 bg-black/50 backdrop-blur rounded-full px-4 py-2 border border-white/20">
-                    <ZoomIn className="w-5 h-5 text-white" />
-                    <input 
-                      type="range" 
-                      min={zoomCapabilities.min} 
-                      max={zoomCapabilities.max} 
-                      step={zoomCapabilities.step} 
-                      value={zoom} 
-                      onChange={handleZoomChange}
-                      className="flex-1 accent-[#C09553]"
-                    />
-                  </div>
-                )}
+                {/* Exposure/Brightness adjustment overlay slider */}
+                <div className="absolute bottom-28 left-6 right-6 md:left-auto md:right-6 md:w-64 z-20 bg-black/60 backdrop-blur rounded-2xl px-4 py-2.5 border border-white/10 flex items-center gap-3">
+                  <span className="text-[10px] text-zinc-300 font-bold uppercase tracking-wider min-w-[50px]">Brilho</span>
+                  <input 
+                    type="range" 
+                    min="0.5" 
+                    max="1.5" 
+                    step="0.05" 
+                    value={cameraExposure} 
+                    onChange={handleExposureChange}
+                    className="flex-1 accent-[#C09553] cursor-pointer"
+                  />
+                  <span className="text-[10px] text-zinc-400 font-mono w-8 text-right">{Math.round(cameraExposure * 100)}%</span>
+                </div>
               </>
             )}
             <canvas ref={canvasRef} className="hidden" />
@@ -861,21 +1035,31 @@ export default function PhotoEditor({
 
           {/* Load Sample alternative or Delete image buttons when image is visible */}
           {hasPhoto && (
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 mt-2 w-full">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-xs font-semibold text-[#B48C4D] hover:text-[#4E1119] transition-colors flex items-center gap-1"
+                className="text-xs font-semibold text-[#B48C4D] hover:text-[#4E1119] transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Trocar foto do quadrante</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setIsMarkupEditorOpen(true)}
+                className="text-xs font-bold text-[#8B0000] hover:text-[#C09553] transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#C09553]" />
+                <span>Editar Imagem (Marcações/Adesivos)</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() =>
                   onUpdateSection({ ...section, image: null, markers: [] })
                 }
-                className="text-xs font-semibold text-zinc-400 hover:text-red-600 transition-colors"
+                className="text-xs font-semibold text-zinc-400 hover:text-red-600 transition-colors cursor-pointer"
               >
                 Remover Imagem e Marcadores
               </button>
@@ -1057,6 +1241,15 @@ export default function PhotoEditor({
         </div>
 
       </div>
+
+      {isMarkupEditorOpen && (
+        <ImageMarkupEditor
+          image={section.image || ''}
+          onSave={handleSaveMarkup}
+          onClose={() => setIsMarkupEditorOpen(false)}
+          title={`Marcações clínicas - ${section.title}`}
+        />
+      )}
     </div>
   );
 }
