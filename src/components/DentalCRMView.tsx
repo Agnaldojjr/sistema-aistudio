@@ -3333,13 +3333,23 @@ export default function DentalCRMView({
                       </div>
 
                       {(() => {
+                        const safeClinicalHistory = clinicalHistory || [];
+                        const safeOdontogramaList = odontogramaList || [];
+                        const safeTratamentosList = tratamentosList || [];
+                        const safeAnamneseList = anamneseList || [];
+                        const safeGaleriaList = galeriaList || [];
+
                         const timelineEvents = [
-                          ...clinicalHistory.map(item => ({ type: 'clinical', date: item.date || new Date().toISOString(), data: item })),
-                          ...odontogramaList.map(item => ({ type: 'odontograma', date: item.date || new Date().toISOString(), data: item })),
-                          ...tratamentosList.map(item => ({ type: 'tratamento', date: item.date || new Date().toISOString(), data: item })),
-                          ...anamneseList.map(item => ({ type: 'anamnese', date: item.date || new Date().toISOString(), data: item })),
-                          ...galeriaList.map(item => ({ type: 'galeria', date: item.date || new Date().toISOString(), data: item })),
-                        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                          ...safeClinicalHistory.filter(i=>i).map(item => ({ type: 'clinical', date: item.date || new Date().toISOString(), data: item })),
+                          ...safeOdontogramaList.filter(i=>i).map(item => ({ type: 'odontograma', date: item.date || new Date().toISOString(), data: item })),
+                          ...safeTratamentosList.filter(i=>i).map(item => ({ type: 'tratamento', date: item.date || new Date().toISOString(), data: item })),
+                          ...safeAnamneseList.filter(i=>i).map(item => ({ type: 'anamnese', date: item.date || new Date().toISOString(), data: item })),
+                          ...safeGaleriaList.filter(i=>i).map(item => ({ type: 'galeria', date: item.date || item.createdTime || new Date().toISOString(), data: item })),
+                        ].sort((a, b) => {
+                          const timeA = new Date(a.date).getTime() || 0;
+                          const timeB = new Date(b.date).getTime() || 0;
+                          return timeB - timeA;
+                        });
 
                         if (timelineEvents.length === 0) {
                           return <p className="text-[11px] text-zinc-400 italic">Nenhum evento registrado no histórico do paciente.</p>;
