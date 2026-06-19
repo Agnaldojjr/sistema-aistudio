@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Calendar as CalendarIcon, Clock, User, Phone, Mail, MessageCircle, AlertCircle, Save, Trash2 } from 'lucide-react';
 import { createCalendarEvent, deleteCalendarEvent } from '../lib/calendar';
 import { addHours, addMinutes, format, parseISO } from 'date-fns';
+import { getGoogleDriveCRMDatabase } from '../lib/driveCrm';
 
 interface EventModalProps {
   onClose: () => void;
@@ -55,6 +56,41 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
   
   const [patientEmail, setPatientEmail] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
+  
+  const [crmPatients, setCrmPatients] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  useEffect(() => {
+    if (!isEditing) {
+      getGoogleDriveCRMDatabase()
+        .then((db: any) => {
+          if (db?.patients) {
+            const sorted = [...db.patients].sort((a: any, b: any) =>
+              (a.name || '').localeCompare(b.name || '')
+            );
+            setCrmPatients(sorted);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to load CRM database in EventModal:', err);
+        });
+    }
+  }, [isEditing]);
+
+  const handleNameChange = (val: string) => {
+    setTitle(val);
+    if (!val.trim()) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    const filtered = crmPatients.filter(p =>
+      (p.name || '').toLowerCase().includes(val.toLowerCase())
+    );
+    setSuggestions(filtered);
+    setShowSuggestions(true);
+  };
   
   // Try to parse phone/email from description if editing
   React.useEffect(() => {
@@ -154,7 +190,7 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
             </div>
           )}
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 relative">
             <label className="text-sm font-semibold text-zinc-700 flex items-center gap-1.5">
               <User className="w-4 h-4 text-zinc-400" />
               Nome do Paciente
@@ -163,10 +199,48 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
               required
               type="text"
               value={title}
-              onChange={e => setTitle(e.target.value)}
+              onChange={e => handleNameChange(e.target.value)}
+              onFocus={() => {
+                if (title && crmPatients.length > 0) {
+                  const filtered = crmPatients.filter(p =>
+                    (p.name || '').toLowerCase().includes(title.toLowerCase())
+                  );
+                  setSuggestions(filtered);
+                  setShowSuggestions(true);
+                } else if (crmPatients.length > 0) {
+                  setSuggestions(crmPatients.slice(0, 10));
+                  setShowSuggestions(true);
+                }
+              }}
+              onBlur={() => {
+                setTimeout(() => setShowSuggestions(false), 250);
+              }}
               placeholder="Ex: Lucimara dos Santos Firmino"
               className="w-full px-3 py-2 border border-zinc-300 rounded-xl focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20"
             />
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute left-0 right-0 z-50 bg-white border border-zinc-200 rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto">
+                {suggestions.map((p, idx) => (
+                  <button
+                    key={p.id || idx}
+                    type="button"
+                    onClick={() => {
+                      setTitle(p.name);
+                      setPatientPhone(p.mobile || p.phone || '');
+                      setPatientEmail(p.email || '');
+                      setShowSuggestions(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-zinc-50 font-sans text-xs flex flex-col gap-0.5 border-b border-zinc-100 last:border-b-0 cursor-pointer"
+                  >
+                    <span className="font-bold text-zinc-800">{p.name}</span>
+                    <span className="text-[10px] text-zinc-500">
+                      {p.mobile || p.phone ? `Celular: ${p.mobile || p.phone}` : 'Sem celular'}
+                      {p.email ? ` | Email: ${p.email}` : ''}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { TreatmentProposal, PatientData } from '../types';
-import { User, HeartPulse, MapPin, Building2, Save } from 'lucide-react';
+import { User, HeartPulse, MapPin, Building2, Save, MessageCircle, Cake, Sparkles, CalendarClock, AlertCircle, Phone } from 'lucide-react';
 
 interface PatientRegistrationTabProps {
   proposal: TreatmentProposal;
@@ -9,6 +9,41 @@ interface PatientRegistrationTabProps {
 
 export default function PatientRegistrationTab({ proposal, setProposal }: PatientRegistrationTabProps) {
   const pd = proposal.patientData || {};
+
+  const [whatsappMessage, setWhatsappMessage] = React.useState('');
+  const [selectedTemplate, setSelectedTemplate] = React.useState('confirmacao');
+
+  React.useEffect(() => {
+    const name = proposal.patientName || 'Paciente';
+    if (selectedTemplate === 'aniversario') {
+      setWhatsappMessage(`Olá, ${name}! A equipe do Dr. Agnaldo Ferreira deseja a você um feliz aniversário! Que seu dia seja iluminado e repleto de sorrisos! 🎂✨`);
+    } else if (selectedTemplate === 'feriado') {
+      setWhatsappMessage(`Olá, ${name}! Desejamos a você e sua família um Feliz Natal e um Próspero Ano Novo! Que o novo ano traga muitas alegrias, saúde e motivos para sorrir! 🎄🎉 - Dr. Agnaldo Ferreira`);
+    } else if (selectedTemplate === 'profilaxia') {
+      setWhatsappMessage(`Olá, ${name}! Faz 6 meses desde sua última profilaxia (limpeza) com o Dr. Agnaldo Ferreira. É hora de agendar sua revisão periódica para manter seu sorriso saudável! Vamos agendar? 🦷😊`);
+    } else if (selectedTemplate === 'confirmacao') {
+      setWhatsappMessage(`Olá, ${name}! Gostaríamos de confirmar sua consulta com o Dr. Agnaldo Ferreira no dia [DATA] às [HORÁRIO]. Por favor, responda esta mensagem para confirmar. Qualquer dúvida, estamos à disposição!`);
+    }
+  }, [selectedTemplate, proposal.patientName]);
+
+  const isBirthdayToday = () => {
+    const birthDate = pd.birthDate;
+    if (!birthDate) return false;
+    const parts = birthDate.split('-');
+    if (parts.length !== 3) return false;
+    const [year, month, day] = parts;
+    const today = new Date();
+    return today.getDate() === parseInt(day) && (today.getMonth() + 1) === parseInt(month);
+  };
+
+  const isProphylaxisDue = () => {
+    const createdAt = pd.createdAt;
+    if (!createdAt) return false;
+    const createdDate = new Date(createdAt);
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    return createdDate < sixMonthsAgo;
+  };
 
   const handleUpdate = (field: keyof PatientData, value: string) => {
     setProposal(prev => ({
@@ -265,6 +300,128 @@ export default function PatientRegistrationTab({ proposal, setProposal }: Patien
               <input type="text" placeholder="MM/AAAA" value={pd.healthInsuranceValidity || ''} onChange={e => handleUpdate('healthInsuranceValidity', e.target.value)} className="w-full border border-zinc-300 rounded p-2 focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] focus:outline-none" />
             </div>
           </div>
+
+        </div>
+      </div>
+
+      {/* 5. WhatsApp & Lembretes */}
+      <div className="border-b border-zinc-200">
+        <div className="bg-[#8B0000] text-white px-4 py-2.5 flex items-center gap-2 border-b border-[#C09553]/30">
+          <MessageCircle className="w-4 h-4 text-[#C09553]" />
+          <h3 className="font-serif font-bold text-sm tracking-wide uppercase">WhatsApp & Lembretes</h3>
+        </div>
+        <div className="p-4 space-y-4 text-xs bg-[#FAF8F5]/30">
+          
+          {/* Smart Alerts */}
+          {(isBirthdayToday() || isProphylaxisDue()) && (
+            <div className="space-y-2">
+              {isBirthdayToday() && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3.5 flex items-start gap-2.5 shadow-sm">
+                  <Cake className="w-4.5 h-4.5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Aniversariante do Dia!</span>
+                    <p className="text-[11px] text-amber-800 mt-0.5">Hoje é aniversário deste paciente. Aproveite para enviar os parabéns e estreitar o relacionamento!</p>
+                  </div>
+                </div>
+              )}
+              {isProphylaxisDue() && (
+                <div className="bg-red-50 border border-red-200 text-red-900 rounded-xl p-3.5 flex items-start gap-2.5 shadow-sm">
+                  <CalendarClock className="w-4.5 h-4.5 text-[#8B0000] shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Lembrete de Profilaxia Semestral</span>
+                    <p className="text-[11px] text-red-800 mt-0.5">Já se passaram 6 meses ou mais desde que este paciente foi registrado ou realizou seu tratamento. Convide-o para uma nova limpeza!</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!pd.mobile ? (
+            <div className="bg-zinc-50 border border-zinc-200 text-zinc-500 rounded-xl p-4 text-center">
+              <AlertCircle className="w-6 h-6 text-zinc-400 mx-auto mb-2" />
+              <p className="font-semibold text-xs">Preencha o campo Celular (nos Dados Cadastrais) para habilitar as mensagens de WhatsApp e lembretes para este paciente.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-zinc-500 font-semibold">Selecione o Modelo de Mensagem</label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTemplate('confirmacao')}
+                    className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${
+                      selectedTemplate === 'confirmacao'
+                        ? 'bg-[#8B0000] text-white border-[#8B0000]'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+                    }`}
+                  >
+                    Confirmar Consulta
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTemplate('aniversario')}
+                    className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${
+                      selectedTemplate === 'aniversario'
+                        ? 'bg-amber-600 text-white border-amber-600'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+                    }`}
+                  >
+                    🎂 Parabéns/Aniversário
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTemplate('profilaxia')}
+                    className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${
+                      selectedTemplate === 'profilaxia'
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+                    }`}
+                  >
+                    🦷 Lembrete de Profilaxia (6 meses)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTemplate('feriado')}
+                    className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${
+                      selectedTemplate === 'feriado'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+                    }`}
+                  >
+                    🎄 Fim de Ano (Natal/Ano Novo)
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-zinc-500 font-semibold">Editar Mensagem antes de Enviar</label>
+                <textarea
+                  rows={4}
+                  value={whatsappMessage}
+                  onChange={(e) => setWhatsappMessage(e.target.value)}
+                  className="w-full border border-zinc-300 rounded p-2 focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] focus:outline-none font-sans text-xs resize-y"
+                  placeholder="Mensagem..."
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const digitsOnly = pd.mobile!.replace(/\D/g, '');
+                    const cleanNum = (digitsOnly.length === 10 || digitsOnly.length === 11) ? '55' + digitsOnly : digitsOnly;
+                    const encodedMsg = encodeURIComponent(whatsappMessage);
+                    const url = cleanNum ? `https://wa.me/${cleanNum}?text=${encodedMsg}` : `https://wa.me/?text=${encodedMsg}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                >
+                  <MessageCircle className="w-4.5 h-4.5 text-white" />
+                  <span>Enviar via WhatsApp ({pd.mobile})</span>
+                </button>
+              </div>
+            </div>
+          )}
 
         </div>
       </div>

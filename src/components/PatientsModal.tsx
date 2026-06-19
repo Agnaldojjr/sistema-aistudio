@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Search, FileText, Loader2, CalendarPlus, FolderOpen, ChevronLeft, ImageIcon, MessageCircle, Phone, Trash2, ShieldAlert, Pencil, Check, User, Camera, Upload, RefreshCw } from 'lucide-react';
+import { X, Search, FileText, Loader2, CalendarPlus, FolderOpen, ChevronLeft, ImageIcon, MessageCircle, Phone, Trash2, ShieldAlert, Pencil, Check, User, Camera, Upload, RefreshCw, Cake, CalendarClock, AlertCircle } from 'lucide-react';
 import { listPatientsFromDrive, loadPatientFromDrive, listPatientImagesFromDrive, deletePatientFolderFromDrive, deleteDummyPatientsFromDrive, listPatientProposalsFromDrive, renameFileInDrive, uploadPatientImageToDrive, deleteFileFromDrive } from '../lib/drive';
 import { ClinicSettings } from '../types';
 
@@ -49,6 +49,8 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [loadedPatientData, setLoadedPatientData] = useState<any | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState('confirmacao');
 
   const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
   const [editingProposalName, setEditingProposalName] = useState<string>('');
@@ -246,14 +248,64 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
 
       setLoadingProposals(true);
       listPatientProposalsFromDrive(selectedPatient.id)
-        .then(data => setProposals(data))
+        .then(data => {
+          setProposals(data);
+          if (data && data.length > 0) {
+            loadPatientFromDrive(selectedPatient.id, data[0].id)
+              .then(fullData => {
+                const pd = fullData?.proposal?.patientData;
+                if (pd) {
+                  if (pd.mobile || pd.phone) {
+                    setWhatsappNumber(pd.mobile || pd.phone);
+                  }
+                  setLoadedPatientData(pd);
+                }
+              })
+              .catch(err => console.warn("Failed to load details for number sync", err));
+          }
+        })
         .catch(err => console.error("Error loading proposals", err))
         .finally(() => setLoadingProposals(false));
     } else {
       setPatientImages([]);
       setProposals([]);
+      setWhatsappNumber('');
+      setLoadedPatientData(null);
     }
   }, [selectedPatient]);
+
+  useEffect(() => {
+    if (!selectedPatient) return;
+    const name = selectedPatient.name || 'Paciente';
+    if (selectedTemplate === 'aniversario') {
+      setWhatsappMessage(`Olá, ${name}! A equipe do Dr. Agnaldo Ferreira deseja a você um feliz aniversário! Que seu dia seja iluminado e repleto de sorrisos! 🎂✨`);
+    } else if (selectedTemplate === 'feriado') {
+      setWhatsappMessage(`Olá, ${name}! Desejamos a você e sua família um Feliz Natal e um Próspero Ano Novo! Que o novo ano traga muitas alegrias, saúde e motivos para sorrir! 🎄🎉 - Dr. Agnaldo Ferreira`);
+    } else if (selectedTemplate === 'profilaxia') {
+      setWhatsappMessage(`Olá, ${name}! Faz 6 meses desde sua última profilaxia (limpeza) com o Dr. Agnaldo Ferreira. É hora de agendar sua revisão periódica para manter seu sorriso saudável! Vamos agendar? 🦷😊`);
+    } else if (selectedTemplate === 'confirmacao') {
+      setWhatsappMessage(`Olá, ${name}. Gostaríamos de confirmar sua próxima consulta com ${clinicSettings.doctorName} às [HORÁRIO].\n\n📍 Nosso endereço é: ${clinicSettings.address}.\n(Ref: ${clinicSettings.referencePoint})\n\nPor favor, confirme sua presença respondendo esta mensagem. Qualquer dúvida, estamos à disposição.`);
+    }
+  }, [selectedTemplate, selectedPatient, clinicSettings]);
+
+  const isBirthdayToday = () => {
+    const birthDate = loadedPatientData?.birthDate;
+    if (!birthDate) return false;
+    const parts = birthDate.split('-');
+    if (parts.length !== 3) return false;
+    const [year, month, day] = parts;
+    const today = new Date();
+    return today.getDate() === parseInt(day) && (today.getMonth() + 1) === parseInt(month);
+  };
+
+  const isProphylaxisDue = () => {
+    const createdAt = loadedPatientData?.createdAt;
+    if (!createdAt) return false;
+    const createdDate = new Date(createdAt);
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    return createdDate < sixMonthsAgo;
+  };
 
   useEffect(() => {
     return () => {
@@ -483,12 +535,88 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                   <div className="mt-8 border-t border-zinc-100 pt-6">
                     <h3 className="font-bold text-[#4E1119] font-serif text-lg mb-4 flex items-center gap-2">
                       <MessageCircle className="w-5 h-5 text-green-600" />
-                      Lembrete WhatsApp
+                      WhatsApp & Lembretes
                     </h3>
+                    
                     <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      
+                      {/* Smart Alerts */}
+                      {(isBirthdayToday() || isProphylaxisDue()) && (
+                        <div className="space-y-2 text-xs">
+                          {isBirthdayToday() && (
+                            <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 flex items-start gap-2 shadow-sm animate-fadeIn">
+                              <Cake className="w-4.5 h-4.5 text-amber-600 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-bold">Aniversariante do Dia!</span>
+                                <p className="text-[10px] text-amber-800 mt-0.5">Hoje é aniversário deste paciente. Aproveite para enviar os parabéns!</p>
+                              </div>
+                            </div>
+                          )}
+                          {isProphylaxisDue() && (
+                            <div className="bg-red-50 border border-red-200 text-red-900 rounded-xl p-3 flex items-start gap-2 shadow-sm animate-fadeIn">
+                              <CalendarClock className="w-4.5 h-4.5 text-[#8B0000] shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-bold">Lembrete de Profilaxia Semestral</span>
+                                <p className="text-[10px] text-red-800 mt-0.5">Já se passaram 6 meses ou mais desde que este paciente foi registrado.</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="space-y-2 text-xs">
+                        <label className="text-xs font-bold text-zinc-500 uppercase">Selecione o Modelo de Mensagem</label>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTemplate('confirmacao')}
+                            className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold transition-all cursor-pointer ${
+                              selectedTemplate === 'confirmacao'
+                                ? 'bg-[#8B0000] text-white border-[#8B0000]'
+                                : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+                            }`}
+                          >
+                            Confirmar Consulta
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTemplate('aniversario')}
+                            className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold transition-all cursor-pointer ${
+                              selectedTemplate === 'aniversario'
+                                ? 'bg-amber-600 text-white border-amber-600'
+                                : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+                            }`}
+                          >
+                            🎂 Parabéns/Aniversário
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTemplate('profilaxia')}
+                            className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold transition-all cursor-pointer ${
+                              selectedTemplate === 'profilaxia'
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+                            }`}
+                          >
+                            🦷 Lembrete de Profilaxia (6 meses)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTemplate('feriado')}
+                            className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold transition-all cursor-pointer ${
+                              selectedTemplate === 'feriado'
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+                            }`}
+                          >
+                            🎄 Fim de Ano (Natal/Ano Novo)
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-1.5">
-                           <label className="text-xs font-bold text-zinc-500 uppercase">Número (opcional)</label>
+                           <label className="text-xs font-bold text-zinc-500 uppercase">Número do Celular</label>
                            <div className="relative">
                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                              <input
@@ -496,32 +624,35 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                                placeholder="Ex: 5511999999999"
                                value={whatsappNumber}
                                onChange={(e) => setWhatsappNumber(e.target.value)}
-                               className="w-full pl-9 pr-3 py-2 rounded-xl border border-zinc-300 focus:border-green-500 focus:ring focus:ring-green-500/20 text-sm"
+                               className="w-full pl-9 pr-3 py-2 rounded-xl border border-zinc-300 focus:border-green-500 focus:ring focus:ring-green-500/20 text-xs"
                              />
                            </div>
-                           <p className="text-[10px] text-zinc-400">Com DDD. Se vazio, você pode escolher o contato no app.</p>
                         </div>
                       </div>
+
                       <div className="space-y-1.5">
                          <label className="text-xs font-bold text-zinc-500 uppercase">Mensagem</label>
                          <textarea
                            value={whatsappMessage}
                            onChange={(e) => setWhatsappMessage(e.target.value)}
-                           className="w-full p-3 rounded-xl border border-zinc-300 focus:border-green-500 focus:ring focus:ring-green-500/20 text-sm min-h-[120px]"
+                           className="w-full p-3 rounded-xl border border-zinc-300 focus:border-green-500 focus:ring focus:ring-green-500/20 text-xs min-h-[100px] resize-y"
                          />
                       </div>
+
                       <div className="flex justify-end">
                         <button
+                          type="button"
                           onClick={() => {
                             const cleanNumber = whatsappNumber.replace(/\D/g, '');
+                            const finalNum = (cleanNumber.length === 10 || cleanNumber.length === 11) ? '55' + cleanNumber : cleanNumber;
                             const encodedMessage = encodeURIComponent(whatsappMessage);
-                            const url = cleanNumber ? `https://wa.me/${cleanNumber}?text=${encodedMessage}` : `https://wa.me/?text=${encodedMessage}`;
+                            const url = finalNum ? `https://wa.me/${finalNum}?text=${encodedMessage}` : `https://wa.me/?text=${encodedMessage}`;
                             window.open(url, '_blank');
                           }}
-                          className="w-full sm:w-auto px-6 py-2.5 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                          className="w-full sm:w-auto px-6 py-2.5 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors flex items-center justify-center gap-2 cursor-pointer text-xs"
                         >
-                          <MessageCircle className="w-5 h-5" />
-                          Enviar Mensagem
+                          <MessageCircle className="w-4 h-4" />
+                          Enviar via WhatsApp
                         </button>
                       </div>
                     </div>
