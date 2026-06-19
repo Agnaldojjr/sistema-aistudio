@@ -21,7 +21,9 @@ import {
   ArrowUpRight, 
   Phone, 
   Send,
-  Loader2
+  Loader2,
+  Monitor,
+  Smartphone
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ClinicSettings, TreatmentProposal } from '../types';
@@ -36,6 +38,8 @@ interface DashboardViewProps {
   onNavigateToPlanning: (patientName?: string, status?: string) => void;
   onOpenRegistry: () => void;
   onOpenPatientsList: () => void;
+  isMobileOptimized: boolean;
+  setIsMobileOptimized: (v: boolean) => void;
 }
 
 // Beautiful simulated mock list of appointments today representing a fully-populated workspace
@@ -64,6 +68,8 @@ export default function DashboardView({
   onNavigateToPlanning,
   onOpenRegistry,
   onOpenPatientsList,
+  isMobileOptimized,
+  setIsMobileOptimized,
 }: DashboardViewProps) {
   
   // Real-time local date details
@@ -260,14 +266,24 @@ export default function DashboardView({
               <Plus className="w-4 h-4" />
               Cadastrar Novo Paciente
             </button>
-            <button
-              id="btn-dash-patients"
-              onClick={onOpenPatientsList}
-              className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-[#FAF8F5] font-bold text-xs px-5 py-3.5 rounded-xl transition-all cursor-pointer active:scale-95"
-            >
-              <Users className="w-4 h-4" />
-              Galeria de Pacientes
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                id="btn-dash-patients"
+                onClick={onOpenPatientsList}
+                className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-[#FAF8F5] font-bold text-xs px-5 py-3.5 rounded-xl transition-all cursor-pointer active:scale-95"
+              >
+                <Users className="w-4 h-4" />
+                Galeria de Pacientes
+              </button>
+              <button
+                onClick={() => setIsMobileOptimized(!isMobileOptimized)}
+                className="flex items-center justify-center gap-2 bg-[#C09553]/20 hover:bg-[#C09553]/30 border border-[#C09553]/35 text-[#FAF8F5] font-bold text-xs px-5 py-2.5 rounded-xl transition-all cursor-pointer active:scale-95"
+                title={isMobileOptimized ? 'Alternar para Modo Desktop' : 'Alternar para Modo Celular'}
+              >
+                {isMobileOptimized ? <Monitor className="w-4 h-4 text-[#C09553]" /> : <Smartphone className="w-4 h-4 text-[#C09553]" />}
+                {isMobileOptimized ? 'Modo Desktop' : 'Modo Celular'}
+              </button>
+            </div>
           </div>
         </div>
 
