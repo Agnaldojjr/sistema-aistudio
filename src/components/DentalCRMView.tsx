@@ -260,7 +260,7 @@ export default function DentalCRMView({
   const [importStatus, setImportStatus] = useState<'idle' | 'loaded'>('idle');
   const [rawData, setRawData] = useState<any[][]>([]);
   const [sheetHeaders, setSheetHeaders] = useState<string[]>([]);
-  const [mappings, setMappings] = useState({ name: -1, phone: -1, code: -1, date: -1, procedure: -1, value: -1 });
+  const [mappings, setMappings] = useState({ name: -1, phone: -1, code: -1, date: -1, procedure: -1, value: -1, cpf: -1, rg: -1 });
 
   // Filter and search states for the detailed clinical log viewer
   const [logFilter, setLogFilter] = useState<'ALL' | 'CRITICAL' | 'WARNING' | 'FORMAT'>('ALL');
@@ -848,18 +848,76 @@ export default function DentalCRMView({
     setRawData(raw);
     
     let nameIdx = -1; let phoneIdx = -1; let codeIdx = -1; let dateIdx = -1; let procedureIdx = -1; let valueIdx = -1;
+    let cpfIdx = -1; let rgIdx = -1;
     
+    // First pass: identify code, phone, date, procedure, value, cpf, rg
     h.forEach((header, idx) => {
       const lower = header.toLowerCase();
-      if (nameIdx === -1 && (lower.includes('nome') || lower.includes('paciente') || lower.includes('cliente'))) nameIdx = idx;
-      if (phoneIdx === -1 && (lower.includes('telefone') || lower.includes('cel') || lower.includes('whatsapp'))) phoneIdx = idx;
-      if (codeIdx === -1 && (lower.includes('codigo') || lower.includes('cod') || lower.includes('id') || lower.includes('prontuario'))) codeIdx = idx;
-      if (dateIdx === -1 && (lower.includes('data') || lower.includes('criacao'))) dateIdx = idx;
-      if (procedureIdx === -1 && (lower.includes('procedimento') || lower.includes('descricao') || lower.includes('servico') || lower.includes('tratamento'))) procedureIdx = idx;
-      if (valueIdx === -1 && (lower.includes('valor') || lower.includes('preco') || lower.includes('custo'))) valueIdx = idx;
+      
+      // Code mapping
+      if (codeIdx === -1 && (lower.includes('codigo') || lower.includes('cod') || lower.includes('id') || lower.includes('prontuario'))) {
+        codeIdx = idx;
+      }
+      // Phone mapping
+      if (phoneIdx === -1 && (lower.includes('telefone') || lower.includes('cel') || lower.includes('whats') || lower.includes('whatsapp') || lower.includes('fone'))) {
+        phoneIdx = idx;
+      }
+      // Date mapping
+      if (dateIdx === -1 && (lower.includes('data') || lower.includes('criacao'))) {
+        dateIdx = idx;
+      }
+      // Procedure mapping
+      if (procedureIdx === -1 && (lower.includes('procedimento') || lower.includes('descricao') || lower.includes('servico') || lower.includes('tratamento'))) {
+        procedureIdx = idx;
+      }
+      // Value mapping
+      if (valueIdx === -1 && (lower.includes('valor') || lower.includes('preco') || lower.includes('custo'))) {
+        valueIdx = idx;
+      }
+      // CPF mapping
+      if (cpfIdx === -1 && (lower === 'cpf' || lower.includes('cpf') || lower.includes('cadastro_pessoa') || lower.includes('documento') || lower.includes('doc'))) {
+        cpfIdx = idx;
+      }
+      // RG mapping
+      if (rgIdx === -1 && (lower === 'rg' || lower.includes('rg') || lower.includes('identidade') || lower.includes('registro_geral'))) {
+        rgIdx = idx;
+      }
     });
 
-    setMappings({ name: nameIdx, phone: phoneIdx, code: codeIdx, date: dateIdx, procedure: procedureIdx, value: valueIdx });
+    // Second pass: identify name index, avoiding matching fields already identified as code or cpf or rg
+    h.forEach((header, idx) => {
+      const lower = header.toLowerCase();
+      if (nameIdx !== -1) return;
+      
+      if (idx === codeIdx || idx === phoneIdx || idx === dateIdx || idx === procedureIdx || idx === valueIdx || idx === cpfIdx || idx === rgIdx) return;
+      
+      if (lower === 'nome_completo' || lower === 'nome' || lower === 'paciente' || lower === 'nome_paciente' || lower === 'nome completo' || lower === 'cliente') {
+        nameIdx = idx;
+      }
+    });
+
+    // Third pass: fallback name match (any header containing "nome", "paciente", "cliente" but not related to "codigo")
+    if (nameIdx === -1) {
+      h.forEach((header, idx) => {
+        const lower = header.toLowerCase();
+        if (nameIdx !== -1) return;
+        if (lower.includes('codigo') || lower.includes('cod') || lower.includes('id') || lower.includes('prontuario')) return;
+        if (lower.includes('nome') || lower.includes('paciente') || lower.includes('cliente')) {
+          nameIdx = idx;
+        }
+      });
+    }
+
+    setMappings({ 
+      name: nameIdx, 
+      phone: phoneIdx, 
+      code: codeIdx, 
+      date: dateIdx, 
+      procedure: procedureIdx, 
+      value: valueIdx,
+      cpf: cpfIdx,
+      rg: rgIdx
+    });
     setImportStatus('loaded');
     setImporting(false);
   };
@@ -893,7 +951,9 @@ export default function DentalCRMView({
         telefone_1: mappings.phone !== -1 ? row[mappings.phone] : '',
         data_realizado: mappings.date !== -1 ? row[mappings.date] : '',
         descricao_procedimento: mappings.procedure !== -1 ? row[mappings.procedure] : '',
-        valor: mappings.value !== -1 ? row[mappings.value] : ''
+        valor: mappings.value !== -1 ? row[mappings.value] : '',
+        cpf: mappings.cpf !== -1 ? row[mappings.cpf] : '',
+        rg: mappings.rg !== -1 ? row[mappings.rg] : ''
       };
     });
 
@@ -1831,6 +1891,36 @@ export default function DentalCRMView({
                       <select 
                         value={mappings.value} 
                         onChange={(e) => handleMappingChange('value', parseInt(e.target.value))}
+                        className="w-full border border-[#E6DEC9] bg-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#C09553] transition-all"
+                      >
+                        <option value={-1}>-- Ignorar --</option>
+                        {sheetHeaders.map((h, i) => (
+                          <option key={i} value={i}>{h}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Campo CPF */}
+                    <div>
+                      <label className="block text-zinc-700 text-sm font-bold mb-1.5">7. CPF do Paciente</label>
+                      <select 
+                        value={mappings.cpf} 
+                        onChange={(e) => handleMappingChange('cpf', parseInt(e.target.value))}
+                        className="w-full border border-[#E6DEC9] bg-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#C09553] transition-all"
+                      >
+                        <option value={-1}>-- Ignorar --</option>
+                        {sheetHeaders.map((h, i) => (
+                          <option key={i} value={i}>{h}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Campo RG */}
+                    <div>
+                      <label className="block text-zinc-700 text-sm font-bold mb-1.5">8. RG do Paciente</label>
+                      <select 
+                        value={mappings.rg} 
+                        onChange={(e) => handleMappingChange('rg', parseInt(e.target.value))}
                         className="w-full border border-[#E6DEC9] bg-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#C09553] transition-all"
                       >
                         <option value={-1}>-- Ignorar --</option>
