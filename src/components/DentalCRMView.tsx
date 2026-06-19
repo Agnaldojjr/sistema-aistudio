@@ -2894,7 +2894,7 @@ export default function DentalCRMView({
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 bg-amber-500/5 text-amber-900 font-semibold'
                     }`}
                   >
-                    ☁️ Biblioteca & Orçamentos (DRIVE) ({isLoadingDriveProposals || isLoadingDriveImages ? '...' : driveProposals.length + driveImages.length})
+                    ☁️ Galeria & Orçamentos (DRIVE) ({isLoadingDriveProposals || isLoadingDriveImages ? '...' : driveProposals.length + driveImages.length})
                   </button>
                 </div>
 
@@ -3901,7 +3901,7 @@ export default function DentalCRMView({
                       <div className="space-y-4 pt-6 border-t border-zinc-200">
                         <div className="border-b border-zinc-100 pb-3 flex justify-between items-center flex-wrap gap-2">
                           <div>
-                            <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">BIBLIOTECA DE IMAGENS NA NUVEM (DRIVE)</span>
+                            <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">GALERIA DE IMAGENS NA NUVEM (DRIVE)</span>
                             <h4 className="font-serif font-bold text-lg text-[#8B0000]">Raio-X, Tomografias e Fotos Clínicas</h4>
                           </div>
 

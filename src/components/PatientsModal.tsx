@@ -415,7 +415,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                 <FileText className="w-5 h-5 text-[#B48C4D]" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-[#4E1119] font-serif">Biblioteca de Pacientes</h2>
+                <h2 className="text-lg font-bold text-[#4E1119] font-serif">Galeria de Pacientes</h2>
                 <p className="text-xs text-zinc-500 font-sans">Busque e gerencie o perfil de seus pacientes</p>
               </div>
             </div>

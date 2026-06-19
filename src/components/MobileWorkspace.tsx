@@ -24,7 +24,7 @@ import {
   Scissors
 } from 'lucide-react';
 import { createCalendarEvent } from '../lib/calendar';
-import { saveTreatmentPlanToDrive, uploadPatientImageToDrive } from '../lib/drive';
+import { saveTreatmentPlanToDrive, uploadPatientImageToDrive, getOrCreatePatientFolderByName } from '../lib/drive';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from '../types';
 import { format, parseISO, addMinutes } from 'date-fns';
 
@@ -262,6 +262,23 @@ export default function MobileWorkspace({
           stopLiveCamera();
           setCapturing(true);
           setTimeout(() => setCapturing(false), 800);
+
+          // Upload to Google Drive patient folder in the background
+          const pName = proposal.patientName;
+          if (pName) {
+            canvas.toBlob(async (blob) => {
+              if (blob) {
+                try {
+                  const folderId = await getOrCreatePatientFolderByName(pName);
+                  const filename = `${targetSectionId}_capture_${Date.now()}.jpg`;
+                  await uploadPatientImageToDrive(folderId, blob, filename);
+                  console.log(`Mobile webcam capture saved to patient ${pName} on Drive`);
+                } catch (err) {
+                  console.warn("Failed to upload mobile webcam snapshot to Drive:", err);
+                }
+              }
+            }, 'image/jpeg', 0.9);
+          }
         }
       }
     }
@@ -282,6 +299,18 @@ export default function MobileWorkspace({
             ...targetSection,
             image: dataUrl,
             markers: []
+          });
+        }
+
+        // Upload to Google Drive patient folder in the background
+        const pName = proposal.patientName;
+        if (pName) {
+          getOrCreatePatientFolderByName(pName).then(async (folderId) => {
+            const filename = `${targetSectionId}_upload_${Date.now()}_${file.name}`;
+            await uploadPatientImageToDrive(folderId, file, filename);
+            console.log(`Mobile upload saved to patient ${pName} on Drive`);
+          }).catch(err => {
+            console.warn("Failed to upload mobile image upload to Drive:", err);
           });
         }
       }

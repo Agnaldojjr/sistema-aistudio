@@ -266,7 +266,7 @@ export default function DashboardView({
               className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-[#FAF8F5] font-bold text-xs px-5 py-3.5 rounded-xl transition-all cursor-pointer active:scale-95"
             >
               <Users className="w-4 h-4" />
-              Biblioteca de Pacientes
+              Galeria de Pacientes
             </button>
           </div>
         </div>

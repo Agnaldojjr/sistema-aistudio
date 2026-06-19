@@ -65,7 +65,7 @@ export default function BrandHeader({
                title="CRM e Importações de Planilhas"
              >
                <User className="w-3.5 h-3.5 mr-1" />
-               CRM/Biblioteca
+               CRM/Galeria
              </button>
              <button
                onClick={() => onChangeView('calendar')}

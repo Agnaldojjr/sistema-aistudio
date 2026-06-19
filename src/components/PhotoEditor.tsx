@@ -7,7 +7,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Info, Camera, X, SwitchCamera, Zap, ZapOff, ZoomIn, Loader2, ImageIcon } from 'lucide-react';
 import { PhotoSection, ToothMarker, Procedure } from '../types';
 import { DEMO_SVG_PLACEHOLDERS } from '../constants';
-import { listPatientImagesByName, downloadFileAsDataUrl } from '../lib/drive';
+import { listPatientImagesByName, downloadFileAsDataUrl, getOrCreatePatientFolderByName, uploadPatientImageToDrive } from '../lib/drive';
 
 interface PhotoEditorProps {
   section: PhotoSection;
@@ -189,6 +189,22 @@ export default function PhotoEditor({
           const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
           onUpdateSection({ ...section, image: dataUrl, markers: [] });
           stopCamera();
+
+          // Upload to Google Drive patient folder in the background
+          if (patientName) {
+            canvas.toBlob(async (blob) => {
+              if (blob) {
+                try {
+                  const folderId = await getOrCreatePatientFolderByName(patientName);
+                  const filename = `${section.id}_capture_${Date.now()}.jpg`;
+                  await uploadPatientImageToDrive(folderId, blob, filename);
+                  console.log(`Webcam capture saved to patient ${patientName} on Drive`);
+                } catch (err) {
+                  console.warn("Failed to upload quadrant webcam snapshot to Drive:", err);
+                }
+              }
+            }, 'image/jpeg', 0.9);
+          }
         }
       }
     }
@@ -225,11 +241,24 @@ export default function PhotoEditor({
       return;
     }
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
+      const dataUrl = e.target?.result as string;
       onUpdateSection({
         ...section,
-        image: e.target?.result as string,
+        image: dataUrl,
       });
+
+      // Upload to Google Drive patient folder in the background
+      if (patientName) {
+        try {
+          const folderId = await getOrCreatePatientFolderByName(patientName);
+          const filename = `${section.id}_upload_${Date.now()}_${file.name}`;
+          await uploadPatientImageToDrive(folderId, file, filename);
+          console.log(`Quadrant upload saved to patient ${patientName} on Drive`);
+        } catch (err) {
+          console.warn("Failed to upload quadrant image upload to Drive:", err);
+        }
+      }
     };
     reader.readAsDataURL(file);
   };
