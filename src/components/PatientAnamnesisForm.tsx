@@ -130,11 +130,24 @@ export default function PatientAnamnesisForm() {
     setSubmitting(true);
     setErrorMessage('');
 
+    const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, timeoutMsg: string): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(timeoutMsg)), timeoutMs)
+        )
+      ]);
+    };
+
     try {
       // Ensure anonymous authentication for public access
       if (!auth.currentUser) {
         try {
-          await signInAnonymously(auth);
+          await withTimeout(
+            signInAnonymously(auth),
+            8000,
+            "Tempo limite excedido ao iniciar sessão anônima. Verifique se o provedor de 'Acesso Anônimo' está ativo no console do Firebase."
+          );
         } catch (authErr: any) {
           console.warn('Anonymous auth failed, attempting direct write:', authErr);
           // Continue anyway — Firestore rules may allow unauthenticated writes
@@ -156,16 +169,20 @@ export default function PatientAnamnesisForm() {
         { question: "Outras observações importantes sobre sua saúde?", answer: q8.trim() !== '' ? q8 : "Nenhuma" }
       ];
 
-      // Save document to public collection
-      await addDoc(collection(db, "public_anamnesis"), {
-        patientId,
-        patientName,
-        date: new Date().toISOString().split('T')[0],
-        questions,
-        signature: signatureBase64,
-        synced: false,
-        submittedAt: new Date().toISOString()
-      });
+      // Save document to public collection with timeout
+      await withTimeout(
+        addDoc(collection(db, "public_anamnesis"), {
+          patientId,
+          patientName,
+          date: new Date().toISOString().split('T')[0],
+          questions,
+          signature: signatureBase64,
+          synced: false,
+          submittedAt: new Date().toISOString()
+        }),
+        10000,
+        "Tempo limite excedido ao salvar dados. Verifique se o banco de dados 'Cloud Firestore' foi criado/inicializado no console do Firebase e se as Regras de Segurança foram publicadas."
+      );
 
       setFormSubmitted(true);
     } catch (err: any) {
