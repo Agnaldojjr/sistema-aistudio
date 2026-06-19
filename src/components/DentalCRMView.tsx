@@ -1160,14 +1160,36 @@ export default function DentalCRMView({
       let healthInsurance = 'PARTICULAR';
       let medicalRecord = '';
       let observations = '';
-      
+      let cpf = '';
+      let birthDate = '';
+      let gender = '';
+      let status = 'ATIVO';
+      let maritalStatus = '';
+      let rg = '';
+      let rgIssuer = '';
+      let howKnewClinic = '';
+      let email = '';
+
       let cep = '';
       let street = '';
       let number = '';
       let complement = '';
       let neighborhood = '';
       let city = 'Salgado';
-      let state = 'SE'; 
+      let state = 'SE';
+
+      let healthInsuranceCard = '';
+      let healthInsuranceValidity = '';
+
+      let respName = '';
+      let respBirthDate = '';
+      let respPhone = '';
+      let respMobile = '';
+      let respMaritalStatus = '';
+      let respCpf = '';
+      let respRg = '';
+      let respRgIssuer = '';
+      let respProfession = '';
 
       groupRows.forEach(item => {
         const r = item.cleanRow;
@@ -1186,6 +1208,73 @@ export default function DentalCRMView({
 
         const possibleObs = r.observacoes || r.obs || r.observacao || r.historico_clinico || '';
         if (possibleObs) observations = (observations ? observations + ' | ' : '') + String(possibleObs).trim();
+
+        const possibleCpf = r.cpf || r.cadastro_de_pessoa_fisica || r.documento || r.doc || '';
+        if (possibleCpf && !cpf) cpf = String(possibleCpf).trim();
+
+        const possibleBirthDate = r.data_nascimento || r.nascimento || r.data_de_nascimento || r.birthdate || r.dn || '';
+        if (possibleBirthDate && !birthDate) {
+          birthDate = normalizeDate(String(possibleBirthDate).trim());
+        }
+
+        const possibleGender = r.sexo || r.genero || r.gender || '';
+        if (possibleGender && !gender) {
+          const gStr = String(possibleGender).trim().toUpperCase();
+          if (gStr.startsWith('F')) gender = 'Feminino';
+          else if (gStr.startsWith('M')) gender = 'Masculino';
+          else gender = String(possibleGender).trim();
+        }
+
+        const possibleStatus = r.situacao || r.status || r.situacao_paciente || '';
+        if (possibleStatus && !status) status = String(possibleStatus).trim().toUpperCase();
+
+        const possibleMarital = r.estado_civil || r.marital_status || r.civil || '';
+        if (possibleMarital && !maritalStatus) maritalStatus = String(possibleMarital).trim();
+
+        const possibleRg = r.rg || r.documento_rg || r.identidade || '';
+        if (possibleRg && !rg) rg = String(possibleRg).trim();
+
+        const possibleRgIssuer = r.orgao_emissor || r.orgao_expedidor || r.rg_uf || r.rg_emissor || '';
+        if (possibleRgIssuer && !rgIssuer) rgIssuer = String(possibleRgIssuer).trim();
+
+        const possibleHowKnew = r.como_conheceu || r.como_conheceu_a_clinica || r.indicacao || r.origem || '';
+        if (possibleHowKnew && !howKnewClinic) howKnewClinic = String(possibleHowKnew).trim();
+
+        const possibleEmail = r.email || r.e_mail || r.correio_eletronico || '';
+        if (possibleEmail && !email) email = String(possibleEmail).trim();
+
+        const possibleCard = r.carteira || r.carteira_convenio || r.num_carteira || r.cartao_convenio || '';
+        if (possibleCard && !healthInsuranceCard) healthInsuranceCard = String(possibleCard).trim();
+
+        const possibleValidity = r.validade || r.validade_convenio || r.vencimento || '';
+        if (possibleValidity && !healthInsuranceValidity) healthInsuranceValidity = String(possibleValidity).trim();
+
+        const possibleRespName = r.nome_responsavel || r.responsavel || r.nome_resp || '';
+        if (possibleRespName && !respName) respName = String(possibleRespName).trim();
+
+        const possibleRespBirth = r.data_nascimento_responsavel || r.nascimento_resp || r.nascimento_responsavel || '';
+        if (possibleRespBirth && !respBirthDate) respBirthDate = normalizeDate(String(possibleRespBirth).trim());
+
+        const possibleRespPhone = r.telefone_responsavel || r.tel_resp || '';
+        if (possibleRespPhone && !respPhone) respPhone = String(possibleRespPhone).trim();
+
+        const possibleRespMobile = r.celular_responsavel || r.cel_resp || '';
+        if (possibleRespMobile && !respMobile) respMobile = String(possibleRespMobile).trim();
+
+        const possibleRespMarital = r.estado_civil_responsavel || r.civil_resp || '';
+        if (possibleRespMarital && !respMaritalStatus) respMaritalStatus = String(possibleRespMarital).trim();
+
+        const possibleRespCpf = r.cpf_responsavel || r.cpf_resp || '';
+        if (possibleRespCpf && !respCpf) respCpf = String(possibleRespCpf).trim();
+
+        const possibleRespRg = r.rg_responsavel || r.rg_resp || '';
+        if (possibleRespRg && !respRg) respRg = String(possibleRespRg).trim();
+
+        const possibleRespRgIssuer = r.orgao_emissor_responsavel || r.rg_emissor_resp || '';
+        if (possibleRespRgIssuer && !respRgIssuer) respRgIssuer = String(possibleRespRgIssuer).trim();
+
+        const possibleRespProf = r.profissao_responsavel || r.profissao_resp || r.profissao || '';
+        if (possibleRespProf && !respProfession) respProfession = String(possibleRespProf).trim();
 
         if (r.cep) cep = String(r.cep);
         if (r.rua || r.endereco || r.logradouro) street = String(r.rua || r.endereco || r.logradouro);
@@ -1220,6 +1309,26 @@ export default function DentalCRMView({
         healthInsurance: healthInsurance || (existingData ? existingData.healthInsurance : 'PARTICULAR'),
         medicalRecord: medicalRecord || (existingData ? existingData.medicalRecord : ''),
         observations: observations || (existingData ? existingData.observations : ''),
+        cpf: cpf || (existingData ? existingData.cpf : ''),
+        birthDate: birthDate || (existingData ? existingData.birthDate : ''),
+        gender: gender || (existingData ? existingData.gender : ''),
+        status: status || (existingData ? existingData.status : 'ATIVO'),
+        maritalStatus: maritalStatus || (existingData ? existingData.maritalStatus : ''),
+        rg: rg || (existingData ? existingData.rg : ''),
+        rgIssuer: rgIssuer || (existingData ? existingData.rgIssuer : ''),
+        howKnewClinic: howKnewClinic || (existingData ? existingData.howKnewClinic : ''),
+        email: email || (existingData ? existingData.email : ''),
+        healthInsuranceCard: healthInsuranceCard || (existingData ? existingData.healthInsuranceCard : ''),
+        healthInsuranceValidity: healthInsuranceValidity || (existingData ? existingData.healthInsuranceValidity : ''),
+        respName: respName || (existingData ? existingData.respName : ''),
+        respBirthDate: respBirthDate || (existingData ? existingData.respBirthDate : ''),
+        respPhone: respPhone || (existingData ? existingData.respPhone : ''),
+        respMobile: respMobile || (existingData ? existingData.respMobile : ''),
+        respMaritalStatus: respMaritalStatus || (existingData ? existingData.respMaritalStatus : ''),
+        respCpf: respCpf || (existingData ? existingData.respCpf : ''),
+        respRg: respRg || (existingData ? existingData.respRg : ''),
+        respRgIssuer: respRgIssuer || (existingData ? existingData.respRgIssuer : ''),
+        respProfession: respProfession || (existingData ? existingData.respProfession : ''),
         cep,
         street,
         number,
@@ -2044,6 +2153,9 @@ export default function DentalCRMView({
                         {
                           codigo_cliente: "1025",
                           paciente: "VALDERMON DA SILVA LOPES",
+                          cpf: "000.000.000-00",
+                          data_nascimento: "1990-05-15",
+                          sexo: "Masculino",
                           tel_celular: "79999887766",
                           convenio_paciente: "Amil Dental",
                           data_consulta: "2026-06-18",
@@ -2057,6 +2169,9 @@ export default function DentalCRMView({
                         {
                           codigo_cliente: "1025",
                           paciente: "VALDERMON DA SILVA LOPES",
+                          cpf: "000.000.000-00",
+                          data_nascimento: "1990-05-15",
+                          sexo: "Masculino",
                           tel_celular: "79999887766",
                           convenio_paciente: "Amil Dental",
                           data_consulta: "2026-05-10",
