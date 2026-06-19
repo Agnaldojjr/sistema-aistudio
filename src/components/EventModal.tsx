@@ -70,13 +70,23 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
               (a.name || '').localeCompare(b.name || '')
             );
             setCrmPatients(sorted);
+
+            if (initialPatientName) {
+              const matched = sorted.find((p: any) => 
+                (p.name || '').toLowerCase().trim() === initialPatientName.toLowerCase().trim()
+              );
+              if (matched) {
+                setPatientPhone(matched.mobile || matched.phone || '');
+                setPatientEmail(matched.email || '');
+              }
+            }
           }
         })
         .catch((err) => {
           console.error('Failed to load CRM database in EventModal:', err);
         });
     }
-  }, [isEditing]);
+  }, [isEditing, initialPatientName]);
 
   const handleNameChange = (val: string) => {
     setTitle(val);

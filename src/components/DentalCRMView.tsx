@@ -48,7 +48,8 @@ import {
   getOrCreatePatientFolderByName,
   renameFileInDrive,
   uploadPatientImageToDrive,
-  deleteFileFromDrive
+  deleteFileFromDrive,
+  saveTreatmentPlanToDrive
 } from '../lib/drive';
 
 // --- ZOD SCHEMAS FOR HISTORICAL IMPORT CONTENT VALIDATION ---
@@ -219,7 +220,7 @@ export default function DentalCRMView({
   const [pagamentosList, setPagamentosList] = useState<any[]>([]);
   const [tratamentosList, setTratamentosList] = useState<any[]>([]);
   const [odontogramaList, setOdontogramaList] = useState<any[]>([]);
-  const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'appointments' | 'anamnesis' | 'clinical' | 'communication' | 'financial' | 'docs_gallery' | 'drive_records'>('info');
+  const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'appointments' | 'anamnesis' | 'clinical' | 'communication' | 'financial' | 'docs_gallery' | 'drive_records' | 'treatment_plan'>('info');
 
   // Google Drive integration states
   const [driveFolderId, setDriveFolderId] = useState<string | null>(null);
@@ -232,6 +233,12 @@ export default function DentalCRMView({
   const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
   const [editingProposalName, setEditingProposalName] = useState<string>('');
   const [isLoadingProposalAction, setIsLoadingProposalAction] = useState<string | null>(null);
+
+  // Treatment Plan states
+  const [activeTreatmentPlan, setActiveTreatmentPlan] = useState<any | null>(null);
+  const [selectedProposalId, setSelectedProposalId] = useState<string>('');
+  const [selectedProposalData, setSelectedProposalData] = useState<any | null>(null);
+  const [isLoadingPlanData, setIsLoadingPlanData] = useState(false);
 
   // HTML5 Webcam and snapshot states
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -383,6 +390,167 @@ export default function DentalCRMView({
     };
   }, [selectedPatient]);
 
+  // Synchronize the selected proposal ID when the patient's proposals list updates
+  useEffect(() => {
+    if (driveProposals.length > 0) {
+      setSelectedProposalId(driveProposals[0].id);
+    } else {
+      setSelectedProposalId('');
+    }
+  }, [driveProposals]);
+
+  // Load the content of the selected proposal JSON file
+  useEffect(() => {
+    if (selectedProposalId && driveFolderId) {
+      const loadPlanData = async () => {
+        setIsLoadingPlanData(true);
+        try {
+          const data = await loadPatientFromDrive(driveFolderId, selectedProposalId);
+          setSelectedProposalData(data);
+          // Set as active plan if it's the latest proposal for the dashboard
+          if (driveProposals.length > 0 && selectedProposalId === driveProposals[0].id) {
+            setActiveTreatmentPlan(data);
+          }
+        } catch (err) {
+          console.error("Error loading selected plan:", err);
+        } finally {
+          setIsLoadingPlanData(false);
+        }
+      };
+      loadPlanData();
+    } else {
+      setSelectedProposalData(null);
+    }
+  }, [selectedProposalId, driveFolderId]);
+
+  // Helper to extract procedure instances from a saved proposal JSON
+  const getProcedureInstancesFromProposal = (proposalData: any) => {
+    if (!proposalData || !proposalData.sections) return [];
+    const instances: {
+      sectionId: string;
+      sectionTitle: string;
+      markerId: string;
+      toothNumber: number;
+      instanceId: string;
+      procedureId: string;
+      name: string;
+      price: number;
+      status: string;
+      updatedAt?: string;
+      date?: string;
+    }[] = [];
+
+    proposalData.sections.forEach((sec: any) => {
+      if (!sec.markers) return;
+      sec.markers.forEach((marker: any) => {
+        if (marker.procedureInstances && marker.procedureInstances.length > 0) {
+          marker.procedureInstances.forEach((inst: any) => {
+            instances.push({
+              sectionId: sec.id,
+              sectionTitle: sec.title,
+              markerId: marker.id,
+              toothNumber: marker.toothNumber,
+              instanceId: inst.id,
+              procedureId: inst.procedureId,
+              name: inst.name,
+              price: inst.price,
+              status: inst.status || 'não realizado',
+              updatedAt: inst.updatedAt || inst.date || '',
+              date: inst.date
+            });
+          });
+        } else if (marker.procedures && marker.procedures.length > 0) {
+          marker.procedures.forEach((procId: string) => {
+            const procDetails = proposalData.procedures?.find((p: any) => p.id === procId);
+            instances.push({
+              sectionId: sec.id,
+              sectionTitle: sec.title,
+              markerId: marker.id,
+              toothNumber: marker.toothNumber,
+              instanceId: `${marker.id}-${procId}`,
+              procedureId: procId,
+              name: procDetails?.name || 'Procedimento',
+              price: procDetails?.price || 0,
+              status: 'não realizado',
+              updatedAt: '',
+              date: ''
+            });
+          });
+        }
+      });
+    });
+
+    return instances;
+  };
+
+  // Handler to update the status of a procedure and save it to Google Drive
+  const handleUpdateProcedureStatus = async (
+    proposalData: any,
+    sectionId: string,
+    markerId: string,
+    instanceId: string,
+    newStatus: 'executado' | 'em andamento' | 'não realizado'
+  ) => {
+    if (!proposalData) return;
+
+    // Deep clone proposal
+    const updatedData = JSON.parse(JSON.stringify(proposalData));
+    const nowStr = new Date().toLocaleString('pt-BR');
+
+    let found = false;
+    updatedData.sections = updatedData.sections.map((sec: any) => {
+      if (sec.id !== sectionId) return sec;
+      sec.markers = sec.markers.map((marker: any) => {
+        if (marker.id !== markerId) return marker;
+        
+        if (!marker.procedureInstances) {
+          marker.procedureInstances = [];
+        }
+        
+        let inst = marker.procedureInstances.find((i: any) => i.id === instanceId);
+        if (inst) {
+          inst.status = newStatus === 'executado' ? 'Realizado' : newStatus === 'em andamento' ? 'Em andamento' : 'A realizar';
+          inst.updatedAt = nowStr;
+          inst.date = nowStr;
+          found = true;
+        } else {
+          const parts = instanceId.split('-');
+          const procId = parts[parts.length - 1];
+          const procDetails = updatedData.procedures?.find((p: any) => p.id === procId);
+          const newInst = {
+            id: instanceId,
+            procedureId: procId,
+            name: procDetails?.name || 'Procedimento',
+            price: procDetails?.price || 0,
+            includeFinancial: true,
+            status: newStatus === 'executado' ? 'Realizado' : newStatus === 'em andamento' ? 'Em andamento' : 'A realizar',
+            date: nowStr,
+            updatedAt: nowStr,
+            dentist: clinicSettings?.doctorName || 'Dentista'
+          };
+          marker.procedureInstances.push(newInst);
+          found = true;
+        }
+        return marker;
+      });
+      return sec;
+    });
+
+    if (!found) return;
+
+    // Update local state immediately
+    setSelectedProposalData(updatedData);
+    if (driveProposals.length > 0 && selectedProposalId === driveProposals[0].id) {
+      setActiveTreatmentPlan(updatedData);
+    }
+
+    try {
+      await saveTreatmentPlanToDrive(selectedPatient!.name, updatedData, selectedProposalId);
+    } catch (err: any) {
+      alert("Erro ao salvar alteração de status no Drive: " + err.message);
+    }
+  };
+
   const syncGoogleDriveDataForPatient = async (patientName: string) => {
     setDriveError(null);
     setDriveFolderId(null);
@@ -493,7 +661,7 @@ export default function DentalCRMView({
     if (!onLoadPatientData) return;
     try {
       setIsLoadingProposalAction(fileId);
-      const data = await loadPatientFromDrive(fileId);
+      const data = await loadPatientFromDrive(driveFolderId || '', fileId);
       onLoadPatientData(data);
       if (onChangeView) {
         onChangeView('planning');
@@ -1771,6 +1939,43 @@ export default function DentalCRMView({
     return Array.from(list);
   };
 
+  // Dashboard calculations for active treatment plan
+  const getTreatmentProgress = () => {
+    if (!activeTreatmentPlan) return null;
+    const instances = getProcedureInstancesFromProposal(activeTreatmentPlan);
+    if (instances.length === 0) return null;
+
+    const total = instances.length;
+    const completed = instances.filter(i => {
+      const st = (i.status || '').toLowerCase().trim();
+      return st === 'executado' || st === 'realizado';
+    }).length;
+    const inProgress = instances.filter(i => (i.status || '').toLowerCase().trim() === 'em andamento').length;
+    const percent = Math.round((completed / total) * 100);
+
+    let nextStep = instances.find(i => (i.status || '').toLowerCase().trim() === 'em andamento');
+    if (!nextStep) {
+      nextStep = instances.find(i => {
+        const st = (i.status || '').toLowerCase().trim();
+        return st === 'não realizado' || st === 'a realizar' || !st;
+      });
+    }
+
+    return {
+      total,
+      completed,
+      inProgress,
+      percent,
+      nextStep: nextStep ? {
+        name: nextStep.name,
+        toothNumber: nextStep.toothNumber,
+        status: nextStep.status
+      } : null
+    };
+  };
+
+  const treatmentProgress = getTreatmentProgress();
+
   return (
     <div className="space-y-6 animate-fade-in-up text-zinc-800">
 
@@ -2638,6 +2843,17 @@ export default function DentalCRMView({
                   </button>
                   <button
                     type="button"
+                    onClick={() => setActiveDetailTab('treatment_plan')}
+                    className={`px-4 py-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus:outline-none cursor-pointer transition-all ${
+                      activeDetailTab === 'treatment_plan'
+                        ? 'bg-[#8B0000] text-[#FAF8F5]'
+                        : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
+                    }`}
+                  >
+                    🛠️ Plano de Tratamento
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setActiveDetailTab('communication')}
                     className={`px-4 py-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus:outline-none cursor-pointer transition-all ${
                       activeDetailTab === 'communication'
@@ -2692,6 +2908,66 @@ export default function DentalCRMView({
                         <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">DADOS DO PACIENTE</span>
                         <h4 className="font-serif font-bold text-lg text-[#8B0000] mt-0.5">Ficha Cadastral Geral consolidada</h4>
                       </div>
+
+                      {/* Dashboard de Tratamento */}
+                      {treatmentProgress ? (
+                        <div className="bg-gradient-to-br from-[#8B0000] to-[#5a0000] text-white p-5 rounded-2xl border border-[#C09553]/40 shadow-sm space-y-4">
+                          <div className="flex justify-between items-center border-b border-white/10 pb-2.5">
+                            <div className="space-y-0.5">
+                              <span className="text-[9px] uppercase font-extrabold text-[#C09553] tracking-widest font-mono">ACOMPANHAMENTO CLÍNICO</span>
+                              <h5 className="font-serif font-bold text-sm">Painel de Evolução do Tratamento</h5>
+                            </div>
+                            <span className="bg-[#C09553] text-[#8B0000] text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                              {treatmentProgress.percent}% Concluído
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Progresso Geral */}
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-xs font-semibold text-white/80">
+                                <span>Progresso dos Procedimentos</span>
+                                <span className="font-mono">{treatmentProgress.completed} de {treatmentProgress.total}</span>
+                              </div>
+                              <div className="w-full bg-white/15 h-2.5 rounded-full overflow-hidden border border-white/5">
+                                <div 
+                                  className="bg-gradient-to-r from-[#C09553] to-amber-300 h-full rounded-full transition-all duration-500"
+                                  style={{ width: `${treatmentProgress.percent}%` }}
+                                />
+                              </div>
+                              <div className="flex gap-3 text-[10px] text-white/60">
+                                <span>🟢 Executados: {treatmentProgress.completed}</span>
+                                <span>🟡 Em andamento: {treatmentProgress.inProgress}</span>
+                                <span>⚪ Pendentes: {treatmentProgress.total - treatmentProgress.completed - treatmentProgress.inProgress}</span>
+                              </div>
+                            </div>
+
+                            {/* Próximo Passo */}
+                            <div className="bg-black/15 p-3 rounded-xl border border-white/5 flex flex-col justify-center">
+                              <span className="text-[9px] uppercase font-bold text-[#C09553] tracking-wider font-mono">Próximo Passo Recomendado</span>
+                              {treatmentProgress.nextStep ? (
+                                <div className="mt-1">
+                                  <p className="text-xs font-bold text-white truncate">
+                                    {treatmentProgress.nextStep.name}
+                                  </p>
+                                  <p className="text-[10px] text-[#C09553] mt-0.5">
+                                    Localização: {treatmentProgress.nextStep.toothNumber ? `Dente ${treatmentProgress.nextStep.toothNumber}` : 'Geral'} • Status: <span className="underline italic uppercase tracking-wider text-[8px] font-extrabold">{treatmentProgress.nextStep.status === 'Realizado' ? 'Executado' : treatmentProgress.nextStep.status === 'Em andamento' ? 'Em andamento' : 'Não realizado'}</span>
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-xs font-semibold text-emerald-300 mt-1 flex items-center gap-1">
+                                  ✨ Todos os procedimentos foram concluídos!
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-[#FAF8F5] p-4 rounded-xl border border-dashed border-[#E6DEC9] text-center text-xs text-zinc-500">
+                          ℹ️ Nenhum orçamento ou plano de tratamento ativo localizado para esta paciente no Drive. 
+                          Para gerar um plano, abra o planejador 3D e salve um novo orçamento.
+                        </div>
+                      )}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-zinc-600">
                         <div className="space-y-3 bg-[#FAF8F5] p-4 rounded-xl border border-[#E6DEC9]/45">
@@ -3030,6 +3306,244 @@ export default function DentalCRMView({
                         )}
                       </div>
 
+                    </div>
+                  )}
+
+                  {/* Panel: Treatment Plan Progress & Status Editor */}
+                  {activeDetailTab === 'treatment_plan' && (
+                    <div className="space-y-6 animate-fade-in-up">
+                      {driveProposals.length > 0 ? (
+                        <>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 pb-4">
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">PLANO DE TRATAMENTO ATIVO</span>
+                              <h4 className="font-serif font-bold text-lg text-[#8B0000] mt-0.5">Mapeamento Clínico e Evolução de Procedimentos</h4>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-zinc-650">Orçamento:</span>
+                              <select
+                                value={selectedProposalId}
+                                onChange={(e) => setSelectedProposalId(e.target.value)}
+                                className="text-xs font-semibold bg-[#FAF8F5] border border-[#E6DEC9] rounded-lg p-2 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#8B0000] cursor-pointer"
+                              >
+                                {driveProposals.map((prop) => (
+                                  <option key={prop.id} value={prop.id}>
+                                    {prop.name.replace('.json', '')} ({new Date(prop.modifiedTime || prop.createdTime).toLocaleDateString('pt-BR')})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          {isLoadingPlanData ? (
+                            <div className="flex flex-col items-center justify-center p-20 space-y-2">
+                              <Loader2 className="w-8 h-8 animate-spin text-[#8B0000]" />
+                              <span className="text-xs text-zinc-555 font-medium animate-pulse">Carregando plano de tratamento...</span>
+                            </div>
+                          ) : selectedProposalData ? (
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                              {/* Left Column: Photos (5 cols) */}
+                              <div className="lg:col-span-5 space-y-6">
+                                <div className="border-b border-zinc-155 pb-2">
+                                  <h5 className="font-bold text-xs text-zinc-800 uppercase tracking-wider font-serif">Imagens Mapeadas</h5>
+                                  <p className="text-[10px] text-zinc-500 mt-0.5">Fotos clínicas com marcação de dentes e procedimentos associados.</p>
+                                </div>
+
+                                {(() => {
+                                  const mappingSections = selectedProposalData.sections?.filter((sec: any) => sec.image && sec.markers?.length > 0) || [];
+                                  if (mappingSections.length === 0) {
+                                    return (
+                                      <div className="p-6 bg-[#FAF8F5] border border-dashed rounded-xl border-zinc-200 text-center text-xs text-zinc-500">
+                                        Nenhuma imagem mapeada neste orçamento.
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div className="space-y-4">
+                                      {mappingSections.map((sec: any) => (
+                                        <div key={sec.id} className="bg-white border rounded-xl p-3 border-[#E6DEC9]/60 shadow-2xs space-y-2">
+                                          <span className="text-[10px] font-bold text-[#8B0000] uppercase tracking-wider block font-sans">
+                                            {sec.title}
+                                          </span>
+                                          
+                                          <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden shadow-xs border border-zinc-200 bg-zinc-950">
+                                            <img
+                                              src={sec.image}
+                                              alt={sec.title}
+                                              className="w-full h-full object-cover"
+                                              referrerPolicy="no-referrer"
+                                            />
+
+                                            {/* Markers Overlays */}
+                                            {sec.markers.map((marker: any) => {
+                                              const size = selectedProposalData.proposal?.markerSize || 26;
+                                              return (
+                                                <div
+                                                  key={marker.id}
+                                                  style={{
+                                                    left: `${marker.x}%`,
+                                                    top: `${marker.y}%`,
+                                                    width: `${size}px`,
+                                                    height: `${size}px`,
+                                                    fontSize: `${Math.max(9, Math.round(size * 0.42))}px`,
+                                                    transform: 'translate(-50%, -50%)',
+                                                  }}
+                                                  className="absolute rounded-full border border-zinc-200 bg-white shadow-md flex items-center justify-center font-bold text-zinc-950 select-none z-10"
+                                                  title={`Dente ${marker.toothNumber}`}
+                                                >
+                                                  <span>{marker.toothNumber}</span>
+
+                                                  {/* Little color dot badges right on the edge */}
+                                                  {marker.procedures && marker.procedures.length > 0 && (
+                                                    <div 
+                                                      className="absolute flex gap-0.5 justify-end"
+                                                      style={{
+                                                        bottom: `-${Math.round(size * 0.1)}px`,
+                                                        right: `-${Math.round(size * 0.1)}px`,
+                                                        maxWidth: `${size * 1.5}px`,
+                                                      }}
+                                                    >
+                                                      {marker.procedures.map((procId: string, idx: number) => {
+                                                        const proc = selectedProposalData.procedures?.find((p: any) => p.id === procId);
+                                                        if (!proc) return null;
+                                                        const dotSize = Math.max(5, Math.round(size * 0.3));
+                                                        return (
+                                                          <span
+                                                            key={`${procId}-${idx}`}
+                                                            className="rounded-full border border-white block"
+                                                            style={{ 
+                                                              backgroundColor: proc.color,
+                                                              width: `${dotSize}px`,
+                                                              height: `${dotSize}px`,
+                                                            }}
+                                                          />
+                                                        );
+                                                      })}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+
+                              {/* Right Column: Procedure List with Actions (7 cols) */}
+                              <div className="lg:col-span-7 space-y-6">
+                                <div className="border-b border-zinc-150 pb-2 flex justify-between items-center">
+                                  <div>
+                                    <h5 className="font-bold text-xs text-zinc-800 uppercase tracking-wider font-serif">Procedimentos Selecionados</h5>
+                                    <p className="text-[10px] text-zinc-500 mt-0.5">Controle de evolução de cada procedimento planejado.</p>
+                                  </div>
+                                  <span className="text-[9px] font-bold bg-[#8B0000]/5 text-[#8B0000] border border-[#8B0000]/20 px-2 py-0.5 rounded-full font-mono uppercase">
+                                    {getProcedureInstancesFromProposal(selectedProposalData).length} Itens
+                                  </span>
+                                </div>
+
+                                {(() => {
+                                  const instances = getProcedureInstancesFromProposal(selectedProposalData);
+                                  if (instances.length === 0) {
+                                    return (
+                                      <div className="p-8 bg-[#FAF8F5] border border-dashed rounded-xl border-zinc-200 text-center text-xs text-zinc-500">
+                                        Nenhum procedimento assinalado neste orçamento.
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div className="divide-y divide-zinc-150 border rounded-xl overflow-hidden bg-white shadow-2xs">
+                                      {instances.map((item) => {
+                                        const cleanStatus = (item.status || '').toLowerCase().trim();
+                                        return (
+                                          <div key={item.instanceId} className="p-4 hover:bg-[#FAF8F5]/40 transition-colors flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                                            <div className="space-y-1 max-w-md">
+                                              <div className="flex items-center gap-2">
+                                                <span className="bg-[#8B0000] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
+                                                  {item.toothNumber ? `Dente ${item.toothNumber}` : 'Geral'}
+                                                </span>
+                                                <h6 className="text-xs font-bold text-zinc-800 truncate" title={item.name}>
+                                                  {item.name}
+                                                </h6>
+                                              </div>
+                                              <p className="text-[10px] text-zinc-500">
+                                                Foto: {item.sectionTitle} • Valor: {formatBRL(item.price)}
+                                              </p>
+                                              {item.updatedAt && (
+                                                <p className="text-[9px] text-[#C09553] font-semibold flex items-center gap-1">
+                                                  ⏱️ Atualizado: {item.updatedAt}
+                                                </p>
+                                              )}
+                                            </div>
+
+                                            {/* Status Actions Group */}
+                                            <div className="flex flex-wrap gap-1.5 shrink-0">
+                                              {[
+                                                { label: 'Não realizado', val: 'não realizado', color: 'hover:bg-rose-50 hover:text-rose-700 hover:border-rose-350 active:bg-rose-100 text-zinc-500 border-zinc-200 bg-white' },
+                                                { label: 'Em andamento', val: 'em andamento', color: 'hover:bg-amber-50 hover:text-amber-700 hover:border-amber-350 active:bg-amber-100 text-zinc-500 border-zinc-200 bg-white' },
+                                                { label: 'Executado', val: 'executado', color: 'hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-350 active:bg-emerald-100 text-zinc-500 border-zinc-200 bg-white' },
+                                              ].map((btn) => {
+                                                const isSelected = cleanStatus === btn.val || 
+                                                  (btn.val === 'não realizado' && (cleanStatus === 'a realizar' || cleanStatus === '')) ||
+                                                  (btn.val === 'executado' && cleanStatus === 'realizado');
+
+                                                let activeClass = '';
+                                                if (isSelected) {
+                                                  if (btn.val === 'não realizado') activeClass = 'bg-rose-100 text-rose-800 border-rose-450 font-bold';
+                                                  if (btn.val === 'em andamento') activeClass = 'bg-amber-100 text-amber-800 border-amber-450 font-bold';
+                                                  if (btn.val === 'executado') activeClass = 'bg-emerald-100 text-emerald-800 border-emerald-450 font-bold';
+                                                }
+
+                                                return (
+                                                  <button
+                                                    key={btn.val}
+                                                    type="button"
+                                                    onClick={() => handleUpdateProcedureStatus(
+                                                      selectedProposalData,
+                                                      item.sectionId,
+                                                      item.markerId,
+                                                      item.instanceId,
+                                                      btn.val as any
+                                                    )}
+                                                    className={`p-1 px-2.5 rounded-lg border text-[10px] transition-all cursor-pointer ${isSelected ? activeClass : btn.color}`}
+                                                  >
+                                                    {btn.label}
+                                                  </button>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-8 text-center bg-[#FAF8F5] border border-dashed rounded-xl border-zinc-200 text-xs text-zinc-500">
+                              Selecione um orçamento para carregar o plano de evolução de tratamento.
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="p-8 text-center bg-[#FAF8F5] border border-dashed rounded-2xl border-zinc-200">
+                          <p className="text-xs text-zinc-555 italic">Nenhum plano ou orçamento ativo localizado no Google Drive para esta paciente.</p>
+                          <p className="text-[10px] text-zinc-400 mt-1 max-w-sm mx-auto">Para gerar o plano de evolução, crie um orçamento clicando no botão abaixo ou abra o Planejador 3D.</p>
+                          <button
+                            onClick={() => {
+                              if (onNewProposal) onNewProposal(selectedPatient.name);
+                            }}
+                            className="mt-4 px-4 py-2 bg-[#8B0000] hover:bg-[#a32c3d] text-[#FAF8F5] text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer"
+                          >
+                            + Criar Novo Orçamento
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
