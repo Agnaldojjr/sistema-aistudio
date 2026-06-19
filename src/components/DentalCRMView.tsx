@@ -53,8 +53,10 @@ import {
   renameFileInDrive,
   uploadPatientImageToDrive,
   deleteFileFromDrive,
-  saveTreatmentPlanToDrive
+  saveTreatmentPlanToDrive,
+  downloadFileAsDataUrl
 } from '../lib/drive';
+import ImageMarkupEditor from './ImageMarkupEditor';
 
 // --- ZOD SCHEMAS FOR HISTORICAL IMPORT CONTENT VALIDATION ---
 const lenientString = z.preprocess((val) => (val !== undefined && val !== null) ? String(val) : val, z.string()).optional().nullable();
@@ -259,6 +261,11 @@ export default function DentalCRMView({
   const [flashOn, setFlashOn] = useState(false);
   const [hasFlash, setHasFlash] = useState(false);
   const [cameraGuideType, setCameraGuideType] = useState<'general' | 'smile' | 'upper' | 'lower'>('general');
+
+  // Gallery image editing states
+  const [editingGalleryImageId, setEditingGalleryImageId] = useState<string | null>(null);
+  const [editingGalleryImageUrl, setEditingGalleryImageUrl] = useState<string | null>(null);
+  const [isDownloadingForEdit, setIsDownloadingForEdit] = useState<string | null>(null);
 
   // Global search & filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -801,6 +808,49 @@ export default function DentalCRMView({
       } catch (e) {
         console.warn('Focus lock constraint not supported by hardware/browser in CRM', e);
       }
+    }
+  };
+
+  // Gallery Image Edit handlers
+  const handleEditGalleryImage = async (imgId: string) => {
+    try {
+      setIsDownloadingForEdit(imgId);
+      const dataUrl = await downloadFileAsDataUrl(imgId);
+      setEditingGalleryImageId(imgId);
+      setEditingGalleryImageUrl(dataUrl);
+    } catch (err: any) {
+      alert('Erro ao carregar imagem para edição: ' + err.message);
+    } finally {
+      setIsDownloadingForEdit(null);
+    }
+  };
+
+  const handleSaveEditedGalleryImage = async (editedImage: string) => {
+    if (!driveFolderId) return;
+    try {
+      setIsDriveUploading(true);
+      setEditingGalleryImageUrl(null);
+      setEditingGalleryImageId(null);
+
+      const arr = editedImage.split(',');
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      const blob = new Blob([u8arr], { type: mime });
+      const filename = `edited-${new Date().getTime()}.jpg`;
+      await uploadPatientImageToDrive(driveFolderId, blob, filename);
+
+      // Refresh gallery
+      const updatedImages = await listPatientImagesFromDrive(driveFolderId);
+      setDriveImages(updatedImages);
+    } catch (err: any) {
+      alert('Erro ao salvar imagem editada: ' + err.message);
+    } finally {
+      setIsDriveUploading(false);
     }
   };
 
@@ -4271,6 +4321,28 @@ export default function DentalCRMView({
                                   <div className="absolute right-2 top-2 bg-zinc-950/75 text-[#FAF8F5] text-[8px] font-mono px-1.5 py-0.5 rounded-md font-bold shadow-sm uppercase">
                                     {normalizeDateDisplay(img.createdTime)}
                                   </div>
+
+                                  {/* Edit Photo Button Overlay */}
+                                  <div className="absolute top-2 left-2 z-10">
+                                    {isDownloadingForEdit === img.id ? (
+                                      <div className="w-8 h-8 rounded-xl bg-white/95 text-zinc-600 flex items-center justify-center shadow-md border border-zinc-200/80">
+                                        <Loader2 className="w-4 h-4 animate-spin text-[#C09553]" />
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                          handleEditGalleryImage(img.id);
+                                        }}
+                                        className="w-8 h-8 rounded-xl bg-white/95 text-[#B48C4D] hover:text-[#4E1119] flex items-center justify-center shadow-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer border border-zinc-200/80"
+                                        title="Editar imagem (Marcações/Adesivos)"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
 
                                 <div className="p-3.5 space-y-1.5">
@@ -4321,6 +4393,17 @@ export default function DentalCRMView({
         </div>
       )}
 
+      {editingGalleryImageUrl && (
+        <ImageMarkupEditor
+          image={editingGalleryImageUrl}
+          onSave={handleSaveEditedGalleryImage}
+          onClose={() => {
+            setEditingGalleryImageUrl(null);
+            setEditingGalleryImageId(null);
+          }}
+          title="Editor Clínico - Galeria do Paciente"
+        />
+      )}
     </div>
   );
 }

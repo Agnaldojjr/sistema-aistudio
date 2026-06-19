@@ -11,7 +11,8 @@ import {
   Eraser, 
   Square,
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  Undo
 } from 'lucide-react';
 
 interface Shape {
