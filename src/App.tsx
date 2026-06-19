@@ -38,10 +38,11 @@ import MobileWorkspace from './components/MobileWorkspace';
 import DentalCRMView from './components/DentalCRMView';
 import PatientAnamnesisForm from './components/PatientAnamnesisForm';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from './types';
-import { DEFAULT_PROCEDURES, DEMO_SVG_PLACEHOLDERS, DEFAULT_CLINIC_SETTINGS } from './constants';
+import { DEFAULT_PROCEDURES, DEMO_SVG_PLACEHOLDERS, DEFAULT_CLINIC_SETTINGS, INITIAL_PROPOSAL, INITIAL_SECTIONS } from './constants';
 import { initAuth, googleSignIn, logout } from './firebase';
 import { saveTreatmentPlanToDrive } from './lib/drive';
 import type { User } from 'firebase/auth';
+import { usePatientContext } from './context/PatientContext';
 
 // ─── Logo SVG (AF Monogram matching the brand identity) ─────────────────────
 const AFLogoSVG = ({ className = '', light = false }: { className?: string; light?: boolean }) => (
@@ -62,25 +63,6 @@ const AFLogoSVG = ({ className = '', light = false }: { className?: string; ligh
 );
 
 // ─── Initial State ─────────────────────────────────────────────────────────
-const INITIAL_SECTIONS: PhotoSection[] = [
-  { id: 'panoramic', title: 'Radiografia Panorâmica', subtitle: 'Planejamento de Implantes e Diagnósticos Gerais', image: null, markers: [] },
-  { id: 'upper', title: 'Arcada Superior', subtitle: 'Dentes Posteriores e Anteriores Superiores', image: null, markers: [] },
-  { id: 'lower', title: 'Arcada Inferior', subtitle: 'Dentes Posteriores e Anteriores Inferiores', image: null, markers: [] },
-  { id: 'smile', title: 'Estética do Sorriso', subtitle: 'Mapeamento de Dentes Anteriores e Estética', image: null, markers: [] },
-];
-
-const INITIAL_PROPOSAL: TreatmentProposal = {
-  patientName: '',
-  status: 'Aberto (paciente não pagou)',
-  notes: 'Orçamento feito sem radiografia atual pós trat. de canal, podendo haver alterações posteriores.',
-  discountPercent: 5,
-  pixDiscountLabel: '5% DESCONTO NO PIX',
-  installments: 12,
-  installmentsLabel: 'Parcelamento em até 12x (com taxas).',
-  customDiscountAmount: 0,
-  showTotalBySection: true,
-  markerSize: 26,
-};
 
 // ─── Navigation Config ──────────────────────────────────────────────────────
 type AppView = 'dashboard' | 'calendar' | 'planning' | 'crm' | 'settings';
@@ -459,14 +441,6 @@ export default function App() {
     return cached ? JSON.parse(cached) : DEFAULT_PROCEDURES;
   });
 
-  const [sections, setSections] = useState<PhotoSection[]>(() => INITIAL_SECTIONS);
-
-  const [proposal, setProposal] = useState<TreatmentProposal>(() => {
-    const cached = localStorage.getItem('agnaldo_dent_proposal');
-    const base = cached ? JSON.parse(cached) : INITIAL_PROPOSAL;
-    return { ...base, patientName: '' };
-  });
-
   const [clinicSettings, setClinicSettings] = useState<ClinicSettings>(() => {
     const cached = localStorage.getItem('agnaldo_dent_clinic_settings');
     return cached ? JSON.parse(cached) : DEFAULT_CLINIC_SETTINGS;
@@ -484,6 +458,9 @@ export default function App() {
   });
   const [appointmentPatientName, setAppointmentPatientName] = useState<string | undefined>(undefined);
   const [currentFileId, setCurrentFileId] = useState<string | null>(null);
+
+  const { activeSections: sections, setActiveSections: setSections, activeProposal: proposal, setActiveProposal: setProposal } = usePatientContext();
+
 
   // Sidebar state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -510,8 +487,8 @@ export default function App() {
   }, []);
 
   useEffect(() => { localStorage.setItem('agnaldo_dent_procedures', JSON.stringify(procedures)); }, [procedures]);
-  useEffect(() => { localStorage.setItem('agnaldo_dent_sections', JSON.stringify(sections)); }, [sections]);
-  useEffect(() => { localStorage.setItem('agnaldo_dent_proposal', JSON.stringify(proposal)); }, [proposal]);
+  // sections and proposal are now managed globally via PatientContext
+
   useEffect(() => { localStorage.setItem('agnaldo_dent_clinic_settings', JSON.stringify(clinicSettings)); }, [clinicSettings]);
   useEffect(() => { localStorage.setItem('agnaldo_dent_mobile_opt', isMobileOptimized.toString()); }, [isMobileOptimized]);
   useEffect(() => {

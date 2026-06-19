@@ -34,7 +34,9 @@ import {
   Zap,
   ZapOff,
   Focus,
-  LayoutGrid
+  LayoutGrid,
+  Activity,
+  Image as ImageIcon
 } from 'lucide-react';
 import { getGoogleDriveCRMDatabase, saveGoogleDriveCRMDatabase } from '../lib/driveCrm';
 import { db } from '../firebase';
@@ -57,6 +59,7 @@ import {
   downloadFileAsDataUrl
 } from '../lib/drive';
 import ImageMarkupEditor from './ImageMarkupEditor';
+import { usePatientContext } from '../context/PatientContext';
 
 // --- ZOD SCHEMAS FOR HISTORICAL IMPORT CONTENT VALIDATION ---
 const lenientString = z.preprocess((val) => (val !== undefined && val !== null) ? String(val) : val, z.string()).optional().nullable();
@@ -209,23 +212,24 @@ export default function DentalCRMView({
   // Navigation
   const [activeSubTab, setActiveSubTab] = useState<'import' | 'crm'>('crm'); // Default directly to CRM for quick review!
   
-  // CRM Patients state
-  const [patients, setPatients] = useState<CRMPatient[]>([]);
-  const [selectedPatient, setSelectedPatient] = useState<CRMPatient | null>(null);
-  
-  // CRM sub-modules state for selected patient
-  const [appointments, setAppointments] = useState<CRMAppointment[]>([]);
-  const [clinicalHistory, setClinicalHistory] = useState<CRMClinicalHistory[]>([]);
-  const [communications, setCommunications] = useState<CRMCommunication[]>([]);
-  
-  // Custom deep modular components state for JSON payload support and detailed view panels
-  const [anamneseList, setAnamneseList] = useState<any[]>([]);
-  const [avisosList, setAvisosList] = useState<any[]>([]);
-  const [documentosList, setDocumentosList] = useState<any[]>([]);
-  const [galeriaList, setGaleriaList] = useState<any[]>([]);
-  const [pagamentosList, setPagamentosList] = useState<any[]>([]);
-  const [tratamentosList, setTratamentosList] = useState<any[]>([]);
-  const [odontogramaList, setOdontogramaList] = useState<any[]>([]);
+  // Use PatientContext for global state
+  const {
+    selectedPatient, setSelectedPatient,
+    appointments, setAppointments,
+    clinicalHistory, setClinicalHistory,
+    communications, setCommunications,
+    anamneseList, setAnamneseList,
+    avisosList, setAvisosList,
+    documentosList, setDocumentosList,
+    galeriaList, setGaleriaList,
+    pagamentosList, setPagamentosList,
+    tratamentosList, setTratamentosList,
+    odontogramaList, setOdontogramaList,
+    saveContextToDrive,
+    isSavingToDrive,
+    refreshPatientSubModules
+  } = usePatientContext();
+
   const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'appointments' | 'anamnesis' | 'clinical' | 'communication' | 'financial' | 'docs_gallery' | 'drive_records' | 'treatment_plan'>('info');
 
   // Google Drive integration states
@@ -348,7 +352,7 @@ export default function DentalCRMView({
         if (addedCount > 0) {
           await saveGoogleDriveCRMDatabase(crmData);
           alert(`Ficha de Anamnese Digital preenchida pelo paciente importada com sucesso! (${addedCount} respostas adicionadas)`);
-          loadPatientSubModules(patientId);
+          refreshPatientSubModules(patientId);
         }
       }
     } catch (err) {
@@ -382,7 +386,7 @@ export default function DentalCRMView({
   // Sync related lists when selected patient changes
   useEffect(() => {
     if (selectedPatient) {
-      loadPatientSubModules(selectedPatient.id);
+      // refreshPatientSubModules(selectedPatient.id); - This is now handled by the useEffect inside PatientContext!
       syncGoogleDriveDataForPatient(selectedPatient.name);
       syncAnamnesisFromFirestore(selectedPatient.id);
     } else {
@@ -951,50 +955,7 @@ export default function DentalCRMView({
     }
   };
 
-  const loadPatientSubModules = async (patientId: string) => {
-    try {
-      const dbData = await getGoogleDriveCRMDatabase();
-
-      // 1. Appointments
-      const appList = (dbData.appointments || []).filter((d: any) => d.patientId === patientId);
-      appList.sort((a: any, b: any) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
-      setAppointments(appList);
-
-      // 2. Clinical History
-      const clinList = (dbData.clinical_history || []).filter((d: any) => d.patientId === patientId);
-      clinList.sort((a: any, b: any) => b.date.localeCompare(a.date));
-      setClinicalHistory(clinList);
-
-      // 3. Communications
-      const commList = (dbData.communications || []).filter((d: any) => d.patientId === patientId);
-      commList.sort((a: any, b: any) => b.date.localeCompare(a.date));
-      setCommunications(commList);
-
-      // 4. Anamnese questions/answers
-      setAnamneseList((dbData.anamnese || []).filter((d: any) => d.patientId === patientId));
-
-      // 5. Avisos / Clinica notifications
-      setAvisosList((dbData.avisos || []).filter((d: any) => d.patientId === patientId));
-
-      // 6. Clinical Documents / PDFs
-      setDocumentosList((dbData.documentos || []).filter((d: any) => d.patientId === patientId));
-
-      // 7. Photo Gallery
-      setGaleriaList((dbData.galeria || []).filter((d: any) => d.patientId === patientId));
-
-      // 8. Financial Receipts
-      setPagamentosList((dbData.pagamentos || []).filter((d: any) => d.patientId === patientId));
-
-      // 9. Treatment Workflows
-      setTratamentosList((dbData.tratamentos || []).filter((d: any) => d.patientId === patientId));
-
-      // 10. Dental Teeth Marks
-      setOdontogramaList((dbData.odontograma_history || []).filter((d: any) => d.patientId === patientId));
-
-    } catch (err) {
-      console.error('Error loading patient details:', err);
-    }
-  };
+  // loadPatientSubModules is now handled by PatientContext
 
   // Drag-and-drop mechanics
   const handleDrag = (e: React.DragEvent) => {
@@ -3361,128 +3322,118 @@ export default function DentalCRMView({
                     </div>
                   )}
 
-                  {/* Panel D: Clinical and Odontograma */}
+                  {/* Panel D: Clinical and Odontograma (Unified Timeline) */}
                   {activeDetailTab === 'clinical' && (
                     <div className="space-y-6">
-                      
-                      {/* Clinical Evolutions (Evolução Tratamento) */}
-                      <div className="space-y-4">
-                        <div className="border-b border-zinc-100 pb-3 flex justify-between items-center">
-                          <div>
-                            <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">DIÁRIO MÉDICO</span>
-                            <h4 className="font-serif font-bold text-md text-[#8B0000] uppercase">Histórico e Evoluções Clínicas</h4>
-                          </div>
-                          <span className="bg-[#C09553]/20 text-zinc-800 px-2.5 py-0.5 rounded-full text-[10px] font-semibold">{clinicalHistory.length} registros</span>
+                      <div className="border-b border-zinc-100 pb-3 flex justify-between items-center">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">TIMELINE CLÍNICA</span>
+                          <h4 className="font-serif font-bold text-md text-[#8B0000] uppercase">Histórico Unificado do Paciente</h4>
                         </div>
+                      </div>
 
-                        {clinicalHistory.length === 0 ? (
-                          <p className="text-[11px] text-zinc-400 italic">Nenhum evento de evolução médica associado.</p>
-                        ) : (
-                          <div className="space-y-3">
-                            {clinicalHistory.map((ch) => (
-                              <div key={ch.id} className="bg-[#FAF8F5]/50 border border-[#E6DEC9]/60 p-4 rounded-xl text-xs space-y-2">
-                                <div className="flex justify-between items-center bg-white border border-[#E6DEC9]/30 px-2 py-1 rounded-md text-[10px] font-bold font-mono">
-                                  <span className="text-[#8B0000]">📅 {normalizeDateDisplay(ch.date)}</span>
-                                  {ch.recalls && <span className="text-amber-805 uppercase tracking-wide">🔁 Retorno em: {ch.recalls}</span>}
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pt-1">
-                                  {ch.proceduresPerformed && (
-                                    <div className="md:col-span-5">
-                                      <span className="text-[9px] uppercase font-bold text-zinc-400 tracking-wider block">Procedimento Realizado</span>
-                                      <span className="font-semibold text-zinc-900 text-xs">{ch.proceduresPerformed}</span>
+                      {(() => {
+                        const timelineEvents = [
+                          ...clinicalHistory.map(item => ({ type: 'clinical', date: item.date || new Date().toISOString(), data: item })),
+                          ...odontogramaList.map(item => ({ type: 'odontograma', date: item.date || new Date().toISOString(), data: item })),
+                          ...tratamentosList.map(item => ({ type: 'tratamento', date: item.date || new Date().toISOString(), data: item })),
+                          ...anamneseList.map(item => ({ type: 'anamnese', date: item.date || new Date().toISOString(), data: item })),
+                          ...galeriaList.map(item => ({ type: 'galeria', date: item.date || new Date().toISOString(), data: item })),
+                        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                        if (timelineEvents.length === 0) {
+                          return <p className="text-[11px] text-zinc-400 italic">Nenhum evento registrado no histórico do paciente.</p>;
+                        }
+
+                        return (
+                          <div className="relative border-l-2 border-[#E6DEC9]/50 ml-3 pl-5 space-y-6">
+                            {timelineEvents.map((event, index) => {
+                              let Icon = Activity;
+                              let iconBg = 'bg-zinc-100 text-zinc-500';
+                              
+                              if (event.type === 'clinical') { Icon = ClipboardList; iconBg = 'bg-blue-100 text-blue-600'; }
+                              if (event.type === 'odontograma') { Icon = Plus; iconBg = 'bg-[#8B0000] text-white'; }
+                              if (event.type === 'tratamento') { Icon = Activity; iconBg = 'bg-emerald-100 text-emerald-600'; }
+                              if (event.type === 'anamnese') { Icon = FileText; iconBg = 'bg-amber-100 text-amber-600'; }
+                              if (event.type === 'galeria') { Icon = ImageIcon; iconBg = 'bg-purple-100 text-purple-600'; }
+
+                              return (
+                                <div key={`tl-${index}`} className="relative">
+                                  {/* Timeline Marker */}
+                                  <div className={`absolute -left-[30px] w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-sm ${iconBg}`}>
+                                    <Icon className="w-3 h-3" />
+                                  </div>
+
+                                  <div className="bg-white border border-[#E6DEC9]/60 p-3 rounded-xl shadow-sm text-xs space-y-2">
+                                    <div className="flex justify-between items-center border-b border-zinc-100 pb-2 mb-2 text-[10px] font-bold font-mono">
+                                      <span className="text-[#8B0000]">{normalizeDateDisplay(event.date)}</span>
+                                      <span className="text-zinc-400 uppercase tracking-wider">{event.type}</span>
                                     </div>
-                                  )}
-                                  <div className="md:col-span-7">
-                                    <span className="text-[9px] uppercase font-bold text-zinc-400 tracking-wider block">Evolução do Caso / Observações</span>
-                                    <p className="text-zinc-600 leading-relaxed font-sans italic text-xs">
-                                      {ch.treatmentEvolution || "Não informado"}
-                                    </p>
+
+                                    {/* Clinical Render */}
+                                    {event.type === 'clinical' && (
+                                      <div className="space-y-1">
+                                        {event.data.proceduresPerformed && <p><strong>Procedimento:</strong> {event.data.proceduresPerformed}</p>}
+                                        <p className="text-zinc-600 italic">"{event.data.treatmentEvolution || 'Sem evolução'}"</p>
+                                        {event.data.recalls && <p className="text-amber-700 font-bold mt-1">🔁 Retorno em: {event.data.recalls}</p>}
+                                      </div>
+                                    )}
+
+                                    {/* Odontograma Render */}
+                                    {event.type === 'odontograma' && (
+                                      <div className="flex items-center gap-3">
+                                        {event.data.tooth ? (
+                                          <div className="w-8 h-8 rounded-full bg-[#8B0000] text-white flex items-center justify-center font-bold text-xs">
+                                            🦷 {event.data.tooth}
+                                          </div>
+                                        ) : (
+                                          <div className="w-8 h-8 rounded-full bg-zinc-100 text-zinc-500 flex items-center justify-center">🦷</div>
+                                        )}
+                                        <div>
+                                          <p className="font-bold">{event.data.procedure || 'Mapeamento Atualizado'}</p>
+                                          {event.data.situation && <p className="text-[10px] text-zinc-500 uppercase">{event.data.situation}</p>}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Tratamento Render */}
+                                    {event.type === 'tratamento' && (
+                                      <div>
+                                        <p className="font-bold">{event.data.name || 'Orçamento / Plano Atualizado'}</p>
+                                        <div className="flex gap-2 mt-1">
+                                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[9px] font-bold uppercase">{event.data.status || 'Aberto'}</span>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Anamnese Render */}
+                                    {event.type === 'anamnese' && (
+                                      <div>
+                                        <p className="font-bold">Formulário de Anamnese Respondido</p>
+                                        <p className="text-zinc-500 text-[10px]">{Object.keys(event.data.answers || {}).length} respostas registradas.</p>
+                                      </div>
+                                    )}
+
+                                    {/* Galeria Render */}
+                                    {event.type === 'galeria' && (
+                                      <div className="flex gap-3 items-center">
+                                        <div className="w-12 h-12 bg-zinc-100 rounded-lg overflow-hidden border border-zinc-200">
+                                          {event.data.url && <img src={event.data.url} alt="Galeria" className="w-full h-full object-cover" />}
+                                        </div>
+                                        <div>
+                                          <p className="font-bold">Mídia Adicionada</p>
+                                          {event.data.description && <p className="text-zinc-500 text-[10px]">{event.data.description}</p>}
+                                        </div>
+                                      </div>
+                                    )}
+
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
-                        )}
-                      </div>
-
-                      {/* Odontograma Diagnóstico */}
-                      <div className="space-y-4 pt-4 border-t border-zinc-100">
-                        <div className="border-b border-zinc-100 pb-3 flex justify-between items-center">
-                          <div>
-                            <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">ODONTOGRAMA COMPLETO</span>
-                            <h4 className="font-serif font-bold text-md text-[#8B0000] uppercase">Mapeamento Clínico por Elemento Dentário</h4>
-                          </div>
-                          <span className="bg-[#8B0000]/80 text-[#FAF8F5] px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold">{odontogramaList.length} Dentes Mapeados</span>
-                        </div>
-
-                        {odontogramaList.length === 0 ? (
-                          <div className="p-8 text-center bg-[#FAF8F5] rounded-xl border border-dashed border-zinc-200">
-                            <p className="text-xs text-zinc-400 italic">Nenhum mapeamento de odontograma associado no histórico importado.</p>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {odontogramaList.map((od) => (
-                              <div key={od.id} className="bg-white border rounded-xl p-3 flex justify-between items-center gap-2 border-[#E6DEC9]">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-9 h-9 rounded-full bg-[#8B0000] text-[#FAF8F5] flex items-center justify-center font-mono font-bold text-xs shrink-0 select-all" title="Dente número">
-                                    🦷 {od.tooth || 'E'}
-                                  </div>
-                                  <div>
-                                    <h5 className="font-bold text-xs text-zinc-850 truncate max-w-[160px]">{od.procedure}</h5>
-                                    <span className="text-[9px] uppercase tracking-wider font-bold text-zinc-400">{od.situation || 'Diagnóstico'}</span>
-                                  </div>
-                                </div>
-                                {od.value && (
-                                  <div className="text-right shrink-0">
-                                    <span className="text-[9px] uppercase text-zinc-400 font-bold block">Investimento</span>
-                                    <span className="font-mono text-xs font-bold text-[#8B0000]">{String(od.value).startsWith('R$') ? od.value : `R$ ${od.value}`}</span>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Tratamentos e Fases Ativas */}
-                      <div className="space-y-4 pt-4 border-t border-zinc-100">
-                        <div className="border-b border-zinc-100 pb-3">
-                          <h4 className="font-serif font-bold text-md text-[#8B0000] uppercase">Planejamento e Fases de Tratamentos Orçados</h4>
-                        </div>
-                        {tratamentosList.length === 0 ? (
-                          <p className="text-[11px] text-zinc-400 italic">Nenhum plano de etapas estruturadas foi informado ou orçado.</p>
-                        ) : (
-                          <div className="overflow-x-auto border rounded-xl">
-                            <table className="w-full text-left text-[11px] font-sans">
-                              <thead className="bg-[#FAF8F5] text-zinc-500 font-bold uppercase text-[9px] border-b">
-                                <tr>
-                                  <th className="p-2.5">Tratamento</th>
-                                  <th className="p-2.5">Início do plano</th>
-                                  <th className="p-2.5">Status</th>
-                                  <th className="p-2.5">Observações da Fase</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-zinc-100 text-zinc-700">
-                                {tratamentosList.map((tr) => (
-                                  <tr key={tr.id}>
-                                    <td className="p-2.5 font-bold text-zinc-800">{tr.name}</td>
-                                    <td className="p-2.5 font-mono">{normalizeDateDisplay(tr.date)}</td>
-                                    <td className="p-2.5">
-                                      <span className={`px-2 py-0.5 text-[8px] font-bold rounded-full uppercase ${
-                                        (tr.status || '').toLowerCase().includes('concl') ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' : 'bg-blue-50 text-blue-700'
-                                      }`}>
-                                        {tr.status}
-                                      </span>
-                                    </td>
-                                    <td className="p-2.5 text-zinc-550 break-words whitespace-normal font-sans text-xs italic">{tr.observations || '-'}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-
+                        );
+                      })()}
                     </div>
                   )}
 

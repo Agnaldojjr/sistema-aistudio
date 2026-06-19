@@ -27,6 +27,7 @@ import {
   FileDown
 } from 'lucide-react';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from '../types';
+import { usePatientContext } from '../context/PatientContext';
 import { saveTreatmentPlanToDrive, saveTreatmentPdfToDrive } from '../lib/drive';
 import { jsPDF } from 'jspdf';
 
@@ -67,7 +68,14 @@ export default function NegotiationTab({
   clinicSettings,
   currentFileId,
   setCurrentFileId,
+  hasMarkers,
+  isEditMode,
+  activeTab
 }: NegotiationTabProps) {
+  const { selectedPatient } = usePatientContext();
+  const patientName = selectedPatient ? selectedPatient.name : (proposal.patientName || '');
+  const pd = selectedPatient || proposal.patientData || {};
+  
   // Local state for the machine fees options
   const [salesVolume, setSalesVolume] = useState<'under_3' | 'between_3_6'>(() => {
     const cached = localStorage.getItem('ag_neg_sales_volume');
@@ -417,12 +425,12 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       doc.setTextColor(60, 60, 60);
       doc.text("PACIENTE:", 20, 42);
       doc.setFont('Helvetica', 'normal');
-      doc.text(proposal.patientName || 'Não Informado', 42, 42);
+      doc.text(patientName || 'Não Informado', 42, 42);
 
       doc.setFont('Helvetica', 'bold');
       doc.text("CONTATO:", 20, 48);
       doc.setFont('Helvetica', 'normal');
-      doc.text(proposal.patientData?.mobile || proposal.patientData?.phone || 'Não Informado', 42, 48);
+      doc.text(pd.mobile || pd.phone || 'Não Informado', 42, 48);
 
       doc.setFont('Helvetica', 'bold');
       doc.text("DATA DO ORÇAMENTO:", 20, 54);
@@ -554,7 +562,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       doc.text(clinicSettings.doctorName.toUpperCase(), 20, currentY + 8);
 
       doc.text("ASSINATURA DO PACIENTE / RESPONSÁVEL", 120, currentY + 4);
-      doc.text((proposal.patientName || 'PACIENTE').toUpperCase(), 120, currentY + 8);
+      doc.text((patientName || 'PACIENTE').toUpperCase(), 120, currentY + 8);
 
       // Bottom footer bar
       doc.setFillColor(78, 17, 25);
@@ -568,7 +576,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
       log("☁️ 2/5 - Iniciando upload seguro do PDF para o Google Drive do Dr. Agnaldo...");
       
-      const safePatientName = proposal.patientName || 'Paciente_Anonimo';
+      const safePatientName = patientName || 'Paciente_Anonimo';
       const cleanFileName = `Orcamento_${safePatientName.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
       
       const driveResult = await saveTreatmentPdfToDrive(safePatientName, pdfBlob, cleanFileName);
@@ -582,7 +590,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       log("🚀 4/5 - Iniciando conexão com a API de Integração do WhatsApp no domínio corporativo...");
       log(`Disparando POST para ${whatsappApiUrl}...`);
 
-      const phoneNum = proposal.patientData?.mobile || proposal.patientData?.phone || '';
+      const phoneNum = pd.mobile || pd.phone || '';
       const rawNumber = phoneNum.replace(/\D/g, '');
       const waDestination = rawNumber ? (rawNumber.startsWith('55') ? rawNumber : `55${rawNumber}`) : '';
 
@@ -592,7 +600,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
       // Format custom message templates
       let formattedMsg = whatsappCustomMsg
-        .replace(/{paciente}/g, proposal.patientName || '')
+        .replace(/{paciente}/g, patientName || '')
         .replace(/{link_pdf}/g, pdfLink)
         .replace(/{total}/g, formatCurrency(chosenSim.custoTotal));
 
@@ -657,7 +665,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         simulations,
         selectedPlanIndex
       };
-      const res = await saveTreatmentPlanToDrive(proposal.patientName, stateToSave, currentFileId || undefined);
+      const res = await saveTreatmentPlanToDrive(patientName, stateToSave, currentFileId || undefined);
       if (res && res.id && setCurrentFileId && (!currentFileId || currentFileId === 'NEW_FILE')) {
         setCurrentFileId(res.id);
       }
@@ -1209,7 +1217,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
               Plano de Tratamento & Condições de Pagamento
             </h2>
             <div className="text-xs text-zinc-600 font-sans mt-0.5 flex flex-col gap-1.5">
-              <div>Paciente: <strong className="text-zinc-800 text-sm uppercase">{proposal.patientName || 'NÃO INFORMADO'}</strong></div>
+              <div>Paciente: <strong className="text-zinc-800 text-sm uppercase">{patientName || 'NÃO INFORMADO'}</strong></div>
               {proposal.notes && (
                 <div className="text-[10px] text-rose-800 font-serif font-semibold italic max-w-2xl bg-rose-50/50 p-2 rounded-lg border border-rose-100/40 leading-normal animate-fadeIn">
                   * {proposal.notes}
@@ -1508,11 +1516,11 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
             <div className="text-[10px] font-bold text-[#8B0000] uppercase tracking-wider text-left">📋 Informações de Envio</div>
             <div className="grid grid-cols-3 gap-y-1.5 text-zinc-600">
               <span className="font-bold text-left">Destinatário:</span>
-              <span className="col-span-2 text-zinc-800 text-left font-semibold">{proposal.patientName || 'Não Informado'}</span>
+              <span className="col-span-2 text-zinc-800 text-left font-semibold">{patientName || 'Não Informado'}</span>
               
-              <span className="font-bold text-left">WhatsApp:</span>
-              <span className="col-span-2 text-zinc-800 text-left font-mono font-bold">
-                {proposal.patientData?.mobile || proposal.patientData?.phone || 'Nenhum número cadastrado'}
+              <span className="font-bold text-left">Contato:</span>
+              <span className="col-span-2 text-zinc-800 text-left font-semibold">
+                {pd.mobile || pd.phone || 'Nenhum número cadastrado'}
               </span>
 
               <span className="font-bold text-left">Doutor:</span>
@@ -1687,11 +1695,11 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                 <button
                   type="button"
                   onClick={() => {
-                    const phone = proposal.patientData?.mobile || proposal.patientData?.phone || '';
+                    const phone = pd.mobile || pd.phone || '';
                     const rawPhone = phone.replace(/\D/g, '');
                     const finalPhone = rawPhone ? `55${rawPhone}` : '';
                     let formattedMsg = whatsappCustomMsg
-                      .replace(/{paciente}/g, proposal.patientName || '')
+                      .replace(/{paciente}/g, patientName || '')
                       .replace(/{link_pdf}/g, generatedPdfUrl)
                       .replace(/{total}/g, formatCurrency(chosenSim.custoTotal));
                     const msg = window.encodeURIComponent(formattedMsg);
@@ -1719,10 +1727,10 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
         <button
           onClick={() => {
-            const phone = proposal.patientData?.mobile || proposal.patientData?.phone || '';
-            const rawPhone = phone.replace(/\D/g, '');
-            const finalPhone = rawPhone ? `55${rawPhone}` : '';
-            const msg = window.encodeURIComponent(`Olá${proposal.patientName ? ' ' + proposal.patientName.split(' ')[0] : ''}, tudo bem? Aqui segue o plano detalhado do seu tratamento odontológico, com as condições e os procedimentos que conversamos. Qualquer dúvida, estou à disposição!`);
+            const phone = pd.mobile || pd.phone || '';
+            const digitsOnly = phone.replace(/\D/g, '');
+            const finalPhone = (digitsOnly.length === 10 || digitsOnly.length === 11) ? '55' + digitsOnly : digitsOnly;
+            const msg = window.encodeURIComponent(`Olá${patientName ? ' ' + patientName.split(' ')[0] : ''}, tudo bem? Aqui segue o plano detalhado do seu tratamento odontológico, com as condições e os procedimentos que conversamos. Qualquer dúvida, estou à disposição!`);
             window.open(`https://wa.me/${finalPhone}?text=${msg}`, '_blank');
           }}
           className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1ebd57] text-white font-bold text-sm px-8 py-4 rounded-xl transition-all shadow-md cursor-pointer"

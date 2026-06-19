@@ -177,3 +177,24 @@ export const DEMO_SVG_PLACEHOLDERS = {
     <text x="400" y="160" fill="%236b7280" font-family="sans-serif" font-size="12" text-anchor="middle">Perfeito para dentes anteriores e planejamento estético</text>
   </svg>`,
 };
+
+export const INITIAL_SECTIONS: PhotoSection[] = [
+  { id: 'panoramic', title: 'Radiografia Panorâmica', subtitle: 'Planejamento de Implantes e Diagnósticos Gerais', image: null, markers: [] },
+  { id: 'upper', title: 'Arcada Superior', subtitle: 'Dentes Posteriores e Anteriores Superiores', image: null, markers: [] },
+  { id: 'lower', title: 'Arcada Inferior', subtitle: 'Dentes Posteriores e Anteriores Inferiores', image: null, markers: [] },
+  { id: 'smile', title: 'Estética do Sorriso', subtitle: 'Mapeamento de Dentes Anteriores e Estética', image: null, markers: [] },
+];
+
+export const INITIAL_PROPOSAL: TreatmentProposal = {
+  patientName: '',
+  status: 'Aberto (paciente não pagou)',
+  notes: 'Orçamento feito sem radiografia atual pós trat. de canal, podendo haver alterações posteriores.',
+  discountPercent: 5,
+  pixDiscountLabel: '5% DESCONTO NO PIX',
+  installments: 12,
+  installmentsLabel: 'Parcelamento em até 12x (com taxas).',
+  customDiscountAmount: 0,
+  showTotalBySection: true,
+  markerSize: 26,
+};
+

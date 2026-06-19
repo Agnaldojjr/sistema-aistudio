@@ -35,6 +35,7 @@ import MedicalDocumentModal from './MedicalDocumentModal';
 import * as XLSX from 'xlsx';
 import { saveTreatmentPlanToDrive, listPatientsFromDrive } from '../lib/drive';
 import { createCalendarEvent } from '../lib/calendar';
+import { usePatientContext } from '../context/PatientContext';
 
 interface PatientDocumentsTabProps {
   proposal: TreatmentProposal;
@@ -50,11 +51,14 @@ interface IssuedDeclaration {
 }
 
 export default function PatientDocumentsTab({ proposal, clinicSettings, setClinicSettings }: PatientDocumentsTabProps) {
-  const pd = proposal.patientData || {};
+  const { selectedPatient } = usePatientContext();
+  const pd = selectedPatient || proposal.patientData || {};
+  const patientName = selectedPatient ? selectedPatient.name : (proposal.patientName || '');
+  
   const [docModalType, setDocModalType] = useState<'receituario' | 'atestado' | 'declaracao' | null>(null);
   const [reprintData, setReprintData] = useState<{ arrival: string, departure: string } | null>(null);
   
-  const localStorageKey = `declarationsHistory_${proposal.patientName}`;
+  const localStorageKey = `declarationsHistory_${patientName}`;
   const [declarationsHistory, setDeclarationsHistory] = useState<IssuedDeclaration[]>(() => {
     try {
       const stored = localStorage.getItem(localStorageKey);
@@ -1488,7 +1492,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
       {docModalType && (
         <MedicalDocumentModal
            type={docModalType}
-           patientName={proposal.patientName}
+           patientName={patientName}
            patientData={pd}
            clinicSettings={clinicSettings}
            onClose={() => setDocModalType(null)}

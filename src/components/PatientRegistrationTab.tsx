@@ -1,6 +1,7 @@
-import React from 'react';
-import { TreatmentProposal, PatientData } from '../types';
+import React, { useEffect } from 'react';
+import { TreatmentProposal, PatientData, CRMPatient } from '../types';
 import { User, HeartPulse, MapPin, Building2, Save, MessageCircle, Cake, Sparkles, CalendarClock, AlertCircle, Phone } from 'lucide-react';
+import { usePatientContext } from '../context/PatientContext';
 
 interface PatientRegistrationTabProps {
   proposal: TreatmentProposal;
@@ -8,10 +9,20 @@ interface PatientRegistrationTabProps {
 }
 
 export default function PatientRegistrationTab({ proposal, setProposal }: PatientRegistrationTabProps) {
-  const pd = proposal.patientData || {};
+  const { selectedPatient, setSelectedPatient, saveContextToDrive, isSavingToDrive } = usePatientContext();
+  
+  // Use selectedPatient if available, otherwise fallback to proposal.patientData
+  const pd: Partial<CRMPatient> = selectedPatient || proposal.patientData || {};
 
   const [whatsappMessage, setWhatsappMessage] = React.useState('');
   const [selectedTemplate, setSelectedTemplate] = React.useState('confirmacao');
+
+  // Sync proposal.patientName if selectedPatient changes
+  useEffect(() => {
+    if (selectedPatient && selectedPatient.name !== proposal.patientName) {
+      setProposal(prev => ({ ...prev, patientName: selectedPatient.name, patientData: selectedPatient }));
+    }
+  }, [selectedPatient, setProposal, proposal.patientName]);
 
   React.useEffect(() => {
     const name = proposal.patientName || 'Paciente';
@@ -49,18 +60,34 @@ export default function PatientRegistrationTab({ proposal, setProposal }: Patien
     return createdDate < sixMonthsAgo;
   };
 
-  const handleUpdate = (field: keyof PatientData, value: string) => {
-    setProposal(prev => ({
-      ...prev,
-      patientData: {
-        ...(prev.patientData || {}),
-        [field]: value
-      }
-    }));
+  const handleUpdate = (field: keyof CRMPatient, value: string) => {
+    if (selectedPatient) {
+      const updatedPatient = { ...selectedPatient, [field]: value };
+      setSelectedPatient(updatedPatient);
+      setProposal(prev => ({
+        ...prev,
+        patientData: updatedPatient
+      }));
+    } else {
+      setProposal(prev => ({
+        ...prev,
+        patientData: {
+          ...(prev.patientData || {}),
+          [field]: value
+        }
+      }));
+    }
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProposal(prev => ({ ...prev, patientName: e.target.value.toUpperCase() }));
+    const newName = e.target.value.toUpperCase();
+    if (selectedPatient) {
+      const updatedPatient = { ...selectedPatient, name: newName };
+      setSelectedPatient(updatedPatient);
+      setProposal(prev => ({ ...prev, patientName: newName, patientData: updatedPatient }));
+    } else {
+      setProposal(prev => ({ ...prev, patientName: newName }));
+    }
   };
 
   return (
@@ -68,9 +95,22 @@ export default function PatientRegistrationTab({ proposal, setProposal }: Patien
       
       {/* 1. Dados Cadastrais */}
       <div className="border-b border-zinc-200">
-        <div className="bg-[#8B0000] text-white px-4 py-2.5 flex items-center gap-2 border-b border-[#C09553]/30">
-          <User className="w-4 h-4 text-[#C09553]" />
-          <h3 className="font-serif font-bold text-sm tracking-wide uppercase">Dados cadastrais</h3>
+        <div className="bg-[#8B0000] text-white px-4 py-2.5 flex items-center justify-between border-b border-[#C09553]/30">
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4 text-[#C09553]" />
+            <h3 className="font-serif font-bold text-sm tracking-wide uppercase">Dados cadastrais</h3>
+          </div>
+          {selectedPatient && (
+            <button
+              type="button"
+              onClick={saveContextToDrive}
+              disabled={isSavingToDrive}
+              className="flex items-center gap-1.5 px-3 py-1 bg-[#C09553] hover:bg-[#A88248] text-white rounded-lg text-[11px] font-bold shadow-sm transition-colors disabled:opacity-50"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {isSavingToDrive ? 'Salvando...' : 'Salvar no Drive'}
+            </button>
+          )}
         </div>
         <div className="p-4 space-y-4 text-xs bg-[#FAF8F5]/30">
           
