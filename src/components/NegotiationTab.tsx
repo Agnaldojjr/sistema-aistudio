@@ -141,10 +141,10 @@ export default function NegotiationTab({
     return cached ? parseFloat(cached) : 500;
   });
 
-  // Local state for Option 1 à vista method ('pix' | 'debito' | 'credito_vista')
-  const [firstOptionMethod, setFirstOptionMethod] = useState<'pix' | 'debito' | 'credito_vista'>(() => {
+  // Local state for Option 1 à vista method ('pix' | 'debito' | 'credito_vista' | 'credito_parcelado')
+  const [firstOptionMethod, setFirstOptionMethod] = useState<'pix' | 'debito' | 'credito_vista' | 'credito_parcelado'>(() => {
     const cached = localStorage.getItem('ag_neg_first_option_method');
-    return (cached as 'pix' | 'debito' | 'credito_vista') || 'pix';
+    return (cached as 'pix' | 'debito' | 'credito_vista' | 'credito_parcelado') || 'pix';
   });
 
   // Index of the chosen simulation to apply in the final printed PDF (0 = À Vista, 1 = Sim 1, 2 = Sim 2, 3 = Patient Offer)
@@ -233,7 +233,7 @@ export default function NegotiationTab({
     const effectiveFeeDecimal = isExceeded ? machineFeeDecimal : 0;
     const t0Ref = desiredNet / (1 - effectiveFeeDecimal);
 
-    // 1. Column index 0: À Vista (Pix / Débito / Crédito 1x)
+    // 1. Column index 0: À Vista ou Crédito Parcelado
     let name0 = 'À Vista no Pix';
     let label0 = 'PIX';
     let pctLabel0 = '100%';
@@ -268,6 +268,18 @@ export default function NegotiationTab({
       inst0 = desiredNet;
       t0 = desiredNet;
       option0FeeDecimal = credit1xRate;
+    } else if (firstOptionMethod === 'credito_parcelado') {
+      name0 = '100% no Cartão';
+      label0 = 'Sem Entrada';
+      pctLabel0 = '0%';
+      e0 = 0;
+      r0 = desiredNet;
+      ch0 = r0 / (1 - effectiveFeeDecimal);
+      taxa0 = ch0 - r0;
+      taxaAbsorvida0 = !isExceeded ? r0 * machineFeeDecimal : 0;
+      inst0 = ch0 / installments;
+      t0 = ch0;
+      option0FeeDecimal = machineFeeDecimal;
     }
 
     const recebimentoLiquido0 = e0 + ch0 * (1 - option0FeeDecimal);
@@ -593,7 +605,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       doc.setFontSize(8);
       doc.setTextColor(60, 60, 60);
       
-      if (selectedPlanIndex === 0) {
+      if (selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado') {
         let methodText = "";
         if (firstOptionMethod === 'pix') methodText = "PIX";
         else if (firstOptionMethod === 'debito') methodText = "Débito";
@@ -1141,12 +1153,13 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                       <div className="mt-2" onClick={(e) => e.stopPropagation()}>
                         <select
                           value={firstOptionMethod}
-                          onChange={(e) => setFirstOptionMethod(e.target.value as 'pix' | 'debito' | 'credito_vista')}
+                          onChange={(e) => setFirstOptionMethod(e.target.value as 'pix' | 'debito' | 'credito_vista' | 'credito_parcelado')}
                           className="w-full bg-[#FAF8F5] border border-[#D5CBB3] rounded-lg p-2 text-xs font-semibold text-zinc-700 focus:outline-none focus:border-[#8B0000]"
                         >
                           <option value="pix">À Vista: PIX</option>
                           <option value="debito">À Vista: Débito</option>
                           <option value="credito_vista">À Vista: Crédito 1x</option>
+                          <option value="credito_parcelado">Crédito Parcelado</option>
                         </select>
                       </div>
                     )}
@@ -1186,7 +1199,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                     )}
 
                     {/* Parcellation value detail */}
-                    {index === 0 ? (
+                    {index === 0 && firstOptionMethod !== 'credito_parcelado' ? (
                       <div className="py-2 text-center bg-zinc-50 border border-zinc-100/50 rounded-lg my-1">
                         <span className="text-[10px] text-zinc-400 uppercase tracking-wide block">Forma de Pagamento</span>
                         <strong className="text-sm font-bold text-[#8B0000] block font-mono mt-0.5">
@@ -1529,7 +1542,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
             <div className="bg-white border text-center p-2 rounded-lg">
               <span className="text-[9px] text-zinc-400 uppercase tracking-widest block font-bold">
-                {selectedPlanIndex === 0 
+                {selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado'
                   ? (firstOptionMethod === 'debito' 
                       ? 'Pagamento no Débito' 
                       : (firstOptionMethod === 'credito_vista' 
@@ -1541,7 +1554,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                 {formatCurrency(chosenSim.cobradoCard)}
               </span>
               <span className="text-[8.5px] text-zinc-400 block mt-0.5">
-                {selectedPlanIndex === 0 
+                {selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado'
                   ? (firstOptionMethod === 'pix' 
                       ? 'Nenhum saldo financiado' 
                       : 'Cobrado à vista no cartão')
@@ -1551,10 +1564,10 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
             <div className="col-span-2 bg-[#F5EFE3] border border-[#D5CBB3] p-2.5 rounded-lg flex justify-between items-center">
               <span className="text-[#8B0000] font-bold text-[10.5px] uppercase tracking-wider block">
-                {selectedPlanIndex === 0 ? 'Acordo de Pagamento:' : 'Acordo de Desembolso Mensal:'}
+                {selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado' ? 'Acordo de Pagamento:' : 'Acordo de Desembolso Mensal:'}
               </span>
               <span className="text-sm font-bold text-[#8B0000] font-mono whitespace-nowrap bg-white border border-[#D5CBB3] px-2 py-0.5 rounded-md">
-                {selectedPlanIndex === 0 
+                {selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado'
                   ? `Pagamento Único à Vista (${formatCurrency(chosenSim.custoTotal)})` 
                   : `${installments}x de ${formatCurrency(chosenSim.valorParcela)}`}
               </span>

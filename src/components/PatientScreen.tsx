@@ -77,7 +77,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
   const percentSim1 = useReactiveLocalStorage<number>('ag_neg_pct_sim1', 30);
   const percentSim2 = useReactiveLocalStorage<number>('ag_neg_pct_sim2', 50);
   const patientOfferInput = useReactiveLocalStorage<number>('ag_neg_offer_input', 500);
-  const firstOptionMethod = useReactiveLocalStorage<'pix' | 'debito' | 'credito_vista'>('ag_neg_first_option_method', 'pix');
+  const firstOptionMethod = useReactiveLocalStorage<'pix' | 'debito' | 'credito_vista' | 'credito_parcelado'>('ag_neg_first_option_method', 'pix');
   const selectedPlanIndex = useReactiveLocalStorage<number>('ag_neg_selected_plan', 0);
   const showInPatientScreen = useReactiveLocalStorage<boolean[]>('ag_neg_show_patient_sims', [true, false, false, false]);
   const customNetDesiredRaw = useReactiveLocalStorage<string | null>('ag_neg_custom_net', null);
@@ -138,7 +138,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
     const effectiveFeeDecimal = isExceeded ? machineFeeDecimal : 0;
     const t0Ref = desiredNet / (1 - effectiveFeeDecimal);
 
-    // 1. Column index 0: À Vista (Pix / Débito / Crédito 1x)
+    // 1. Column index 0: À Vista (Pix / Débito / Crédito 1x) ou Crédito Parcelado
     let name0 = 'À Vista no Pix';
     let label0 = 'PIX';
     let e0 = desiredNet;
@@ -162,6 +162,13 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
       ch0 = desiredNet;
       inst0 = desiredNet;
       t0 = desiredNet;
+    } else if (firstOptionMethod === 'credito_parcelado') {
+      name0 = '100% no Cartão';
+      label0 = 'Sem Entrada';
+      e0 = 0;
+      ch0 = desiredNet / (1 - effectiveFeeDecimal);
+      inst0 = ch0 / installments;
+      t0 = ch0;
     }
 
     const e1 = (desiredNet * percentSim1) / 100;
@@ -599,7 +606,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
                       </div>
 
                       <div className="divide-y divide-zinc-100 font-sans text-sm">
-                        {index === 0 ? (
+                        {index === 0 && firstOptionMethod !== 'credito_parcelado' ? (
                           <>
                             <div className="py-2 flex justify-between items-center">
                               <span className="text-zinc-500 font-medium text-xs">
@@ -620,7 +627,9 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
                         ) : (
                           <>
                             <div className="py-2 flex justify-between items-center">
-                              <span className="text-zinc-500 font-medium text-xs">Entrada (PIX/Dinheiro):</span>
+                              <span className="text-zinc-500 font-medium text-xs">
+                                {index === 0 && firstOptionMethod === 'credito_parcelado' ? 'Entrada (Nenhuma):' : 'Entrada (PIX/Dinheiro):'}
+                              </span>
                               <strong className="text-[#896A39] font-mono font-bold text-sm bg-[#FAF8F5] border border-[#E6DEC9] px-2 py-0.5 rounded-md">{formatCurrency(sim.entrada)}</strong>
                             </div>
 
