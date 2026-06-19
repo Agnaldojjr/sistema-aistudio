@@ -39,6 +39,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { getGoogleDriveCRMDatabase, saveGoogleDriveCRMDatabase } from '../lib/driveCrm';
+import { jsPDF } from 'jspdf';
 import { db } from '../firebase';
 import { collection, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
@@ -317,6 +318,219 @@ export default function DentalCRMView({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [syncingAnamnesis, setSyncingAnamnesis] = useState(false);
+  const [selectedAnamnesisDate, setSelectedAnamnesisDate] = useState<string>('');
+
+  const groupedAnamnese = useMemo(() => {
+    const groups: { [date: string]: any[] } = {};
+    (anamneseList || []).forEach(item => {
+      const d = item.date || 'Desconhecida';
+      if (!groups[d]) groups[d] = [];
+      groups[d].push(item);
+    });
+    return groups;
+  }, [anamneseList]);
+
+  useEffect(() => {
+    const dates = Object.keys(groupedAnamnese).sort((a, b) => b.localeCompare(a));
+    if (dates.length > 0 && (!selectedAnamnesisDate || !dates.includes(selectedAnamnesisDate))) {
+      setSelectedAnamnesisDate(dates[0]);
+    }
+  }, [groupedAnamnese, selectedAnamnesisDate]);
+
+  const uploadAnamnesisPdfToDrive = async (patientName: string, date: string, questions: { question: string; answer: string }[], signatureBase64: string) => {
+    try {
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // 1. Header (monogram / clinical title)
+      doc.setTextColor(138, 31, 39); // #8A1F27
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("DR. AGNALDO FERREIRA", 105, 25, { align: 'center', charSpace: 1.5 });
+      
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text("ODONTOLOGIA RESTAURADORA", 105, 30, { align: 'center', charSpace: 1 });
+      
+      doc.setDrawColor(192, 149, 83); // #C09553 gold line
+      doc.setLineWidth(0.5);
+      doc.line(35, 34, 175, 34);
+
+      // Title
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("ANAMNESE ODONTOLÓGICA DIGITAL", 105, 45, { align: 'center' });
+
+      // Patient & Date info
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Paciente: ${patientName.toUpperCase()}`, 20, 56);
+      doc.text(`Data de Envio: ${normalizeDateDisplay(date)}`, 20, 62);
+      
+      doc.line(20, 66, 190, 66);
+
+      // Render questions
+      let y = 74;
+      doc.setFontSize(9);
+      questions.forEach((q, index) => {
+        if (y > 250) {
+          doc.addPage();
+          y = 25;
+        }
+        
+        doc.setFont("helvetica", "bold");
+        const questionText = `${index + 1}. ${q.question}`;
+        const splitQuestion = doc.splitTextToSize(questionText, 170);
+        doc.text(splitQuestion, 20, y);
+        y += (splitQuestion.length * 4.5) + 1;
+
+        doc.setFont("helvetica", "normal");
+        const answerText = `R: ${q.answer}`;
+        const splitAnswer = doc.splitTextToSize(answerText, 170);
+        doc.text(splitAnswer, 25, y);
+        y += (splitAnswer.length * 4.5) + 5;
+      });
+
+      // Signature
+      if (signatureBase64) {
+        if (y > 220) {
+          doc.addPage();
+          y = 30;
+        }
+        y += 10;
+        doc.setFont("helvetica", "bold");
+        doc.text("Assinatura Eletrônica do Paciente:", 20, y);
+        y += 5;
+        
+        try {
+          doc.addImage(signatureBase64, 'PNG', 20, y, 60, 20);
+          y += 22;
+        } catch (err) {
+          console.warn("Failed to embed signature image in PDF:", err);
+        }
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.text(`Documento gerado e assinado eletronicamente pelo paciente em: ${normalizeDateDisplay(date)}`, 20, y);
+      }
+
+      // Footer contact line
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setTextColor(138, 31, 39); // #8A1F27
+        doc.setFontSize(8);
+        doc.text("Rua da Bahia, 1148 - Centro, Belo Horizonte - MG   dragnaldof@gmail.com", 105, 285, { align: 'center' });
+      }
+
+      const pdfBlob = doc.output('blob');
+      const filename = `Anamnese_${patientName.replace(/\s+/g, '_')}_${date.replace(/\//g, '-')}.pdf`;
+      await saveTreatmentPdfToDrive(patientName, pdfBlob, filename);
+    } catch (err) {
+      console.error("Erro ao salvar PDF de anamnese no Drive:", err);
+    }
+  };
+
+  const handleDownloadAnamnesisPdf = (date: string, questions: any[], signatureBase64: string) => {
+    if (!selectedPatient) return;
+    try {
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // 1. Header (monogram / clinical title)
+      doc.setTextColor(138, 31, 39); // #8A1F27
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("DR. AGNALDO FERREIRA", 105, 25, { align: 'center', charSpace: 1.5 });
+      
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text("ODONTOLOGIA RESTAURADORA", 105, 30, { align: 'center', charSpace: 1 });
+      
+      doc.setDrawColor(192, 149, 83); // #C09553 gold line
+      doc.setLineWidth(0.5);
+      doc.line(35, 34, 175, 34);
+
+      // Title
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("ANAMNESE ODONTOLÓGICA DIGITAL", 105, 45, { align: 'center' });
+
+      // Patient & Date info
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Paciente: ${selectedPatient.name.toUpperCase()}`, 20, 56);
+      doc.text(`Data de Envio: ${normalizeDateDisplay(date)}`, 20, 62);
+      
+      doc.line(20, 66, 190, 66);
+
+      // Render questions
+      let y = 74;
+      doc.setFontSize(9);
+      questions.forEach((q, index) => {
+        if (y > 250) {
+          doc.addPage();
+          y = 25;
+        }
+        
+        doc.setFont("helvetica", "bold");
+        const questionText = `${index + 1}. ${q.question || q.pergunta || ''}`;
+        const splitQuestion = doc.splitTextToSize(questionText, 170);
+        doc.text(splitQuestion, 20, y);
+        y += (splitQuestion.length * 4.5) + 1;
+
+        doc.setFont("helvetica", "normal");
+        const answerText = `R: ${q.answer || q.resposta || ''}`;
+        const splitAnswer = doc.splitTextToSize(answerText, 170);
+        doc.text(splitAnswer, 25, y);
+        y += (splitAnswer.length * 4.5) + 5;
+      });
+
+      // Signature
+      if (signatureBase64) {
+        if (y > 220) {
+          doc.addPage();
+          y = 30;
+        }
+        y += 10;
+        doc.setFont("helvetica", "bold");
+        doc.text("Assinatura Eletrônica do Paciente:", 20, y);
+        y += 5;
+        
+        try {
+          doc.addImage(signatureBase64, 'PNG', 20, y, 60, 20);
+          y += 22;
+        } catch (err) {
+          console.warn("Failed to embed signature image in PDF:", err);
+        }
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.text(`Documento gerado e assinado eletronicamente pelo paciente em: ${normalizeDateDisplay(date)}`, 20, y);
+      }
+
+      // Footer contact line
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setTextColor(138, 31, 39); // #8A1F27
+        doc.setFontSize(8);
+        doc.text("Rua da Bahia, 1148 - Centro, Belo Horizonte - MG   dragnaldof@gmail.com", 105, 285, { align: 'center' });
+      }
+
+      doc.save(`Anamnese_${selectedPatient.name.replace(/\s+/g, '_')}_${date.replace(/\//g, '-')}.pdf`);
+    } catch (err: any) {
+      alert("Erro ao baixar PDF da anamnese: " + err.message);
+    }
+  };
 
   const syncAnamnesisFromFirestore = async (patientId: string) => {
     if (!patientId || syncingAnamnesis) return;
@@ -334,6 +548,7 @@ export default function DentalCRMView({
         for (const docSnap of querySnapshot.docs) {
           const data = docSnap.data();
           const newQuestions = data.questions || [];
+          const submissionDate = data.date || new Date().toISOString().split('T')[0];
           
           newQuestions.forEach((qItem: any, idx: number) => {
             const qId = `ana_${patientId}_${Date.now()}_${idx}`;
@@ -342,18 +557,30 @@ export default function DentalCRMView({
               patientId,
               question: qItem.question,
               answer: qItem.answer,
-              date: data.date || new Date().toISOString().split('T')[0],
+              date: submissionDate,
               signature: data.signature || ''
             });
             addedCount++;
           });
+
+          // Upload PDF version of Anamnesis to Drive Documents folder
+          try {
+            await uploadAnamnesisPdfToDrive(
+              selectedPatient!.name,
+              submissionDate,
+              newQuestions.map((q: any) => ({ question: q.question, answer: q.answer })),
+              data.signature || ''
+            );
+          } catch (pdfErr) {
+            console.error("Erro ao gerar/salvar PDF de anamnese no Drive:", pdfErr);
+          }
           
           await deleteDoc(doc(db, "public_anamnesis", docSnap.id));
         }
         
         if (addedCount > 0) {
           await saveGoogleDriveCRMDatabase(crmData);
-          alert(`Ficha de Anamnese Digital preenchida pelo paciente importada com sucesso! (${addedCount} respostas adicionadas)`);
+          alert(`Ficha de Anamnese Digital preenchida pelo paciente importada com sucesso! (${addedCount} respostas adicionadas e salvas em PDF no Google Drive)`);
           refreshPatientSubModules(patientId);
         }
       }
@@ -3257,7 +3484,30 @@ export default function DentalCRMView({
                           <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">DADOS MÉDICOS</span>
                           <h4 className="font-serif font-bold text-lg text-[#8B0000]">Questionário Médico de Anamnese</h4>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {Object.keys(groupedAnamnese).length > 1 && (
+                            <select
+                              value={selectedAnamnesisDate}
+                              onChange={(e) => setSelectedAnamnesisDate(e.target.value)}
+                              className="px-3 py-1.5 text-xs font-bold border border-zinc-200 rounded-lg bg-white text-zinc-700 focus:outline-none"
+                            >
+                              {Object.keys(groupedAnamnese).sort((a, b) => b.localeCompare(a)).map(dateStr => (
+                                <option key={dateStr} value={dateStr}>
+                                  Ficha de: {normalizeDateDisplay(dateStr)}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          {selectedAnamnesisDate && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadAnamnesisPdf(selectedAnamnesisDate, groupedAnamnese[selectedAnamnesisDate] || [], (groupedAnamnese[selectedAnamnesisDate] || []).find(a => a.signature)?.signature || '')}
+                              className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-bold rounded-lg uppercase transition-all duration-200 cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Baixar PDF
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={handleSendAnamnesisLink}
@@ -3274,7 +3524,9 @@ export default function DentalCRMView({
                           >
                             <RefreshCw className={`w-3.5 h-3.5 ${syncingAnamnesis ? 'animate-spin' : ''}`} />
                           </button>
-                          <span className="bg-[#8B0000] text-[#FAF8F5] px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase">{anamneseList.length} Perguntas</span>
+                          <span className="bg-[#8B0000] text-[#FAF8F5] px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase">
+                            {Object.keys(groupedAnamnese).length} {Object.keys(groupedAnamnese).length === 1 ? 'Versão' : 'Versões'}
+                          </span>
                         </div>
                       </div>
 
@@ -3291,7 +3543,7 @@ export default function DentalCRMView({
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {anamneseList.map((a) => (
+                          {(groupedAnamnese[selectedAnamnesisDate] || []).map((a) => (
                             <div key={a.id} className="bg-[#FAF8F5] border border-[#E6DEC9]/65 p-4 rounded-xl space-y-2 relative overflow-hidden">
                               <div className="absolute right-2 top-2 bg-amber-50 rounded text-[8px] font-mono p-1 text-amber-800 font-bold">Q&A Check</div>
                               <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Pergunta Clínica:</span>
@@ -3303,18 +3555,18 @@ export default function DentalCRMView({
                             </div>
                           ))}
                           
-                          {/* If a signature exists, show it */}
-                          {anamneseList.some(a => a.signature) && (
+                          {/* If a signature exists for this version, show it */}
+                          {(groupedAnamnese[selectedAnamnesisDate] || []).some(a => a.signature) && (
                             <div className="md:col-span-2 bg-[#FAF8F5] border border-[#E6DEC9] p-4 rounded-xl space-y-3 relative overflow-hidden">
                               <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Assinatura Eletrônica do Paciente:</span>
                               <div className="bg-white border border-[#E6DEC9] p-3 rounded-lg flex flex-col items-center justify-center">
                                 <img 
-                                  src={anamneseList.find(a => a.signature).signature} 
+                                  src={(groupedAnamnese[selectedAnamnesisDate] || []).find(a => a.signature).signature} 
                                   alt="Assinatura Eletrônica" 
                                   className="max-h-24 bg-white select-none pointer-events-none" 
                                 />
                                 <span className="text-[10px] text-zinc-500 mt-2 font-mono">
-                                  Assinado digitalmente em: {normalizeDateDisplay(anamneseList.find(a => a.signature).date || new Date().toISOString().split('T')[0])}
+                                  Assinado digitalmente em: {normalizeDateDisplay(selectedAnamnesisDate)}
                                 </span>
                               </div>
                             </div>
