@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Upload, 
   FileSpreadsheet, 
@@ -57,7 +57,8 @@ import {
   uploadPatientImageToDrive,
   deleteFileFromDrive,
   saveTreatmentPlanToDrive,
-  downloadFileAsDataUrl
+  downloadFileAsDataUrl,
+  saveTreatmentPdfToDrive
 } from '../lib/drive';
 import ImageMarkupEditor from './ImageMarkupEditor';
 import { usePatientContext } from '../context/PatientContext';
@@ -3561,7 +3562,7 @@ export default function DentalCRMView({
                               <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Assinatura Eletrônica do Paciente:</span>
                               <div className="bg-white border border-[#E6DEC9] p-3 rounded-lg flex flex-col items-center justify-center">
                                 <img 
-                                  src={(groupedAnamnese[selectedAnamnesisDate] || []).find(a => a.signature).signature} 
+                                  src={(groupedAnamnese[selectedAnamnesisDate] || []).find(a => a.signature)?.signature || ''} 
                                   alt="Assinatura Eletrônica" 
                                   className="max-h-24 bg-white select-none pointer-events-none" 
                                 />
