@@ -2796,11 +2796,11 @@ export default function DentalCRMView({
                 </div>
 
                 {/* Sub-Tabs Grid Layout */}
-                <div className="border-b border-zinc-200 bg-[#FAF8F5] flex overflow-x-auto divide-x divide-zinc-200 no-scrollbar">
+                <div className="bg-[#FAF8F5] flex flex-wrap border-t border-l border-zinc-200">
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('info')}
-                    className={`px-4 py-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus:outline-none cursor-pointer transition-all ${
+                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'info'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -2811,7 +2811,7 @@ export default function DentalCRMView({
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('appointments')}
-                    className={`px-4 py-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus:outline-none cursor-pointer transition-all ${
+                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'appointments'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -2822,7 +2822,7 @@ export default function DentalCRMView({
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('anamnesis')}
-                    className={`px-4 py-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus:outline-none cursor-pointer transition-all ${
+                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'anamnesis'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -2833,7 +2833,7 @@ export default function DentalCRMView({
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('clinical')}
-                    className={`px-4 py-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus:outline-none cursor-pointer transition-all ${
+                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'clinical'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -2844,7 +2844,7 @@ export default function DentalCRMView({
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('treatment_plan')}
-                    className={`px-4 py-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus:outline-none cursor-pointer transition-all ${
+                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'treatment_plan'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -2855,7 +2855,7 @@ export default function DentalCRMView({
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('communication')}
-                    className={`px-4 py-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus:outline-none cursor-pointer transition-all ${
+                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'communication'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -2866,7 +2866,7 @@ export default function DentalCRMView({
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('financial')}
-                    className={`px-4 py-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus:outline-none cursor-pointer transition-all ${
+                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'financial'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -2877,7 +2877,7 @@ export default function DentalCRMView({
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('docs_gallery')}
-                    className={`px-4 py-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus:outline-none cursor-pointer transition-all ${
+                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'docs_gallery'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -2888,10 +2888,10 @@ export default function DentalCRMView({
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('drive_records')}
-                    className={`px-4 py-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap focus:outline-none cursor-pointer transition-all ${
+                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'drive_records'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
-                        : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 bg-amber-500/5 text-amber-900 font-semibold border-l'
+                        : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 bg-amber-500/5 text-amber-900 font-semibold'
                     }`}
                   >
                     ☁️ Biblioteca & Orçamentos (DRIVE) ({isLoadingDriveProposals || isLoadingDriveImages ? '...' : driveProposals.length + driveImages.length})
