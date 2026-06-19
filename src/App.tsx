@@ -729,7 +729,7 @@ export default function App() {
 
         {/* ── CRM ─────────────────────────────────────────────── */}
         {currentAppView === 'crm' && (
-          <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 max-w-7xl w-full mx-auto animate-fade-in-up">
+          <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 w-full animate-fade-in-up">
             <DentalCRMView
               onLoadPatientData={handleLoadPatientData}
               onNewProposal={handleNewProposalForPatient}
