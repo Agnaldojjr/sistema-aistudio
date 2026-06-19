@@ -33,6 +33,8 @@ import {
   Check
 } from 'lucide-react';
 import { getGoogleDriveCRMDatabase, saveGoogleDriveCRMDatabase } from '../lib/driveCrm';
+import { db } from '../firebase';
+import { collection, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { CRMPatient, CRMAppointment, CRMClinicalHistory, CRMCommunication } from '../types';
 import { z } from 'zod';
@@ -188,12 +190,14 @@ export default function DentalCRMView({
   onLoadPatientData,
   onNewProposal,
   onChangeView,
-  clinicSettings
+  clinicSettings,
+  onNewAppointment
 }: {
   onLoadPatientData?: (data: any) => void;
   onNewProposal?: (patientName: string) => void;
   onChangeView?: (view: any) => void;
   clinicSettings?: any;
+  onNewAppointment?: (patientName: string) => void;
 } = {}) {
   // Navigation
   const [activeSubTab, setActiveSubTab] = useState<'import' | 'crm'>('crm'); // Default directly to CRM for quick review!
@@ -280,6 +284,70 @@ export default function DentalCRMView({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [syncingAnamnesis, setSyncingAnamnesis] = useState(false);
+
+  const syncAnamnesisFromFirestore = async (patientId: string) => {
+    if (!patientId || syncingAnamnesis) return;
+    setSyncingAnamnesis(true);
+    try {
+      const q = query(collection(db, "public_anamnesis"), where("patientId", "==", patientId));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const crmData = await getGoogleDriveCRMDatabase();
+        if (!crmData.anamnese) crmData.anamnese = [];
+        
+        let addedCount = 0;
+        
+        for (const docSnap of querySnapshot.docs) {
+          const data = docSnap.data();
+          const newQuestions = data.questions || [];
+          
+          newQuestions.forEach((qItem: any, idx: number) => {
+            const qId = `ana_${patientId}_${Date.now()}_${idx}`;
+            crmData.anamnese.push({
+              id: qId,
+              patientId,
+              question: qItem.question,
+              answer: qItem.answer,
+              date: data.date || new Date().toISOString().split('T')[0],
+              signature: data.signature || ''
+            });
+            addedCount++;
+          });
+          
+          await deleteDoc(doc(db, "public_anamnesis", docSnap.id));
+        }
+        
+        if (addedCount > 0) {
+          await saveGoogleDriveCRMDatabase(crmData);
+          alert(`Ficha de Anamnese Digital preenchida pelo paciente importada com sucesso! (${addedCount} respostas adicionadas)`);
+          loadPatientSubModules(patientId);
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao sincronizar anamnese:", err);
+    } finally {
+      setSyncingAnamnesis(false);
+    }
+  };
+
+  const handleSendAnamnesisLink = () => {
+    if (!selectedPatient) return;
+    const name = encodeURIComponent(selectedPatient.name);
+    const id = selectedPatient.id;
+    const link = `${window.location.origin}?mode=anamnese&patientId=${id}&patientName=${name}`;
+    
+    navigator.clipboard.writeText(link);
+    
+    const msg = `Olá, ${selectedPatient.name}! Para agilizar o seu atendimento clínico, por favor preencha a sua Ficha de Anamnese Odontológica Digital clicando no link a seguir antes da sua consulta:\n\n🔗 ${link}\n\nQualquer dúvida, estamos à disposição!`;
+    const cleanNum = selectedPatient.mobile ? selectedPatient.mobile.replace(/\D/g, '') : '';
+    const waUrl = `https://wa.me/${(cleanNum.length === 10 || cleanNum.length === 11) ? '55' + cleanNum : cleanNum}?text=${encodeURIComponent(msg)}`;
+    
+    alert("Link de Anamnese copiado para a área de transferência! Abrindo WhatsApp para envio...");
+    window.open(waUrl, '_blank');
+  };
+
   // Load patient directory on mount or tab change
   useEffect(() => {
     loadPatientsFromFirestore();
@@ -290,6 +358,7 @@ export default function DentalCRMView({
     if (selectedPatient) {
       loadPatientSubModules(selectedPatient.id);
       syncGoogleDriveDataForPatient(selectedPatient.name);
+      syncAnamnesisFromFirestore(selectedPatient.id);
     } else {
       setAppointments([]);
       setClinicalHistory([]);
@@ -2495,14 +2564,30 @@ export default function DentalCRMView({
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDeletePatient(selectedPatient.id)}
-                    className="p-2 hover:bg-rose-900 border border-transparent hover:border-rose-700 rounded-lg text-rose-300 transition-colors cursor-pointer self-end sm:self-auto"
-                    title="Remover Prontuário"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onNewAppointment && selectedPatient) {
+                          onNewAppointment(selectedPatient.name);
+                        }
+                      }}
+                      className="px-3.5 py-2 bg-[#C09553] hover:bg-[#B48C4D] text-white text-xs font-bold rounded-xl uppercase tracking-wide transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                      title="Agendar nova consulta para este paciente"
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>Agendar Consulta</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePatient(selectedPatient.id)}
+                      className="p-2 hover:bg-rose-900 border border-transparent hover:border-rose-700 rounded-lg text-rose-300 transition-colors cursor-pointer"
+                      title="Remover Prontuário"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Sub-Tabs Grid Layout */}
@@ -2637,7 +2722,19 @@ export default function DentalCRMView({
                           <h5 className="font-bold text-zinc-800 uppercase tracking-wide text-[9px] border-b pb-1">Canais de Contato</h5>
                           <div className="flex justify-between items-center">
                             <span className="font-semibold text-zinc-400">WhatsApp / Celular:</span>
-                            <span className="text-emerald-700 font-bold">{selectedPatient.mobile || 'Não informado'}</span>
+                            {selectedPatient.mobile ? (
+                              <a
+                                href={`https://wa.me/${selectedPatient.mobile.replace(/\D/g, '').length === 10 || selectedPatient.mobile.replace(/\D/g, '').length === 11 ? '55' + selectedPatient.mobile.replace(/\D/g, '') : selectedPatient.mobile.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-emerald-750 font-bold hover:underline hover:text-emerald-600 flex items-center gap-1 cursor-pointer"
+                                title="Clique para enviar WhatsApp"
+                              >
+                                {selectedPatient.mobile}
+                              </a>
+                            ) : (
+                              <span className="text-zinc-500">Não informado</span>
+                            )}
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="font-semibold text-zinc-400">Telefone Fixo:</span>
@@ -2739,17 +2836,42 @@ export default function DentalCRMView({
                   {/* Panel C: Anamnesis details */}
                   {activeDetailTab === 'anamnesis' && (
                     <div className="space-y-4">
-                      <div className="border-b border-zinc-100 pb-3 flex justify-between items-center">
+                      <div className="border-b border-zinc-100 pb-3 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                         <div>
-                          <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">AVALIAÇÃO DE RISCO MÉDICO</span>
+                          <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">DADOS MÉDICOS</span>
                           <h4 className="font-serif font-bold text-lg text-[#8B0000]">Questionário Médico de Anamnese</h4>
                         </div>
-                        <span className="bg-[#8B0000] text-[#FAF8F5] px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase">{anamneseList.length} Perguntas</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleSendAnamnesisLink}
+                            className="px-3 py-1.5 bg-[#C09553] hover:bg-[#B48C4D] text-white text-[11px] font-bold rounded-lg uppercase transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                          >
+                            Enviar Anamnese Digital
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => syncAnamnesisFromFirestore(selectedPatient.id)}
+                            disabled={syncingAnamnesis}
+                            className="p-1.5 text-zinc-550 hover:text-[#8B0000] border border-zinc-200 hover:border-[#8B0000] rounded-lg transition-all cursor-pointer bg-white"
+                            title="Buscar respostas preenchidas pelo paciente"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${syncingAnamnesis ? 'animate-spin' : ''}`} />
+                          </button>
+                          <span className="bg-[#8B0000] text-[#FAF8F5] px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase">{anamneseList.length} Perguntas</span>
+                        </div>
                       </div>
 
                       {anamneseList.length === 0 ? (
-                        <div className="p-10 text-center border-2 border-dashed border-zinc-200 rounded-xl bg-[#FAF8F5]">
-                          <p className="text-xs text-zinc-400 italic">Nenhum check clínico de anamnese registrado. Envie arquivos ou preencha a ficha do paciente para popular.</p>
+                        <div className="p-10 text-center border-2 border-dashed border-zinc-200 rounded-xl bg-[#FAF8F5] flex flex-col items-center justify-center space-y-3">
+                          <p className="text-xs text-zinc-400 italic">Nenhum check clínico de anamnese registrado. Clique em 'Enviar Anamnese Digital' para mandar o link ao paciente responder.</p>
+                          <button
+                            type="button"
+                            onClick={handleSendAnamnesisLink}
+                            className="px-4 py-2 bg-[#8B0000] hover:bg-[#6c1b26] text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+                          >
+                            Enviar Link por WhatsApp
+                          </button>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2764,6 +2886,23 @@ export default function DentalCRMView({
                               </div>
                             </div>
                           ))}
+                          
+                          {/* If a signature exists, show it */}
+                          {anamneseList.some(a => a.signature) && (
+                            <div className="md:col-span-2 bg-[#FAF8F5] border border-[#E6DEC9] p-4 rounded-xl space-y-3 relative overflow-hidden">
+                              <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Assinatura Eletrônica do Paciente:</span>
+                              <div className="bg-white border border-[#E6DEC9] p-3 rounded-lg flex flex-col items-center justify-center">
+                                <img 
+                                  src={anamneseList.find(a => a.signature).signature} 
+                                  alt="Assinatura Eletrônica" 
+                                  className="max-h-24 bg-white select-none pointer-events-none" 
+                                />
+                                <span className="text-[10px] text-zinc-500 mt-2 font-mono">
+                                  Assinado digitalmente em: {normalizeDateDisplay(anamneseList.find(a => a.signature).date || new Date().toISOString().split('T')[0])}
+                                </span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

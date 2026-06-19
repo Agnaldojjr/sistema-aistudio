@@ -36,6 +36,7 @@ import SettingsView from './components/SettingsView';
 import ClinicalAttendanceManager from './components/ClinicalAttendanceManager';
 import MobileWorkspace from './components/MobileWorkspace';
 import DentalCRMView from './components/DentalCRMView';
+import PatientAnamnesisForm from './components/PatientAnamnesisForm';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from './types';
 import { DEFAULT_PROCEDURES, DEMO_SVG_PLACEHOLDERS, DEFAULT_CLINIC_SETTINGS } from './constants';
 import { initAuth, googleSignIn, logout } from './firebase';
@@ -634,6 +635,10 @@ export default function App() {
     return <PatientScreen hideSimulation={false} />;
   }
 
+  if (urlMode === 'anamnese') {
+    return <PatientAnamnesisForm />;
+  }
+
   // --- RENDER: Login Screen ---
   if (needsAuth) {
     return <LoginScreen onLogin={handleLogin} isLoggingIn={isLoggingIn} />;
@@ -730,6 +735,10 @@ export default function App() {
               onNewProposal={handleNewProposalForPatient}
               onChangeView={setCurrentAppView}
               clinicSettings={clinicSettings}
+              onNewAppointment={(patientName) => {
+                setAppointmentPatientName(patientName);
+                setCurrentAppView('calendar');
+              }}
             />
           </main>
         )}
