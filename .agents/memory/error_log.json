@@ -1,0 +1,10 @@
+[
+  {
+    "id": "ERR-20260619-001",
+    "timestamp": "2026-06-19T20:15:00Z",
+    "component": "DentalCRMView.tsx",
+    "symptom": "White screen crash when clicking on Patients tab",
+    "rootCause": "Lack of optional chaining on a .find() result inside the signature display segment, and missing React/module imports.",
+    "preventionRule": "Always check for useMemo import when using memoized arrays. Always use optional chaining (?.signature || '') when calling .find() inside JSX blocks."
+  }
+]
