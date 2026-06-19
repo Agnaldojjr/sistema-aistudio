@@ -4,6 +4,12 @@ import { createCalendarEvent, deleteCalendarEvent } from '../lib/calendar';
 import { addHours, addMinutes, format, parseISO } from 'date-fns';
 import { getGoogleDriveCRMDatabase } from '../lib/driveCrm';
 
+const TIME_SLOTS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2).toString().padStart(2, '0');
+  const m = (i % 2 === 0 ? '00' : '30');
+  return `${h}:${m}`;
+});
+
 interface EventModalProps {
   onClose: () => void;
   onSaved: () => void;
@@ -271,23 +277,52 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
                 <Clock className="w-4 h-4 text-zinc-400" /> Horário
               </label>
               <div className="flex items-center gap-2">
-                <input
-                  required
-                  type="time"
-                  step="1800"
-                  value={startTime}
-                  onChange={e => setStartTime(e.target.value)}
-                  className="w-full px-2 py-2 border border-zinc-300 rounded-xl focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20 text-sm"
-                />
+                {(() => {
+                  const startTimeSlots = [...TIME_SLOTS];
+                  if (startTime && !startTimeSlots.includes(startTime)) {
+                    startTimeSlots.push(startTime);
+                    startTimeSlots.sort();
+                  }
+                  return (
+                    <select
+                      value={startTime}
+                      onChange={e => {
+                        setStartTime(e.target.value);
+                        // Auto-set end time to 30 mins later if it's before or equal to start time
+                        const startIdx = TIME_SLOTS.indexOf(e.target.value);
+                        const endIdx = TIME_SLOTS.indexOf(endTime);
+                        if (startIdx >= 0 && (endIdx <= startIdx || endIdx > startIdx + 4)) {
+                          const nextIdx = (startIdx + 1) % TIME_SLOTS.length;
+                          setEndTime(TIME_SLOTS[nextIdx]);
+                        }
+                      }}
+                      className="w-full px-2 py-2 border border-zinc-300 rounded-xl focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20 text-sm bg-white cursor-pointer"
+                    >
+                      {startTimeSlots.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  );
+                })()}
                 <span className="text-zinc-400">às</span>
-                <input
-                  required
-                  type="time"
-                  step="1800"
-                  value={endTime}
-                  onChange={e => setEndTime(e.target.value)}
-                  className="w-full px-2 py-2 border border-zinc-300 rounded-xl focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20 text-sm"
-                />
+                {(() => {
+                  const endTimeSlots = [...TIME_SLOTS];
+                  if (endTime && !endTimeSlots.includes(endTime)) {
+                    endTimeSlots.push(endTime);
+                    endTimeSlots.sort();
+                  }
+                  return (
+                    <select
+                      value={endTime}
+                      onChange={e => setEndTime(e.target.value)}
+                      className="w-full px-2 py-2 border border-zinc-300 rounded-xl focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20 text-sm bg-white cursor-pointer"
+                    >
+                      {endTimeSlots.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  );
+                })()}
               </div>
             </div>
           </div>
