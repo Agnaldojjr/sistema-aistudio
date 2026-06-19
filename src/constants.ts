@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Procedure, ClinicSettings } from './types';
+import { Procedure, ClinicSettings, PhotoSection, TreatmentProposal } from './types';
 
 export const DEFAULT_CLINIC_SETTINGS: ClinicSettings = {
   doctorName: "Dr. Agnaldo Ferreira",

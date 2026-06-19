@@ -67,10 +67,7 @@ export default function NegotiationTab({
   setProposal,
   clinicSettings,
   currentFileId,
-  setCurrentFileId,
-  hasMarkers,
-  isEditMode,
-  activeTab
+  setCurrentFileId
 }: NegotiationTabProps) {
   const { selectedPatient } = usePatientContext();
   const patientName = selectedPatient ? selectedPatient.name : (proposal.patientName || '');

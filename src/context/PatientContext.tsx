@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { getGoogleDriveCRMDatabase, saveGoogleDriveCRMDatabase } from '../lib/driveCrm';
 import { CRMPatient, CRMAppointment, CRMClinicalHistory, CRMCommunication, PhotoSection, TreatmentProposal } from '../types';
-import { DEFAULT_PROPOSAL, DEMO_SVG_PLACEHOLDERS } from '../constants'; // we might need to export INITIAL_SECTIONS and INITIAL_PROPOSAL from constants or App.tsx
 
 interface PatientContextData {
   selectedPatient: CRMPatient | null;
@@ -39,9 +38,9 @@ interface PatientContextData {
   
   // Active Planning Tab states (Odontograma & Orçamento)
   activeSections: PhotoSection[];
-  setActiveSections: (sections: PhotoSection[]) => void;
+  setActiveSections: React.Dispatch<React.SetStateAction<PhotoSection[]>>;
   activeProposal: TreatmentProposal;
-  setActiveProposal: (proposal: TreatmentProposal) => void;
+  setActiveProposal: React.Dispatch<React.SetStateAction<TreatmentProposal>>;
   
   // Ações baseadas em "Botões de Salvar"
   saveContextToDrive: () => Promise<void>;

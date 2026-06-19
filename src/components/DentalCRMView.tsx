@@ -212,6 +212,8 @@ export default function DentalCRMView({
   // Navigation
   const [activeSubTab, setActiveSubTab] = useState<'import' | 'crm'>('crm'); // Default directly to CRM for quick review!
   
+  const [patients, setPatients] = useState<CRMPatient[]>([]);
+
   // Use PatientContext for global state
   const {
     selectedPatient, setSelectedPatient,
