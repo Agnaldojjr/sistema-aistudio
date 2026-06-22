@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Settings, Sparkles, MessageSquare, CheckCircle, RotateCcw } from 'lucide-react';
+import { Save, Settings, Sparkles, MessageSquare, CheckCircle, RotateCcw, Database } from 'lucide-react';
+import { getGoogleDriveCRMDatabase } from '../lib/driveCrm';
+import { saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
 
 interface SettingsViewProps {
   currentTheme: string;
@@ -57,6 +59,22 @@ export default function SettingsView({ currentTheme, onChangeTheme, clinicSettin
       
       setShowSavedToast(true);
       setTimeout(() => setShowSavedToast(false), 3000);
+    }
+  };
+
+  const [isMigrating, setIsMigrating] = useState(false);
+  const handleMigration = async () => {
+    if (!window.confirm("Isso fará o download do banco de dados do Google Drive e substituirá os dados locais do Supabase. Deseja continuar?")) return;
+    
+    setIsMigrating(true);
+    try {
+      const data = await getGoogleDriveCRMDatabase();
+      await saveSupabaseCRMDatabase(data);
+      alert("Migração concluída com sucesso! Recarregue a página para ver os dados.");
+    } catch (err: any) {
+      alert("Erro na migração: " + err.message);
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -249,6 +267,29 @@ export default function SettingsView({ currentTheme, onChangeTheme, clinicSettin
                 placeholder="Escreva a mensagem..."
               />
             </div>
+          </div>
+        </div>
+
+
+        {/* Section 3: Data Migration */}
+        <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+          <div className="bg-[#8B0000] text-white px-4 py-2.5 flex items-center gap-2 border-b border-[#C09553]/30">
+            <Database className="w-4 h-4 text-[#C09553]" />
+            <h3 className="font-serif font-bold text-sm tracking-wide uppercase">Migração de Dados</h3>
+          </div>
+          
+          <div className="p-5 space-y-4 text-xs">
+            <p className="text-zinc-500 leading-relaxed mb-2">
+              Utilize esta ferramenta para importar seu banco de dados antigo do Google Drive (JSON) para o novo banco de dados (Supabase Postgres).
+            </p>
+            <button
+              type="button"
+              disabled={isMigrating}
+              onClick={handleMigration}
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer disabled:opacity-50"
+            >
+              {isMigrating ? "Migrando..." : "Migrar do Google Drive para Supabase"}
+            </button>
           </div>
         </div>
 

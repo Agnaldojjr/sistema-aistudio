@@ -38,10 +38,9 @@ import {
   Activity,
   Image as ImageIcon
 } from 'lucide-react';
-import { getGoogleDriveCRMDatabase, saveGoogleDriveCRMDatabase } from '../lib/driveCrm';
+import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
 import { jsPDF } from 'jspdf';
-import { db } from '../firebase';
-import { collection, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import * as XLSX from 'xlsx';
 import { CRMPatient, CRMAppointment, CRMClinicalHistory, CRMCommunication } from '../types';
 import { z } from 'zod';
@@ -537,17 +536,20 @@ export default function DentalCRMView({
     if (!patientId || syncingAnamnesis) return;
     setSyncingAnamnesis(true);
     try {
-      const q = query(collection(db, "public_anamnesis"), where("patientId", "==", patientId));
-      const querySnapshot = await getDocs(q);
+      const { data: anamnesisDocs, error } = await supabase
+        .from('public_anamnesis')
+        .select('*')
+        .eq('patient_id', patientId);
       
-      if (!querySnapshot.empty) {
-        const crmData = await getGoogleDriveCRMDatabase();
+      if (error) throw error;
+
+      if (anamnesisDocs && anamnesisDocs.length > 0) {
+        const crmData = await getSupabaseCRMDatabase();
         if (!crmData.anamnese) crmData.anamnese = [];
         
         let addedCount = 0;
         
-        for (const docSnap of querySnapshot.docs) {
-          const data = docSnap.data();
+        for (const data of anamnesisDocs) {
           const newQuestions = data.questions || [];
           const submissionDate = data.date || new Date().toISOString().split('T')[0];
           
@@ -576,11 +578,11 @@ export default function DentalCRMView({
             console.error("Erro ao gerar/salvar PDF de anamnese no Drive:", pdfErr);
           }
           
-          await deleteDoc(doc(db, "public_anamnesis", docSnap.id));
+          await supabase.from('public_anamnesis').delete().eq('id', data.id);
         }
         
         if (addedCount > 0) {
-          await saveGoogleDriveCRMDatabase(crmData);
+          await saveSupabaseCRMDatabase(crmData);
           alert(`Ficha de Anamnese Digital preenchida pelo paciente importada com sucesso! (${addedCount} respostas adicionadas e salvas em PDF no Google Drive)`);
           refreshPatientSubModules(patientId);
         }
@@ -1173,7 +1175,7 @@ export default function DentalCRMView({
   const loadPatientsFromFirestore = async () => {
     setIsLoadingCRM(true);
     try {
-      const dbData = await getGoogleDriveCRMDatabase();
+      const dbData = await getSupabaseCRMDatabase();
       const list = dbData.patients || [];
       // Sort patients alphabetically
       list.sort((a: any, b: any) => a.name.localeCompare(b.name));
@@ -1271,7 +1273,7 @@ export default function DentalCRMView({
 
       let crmData: any;
       try {
-        crmData = await getGoogleDriveCRMDatabase();
+        crmData = await getSupabaseCRMDatabase();
       } catch (err: any) {
         setImportErrors(["Falha ao carregar banco de dados base do Google Drive. Verifique autenticação."]);
         setImporting(false);
@@ -1422,7 +1424,7 @@ export default function DentalCRMView({
 
       setImportProgress(60);
       try {
-        await saveGoogleDriveCRMDatabase(crmData);
+        await saveSupabaseCRMDatabase(crmData);
       } catch (err: any) {
         errors.push("Erro crítico: Falha ao salvar banco de dados do CRM no Drive: " + err.message);
       }
@@ -1692,7 +1694,7 @@ export default function DentalCRMView({
     
     let crmData: any;
     try {
-      crmData = await getGoogleDriveCRMDatabase();
+      crmData = await getSupabaseCRMDatabase();
     } catch (err: any) {
       setImportErrors(["Falha ao carregar banco de dados base do Google Drive. Verifique autenticação."]);
       setImporting(false);
@@ -2157,7 +2159,7 @@ export default function DentalCRMView({
     console.log("Saving generated CRM Database to Drive...");
 
     try {
-      await saveGoogleDriveCRMDatabase(crmData);
+      await saveSupabaseCRMDatabase(crmData);
     } catch (err: any) {
       errors.push("Erro crítico: Falha ao salvar banco de dados do CRM no Drive: " + err.message);
     }
@@ -2231,7 +2233,7 @@ export default function DentalCRMView({
     if (!newPatientData.name) return;
 
     try {
-      const crmData = await getGoogleDriveCRMDatabase();
+      const crmData = await getSupabaseCRMDatabase();
       if (!crmData.patients) crmData.patients = [];
       
       const code = newPatientData.codigo_paciente || `COD-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -2250,7 +2252,7 @@ export default function DentalCRMView({
       };
 
       crmData.patients.push(payload);
-      await saveGoogleDriveCRMDatabase(crmData);
+      await saveSupabaseCRMDatabase(crmData);
       
       setNewPatientData({
         name: '',
@@ -2274,12 +2276,12 @@ export default function DentalCRMView({
     }
 
     try {
-      const crmData = await getGoogleDriveCRMDatabase();
+      const crmData = await getSupabaseCRMDatabase();
       crmData.patients = (crmData.patients || []).filter((p: any) => p.id !== pId);
       crmData.appointments = (crmData.appointments || []).filter((p: any) => p.patientId !== pId);
       crmData.clinical_history = (crmData.clinical_history || []).filter((p: any) => p.patientId !== pId);
       crmData.communications = (crmData.communications || []).filter((p: any) => p.patientId !== pId);
-      await saveGoogleDriveCRMDatabase(crmData);
+      await saveSupabaseCRMDatabase(crmData);
 
       setSelectedPatient(null);
       await loadPatientsFromFirestore();

@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -22,12 +23,30 @@ async function startServer() {
     }
   });
 
+  // Configuração de Rate Limiting para as APIs
+  const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minuto
+    max: 10, // Limita a 10 requisições por IP a cada janela (1 minuto)
+    message: { error: 'Limite de requisições excedido. Por favor, tente novamente em alguns instantes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Aplica o rate limiter em todas as rotas /api/
+  app.use("/api/", apiLimiter);
+
   // API routes
   app.post("/api/suggest-prescription", async (req, res) => {
     try {
       const { procedure } = req.body;
-      if (!procedure) {
-        return res.status(400).json({ error: "Procedimento não informado." });
+      
+      // Validação de Input para evitar Prompt Injection e Payload Abuse
+      if (!procedure || typeof procedure !== 'string' || procedure.trim().length === 0) {
+        return res.status(400).json({ error: "Procedimento não informado ou em formato inválido." });
+      }
+
+      if (procedure.length > 1000) {
+        return res.status(400).json({ error: "A descrição do procedimento excede o tamanho máximo permitido (1000 caracteres)." });
       }
 
       const prompt = `Você é um dentista experiente. O usuário vai descrever o procedimento odontológico realizado e você deve sugerir automaticamente a prescrição e instruções (posologia) para o receituário do paciente.

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { getGoogleDriveCRMDatabase, saveGoogleDriveCRMDatabase } from '../lib/driveCrm';
+import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
 import { CRMPatient, CRMAppointment, CRMClinicalHistory, CRMCommunication, PhotoSection, TreatmentProposal } from '../types';
 
 interface PatientContextData {
@@ -92,7 +92,7 @@ export function PatientProvider({ children }: { children: ReactNode }) {
   const refreshPatientSubModules = useCallback(async (patientId: string) => {
     if (!patientId) return;
     try {
-      const crmData = await getGoogleDriveCRMDatabase();
+      const crmData = await getSupabaseCRMDatabase();
       
       setAppointments((crmData.appointments || []).filter((a: any) => a.patientId === patientId));
       setClinicalHistory((crmData.clinical_history || []).filter((h: any) => h.patientId === patientId));
@@ -148,7 +148,7 @@ export function PatientProvider({ children }: { children: ReactNode }) {
     if (!selectedPatient) return;
     setIsSavingToDrive(true);
     try {
-      const crmData = await getGoogleDriveCRMDatabase();
+      const crmData = await getSupabaseCRMDatabase();
       const pId = selectedPatient.id;
 
       // Atualiza o paciente global
@@ -201,8 +201,8 @@ export function PatientProvider({ children }: { children: ReactNode }) {
       crmData.tratamentos = mergeLists(crmData.tratamentos, updatedTratamentosList);
       crmData.odontograma = mergeLists(crmData.odontograma, updatedOdontogramaList);
 
-      await saveGoogleDriveCRMDatabase(crmData);
-      console.log('Salvo com sucesso no Drive via Context API!');
+      await saveSupabaseCRMDatabase(crmData);
+      console.log('Salvo com sucesso no Supabase via Context API!');
     } catch (err) {
       console.error("Erro ao salvar no Drive:", err);
       throw err; // Permite que a UI exiba o erro

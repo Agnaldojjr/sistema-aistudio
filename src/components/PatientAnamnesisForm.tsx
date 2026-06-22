@@ -1,7 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { db, auth } from '../firebase';
-import { collection, addDoc } from 'firebase/firestore';
-import { signInAnonymously } from 'firebase/auth';
+import { supabase } from '../lib/supabase';
 import { CheckCircle2, AlertCircle, RefreshCw, Sparkles, Send } from 'lucide-react';
 
 const AFLogoSVG = ({ className = '' }: { className?: string }) => (
@@ -140,19 +138,7 @@ export default function PatientAnamnesisForm() {
     };
 
     try {
-      // Ensure anonymous authentication for public access
-      if (!auth.currentUser) {
-        try {
-          await withTimeout(
-            signInAnonymously(auth),
-            8000,
-            "Tempo limite excedido ao iniciar sessão anônima. Verifique se o provedor de 'Acesso Anônimo' está ativo no console do Firebase."
-          );
-        } catch (authErr: any) {
-          console.warn('Anonymous auth failed, attempting direct write:', authErr);
-          // Continue anyway — Firestore rules may allow unauthenticated writes
-        }
-      }
+
 
       const canvas = canvasRef.current;
       const signatureBase64 = canvas ? canvas.toDataURL('image/png') : '';
@@ -169,20 +155,19 @@ export default function PatientAnamnesisForm() {
         { question: "Outras observações importantes sobre sua saúde?", answer: q8.trim() !== '' ? q8 : "Nenhuma" }
       ];
 
-      // Save document to public collection with timeout
-      await withTimeout(
-        addDoc(collection(db, "public_anamnesis"), {
-          patientId,
-          patientName,
-          date: new Date().toISOString().split('T')[0],
-          questions,
+      // Save document to Supabase public table
+      const { error: insertError } = await supabase
+        .from('public_anamnesis')
+        .insert({
+          patient_id: patientId,
+          questions: questions,
           signature: signatureBase64,
-          synced: false,
-          submittedAt: new Date().toISOString()
-        }),
-        10000,
-        "Tempo limite excedido ao salvar dados. Verifique se o banco de dados 'Cloud Firestore' foi criado/inicializado no console do Firebase e se as Regras de Segurança foram publicadas."
-      );
+          date: new Date().toISOString().split('T')[0]
+        });
+
+      if (insertError) {
+        throw new Error('Falha ao enviar anamnese: ' + insertError.message);
+      }
 
       setFormSubmitted(true);
     } catch (err: any) {

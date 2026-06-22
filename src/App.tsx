@@ -41,7 +41,7 @@ import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from './ty
 import { DEFAULT_PROCEDURES, DEMO_SVG_PLACEHOLDERS, DEFAULT_CLINIC_SETTINGS, INITIAL_PROPOSAL, INITIAL_SECTIONS } from './constants';
 import { initAuth, googleSignIn, logout } from './firebase';
 import { saveTreatmentPlanToDrive } from './lib/drive';
-import type { User } from 'firebase/auth';
+import type { User } from '@supabase/supabase-js';
 import { usePatientContext } from './context/PatientContext';
 
 // ─── Logo SVG (AF Monogram matching the brand identity) ─────────────────────
