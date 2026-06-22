@@ -7,15 +7,21 @@ export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
 ) => {
+  // Verifica a sessão inicial imediatamente para processar o hash do OAuth
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session) {
+      if (session.provider_token) cachedAccessToken = session.provider_token;
+      if (onAuthSuccess) onAuthSuccess(session.user, cachedAccessToken || '');
+    } else {
+      if (onAuthFailure) onAuthFailure();
+    }
+  });
+
   const { data: { subscription } } = supabase.auth.onAuthStateChange(
     (event, session) => {
       if (session) {
-        if (session.provider_token) {
-          cachedAccessToken = session.provider_token;
-        }
-        if (onAuthSuccess) {
-          onAuthSuccess(session.user, cachedAccessToken || '');
-        }
+        if (session.provider_token) cachedAccessToken = session.provider_token;
+        if (onAuthSuccess) onAuthSuccess(session.user, cachedAccessToken || '');
       } else {
         cachedAccessToken = null;
         if (onAuthFailure) onAuthFailure();
