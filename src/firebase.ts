@@ -1,16 +1,18 @@
 import { supabase } from './lib/supabase';
 import type { User } from '@supabase/supabase-js';
 
-let cachedAccessToken: string | null = null;
+let cachedAccessToken: string | null = localStorage.getItem('provider_token');
 
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
 ) => {
-  // Verifica a sessão inicial imediatamente para processar o hash do OAuth
   supabase.auth.getSession().then(({ data: { session } }) => {
     if (session) {
-      if (session.provider_token) cachedAccessToken = session.provider_token;
+      if (session.provider_token) {
+        cachedAccessToken = session.provider_token;
+        localStorage.setItem('provider_token', session.provider_token);
+      }
       if (onAuthSuccess) onAuthSuccess(session.user, cachedAccessToken || '');
     } else {
       if (onAuthFailure) onAuthFailure();
@@ -20,10 +22,14 @@ export const initAuth = (
   const { data: { subscription } } = supabase.auth.onAuthStateChange(
     (event, session) => {
       if (session) {
-        if (session.provider_token) cachedAccessToken = session.provider_token;
+        if (session.provider_token) {
+          cachedAccessToken = session.provider_token;
+          localStorage.setItem('provider_token', session.provider_token);
+        }
         if (onAuthSuccess) onAuthSuccess(session.user, cachedAccessToken || '');
       } else {
         cachedAccessToken = null;
+        localStorage.removeItem('provider_token');
         if (onAuthFailure) onAuthFailure();
       }
     }
@@ -37,8 +43,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // Não precisamos mais de escopos do Drive ou Calendar
-        // O Supabase por padrão já pede email e profile
+        scopes: 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events',
         queryParams: {
           access_type: 'offline',
           prompt: 'consent'
@@ -62,5 +67,6 @@ export const getAccessToken = async (): Promise<string | null> => {
 export const logout = async () => {
   await supabase.auth.signOut();
   cachedAccessToken = null;
+  localStorage.removeItem('provider_token');
 };
 
