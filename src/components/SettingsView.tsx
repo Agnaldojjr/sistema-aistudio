@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Settings, Sparkles, MessageSquare, CheckCircle, RotateCcw, Database } from 'lucide-react';
-import { getGoogleDriveCRMDatabase } from '../lib/driveCrm';
-import { saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
+import { Download, Save, Settings, Sparkles, MessageSquare, CheckCircle, RotateCcw, Database } from 'lucide-react';
+import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
 
 interface SettingsViewProps {
   currentTheme: string;
@@ -62,19 +61,24 @@ export default function SettingsView({ currentTheme, onChangeTheme, clinicSettin
     }
   };
 
-  const [isMigrating, setIsMigrating] = useState(false);
-  const handleMigration = async () => {
-    if (!window.confirm("Isso fará o download do banco de dados do Google Drive e substituirá os dados locais do Supabase. Deseja continuar?")) return;
-    
-    setIsMigrating(true);
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const handleBackup = async () => {
+    setIsBackingUp(true);
     try {
-      const data = await getGoogleDriveCRMDatabase();
-      await saveSupabaseCRMDatabase(data);
-      alert("Migração concluída com sucesso! Recarregue a página para ver os dados.");
+      const data = await getSupabaseCRMDatabase();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_odontocrm_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert("Erro na migração: " + err.message);
+      alert("Erro ao gerar backup: " + err.message);
     } finally {
-      setIsMigrating(false);
+      setIsBackingUp(false);
     }
   };
 
@@ -271,24 +275,25 @@ export default function SettingsView({ currentTheme, onChangeTheme, clinicSettin
         </div>
 
 
-        {/* Section 3: Data Migration */}
+        {/* Section 3: Data Backup */}
         <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
           <div className="bg-[#8B0000] text-white px-4 py-2.5 flex items-center gap-2 border-b border-[#C09553]/30">
             <Database className="w-4 h-4 text-[#C09553]" />
-            <h3 className="font-serif font-bold text-sm tracking-wide uppercase">Migração de Dados</h3>
+            <h3 className="font-serif font-bold text-sm tracking-wide uppercase">Gerenciamento de Dados</h3>
           </div>
           
           <div className="p-5 space-y-4 text-xs">
             <p className="text-zinc-500 leading-relaxed mb-2">
-              Utilize esta ferramenta para importar seu banco de dados antigo do Google Drive (JSON) para o novo banco de dados (Supabase Postgres).
+              Faça o download de todos os seus dados do CRM em formato JSON para mantê-los seguros como um backup offline.
             </p>
             <button
               type="button"
-              disabled={isMigrating}
-              onClick={handleMigration}
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer disabled:opacity-50"
+              disabled={isBackingUp}
+              onClick={handleBackup}
+              className="px-6 py-3 bg-[#4E1119] hover:bg-[#6c1b26] text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isMigrating ? "Migrando..." : "Migrar do Google Drive para Supabase"}
+              <Download className="w-4 h-4" />
+              {isBackingUp ? "Gerando Backup..." : "Fazer Backup Completo (Download)"}
             </button>
           </div>
         </div>

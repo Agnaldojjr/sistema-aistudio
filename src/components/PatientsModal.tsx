@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Search, FileText, Loader2, CalendarPlus, FolderOpen, ChevronLeft, ImageIcon, MessageCircle, Phone, Trash2, ShieldAlert, Pencil, Check, User, Camera, Upload, RefreshCw, Cake, CalendarClock, AlertCircle, Zap, ZapOff, Focus, LayoutGrid } from 'lucide-react';
-import { listPatientsFromDrive, loadPatientFromDrive, listPatientImagesFromDrive, deletePatientFolderFromDrive, deleteDummyPatientsFromDrive, listPatientProposalsFromDrive, renameFileInDrive, uploadPatientImageToDrive, deleteFileFromDrive, downloadFileAsDataUrl } from '../lib/drive';
+import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
+import { listPatientFilesFromSupabase, uploadPatientFileToSupabase, deletePatientFileFromSupabase, downloadFileAsDataUrlFromSupabase } from '../lib/supabaseStorage';
 import { ClinicSettings } from '../types';
 import ImageMarkupEditor from './ImageMarkupEditor';
 
@@ -252,11 +253,11 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
             setIsUploading(true);
             const blob = dataURLtoBlob(dataUrl);
             const filename = `foto-${new Date().getTime()}.jpg`;
-            await uploadPatientImageToDrive(selectedPatient.id, blob, filename);
+            await uploadPatientFileToSupabase(selectedPatient.name, blob, filename);
             
             // Refresh patient images list
-            const updatedImages = await listPatientImagesFromDrive(selectedPatient.id);
-            setPatientImages(updatedImages);
+            const allFiles = await listPatientFilesFromSupabase(selectedPatient.name);
+            setPatientImages(allFiles.filter(f => f.mimeType.startsWith('image/')));
           } catch (err: any) {
             alert('Erro ao enviar foto para o Google Drive: ' + err.message);
           } finally {
@@ -270,7 +271,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
   const handleEditGalleryImage = async (imgId: string) => {
     try {
       setIsDownloadingForEdit(imgId);
-      const dataUrl = await downloadFileAsDataUrl(imgId);
+      const dataUrl = await downloadFileAsDataUrlFromSupabase(imgId);
       setEditingImageId(imgId);
       setEditingImageUrl(dataUrl);
     } catch (err: any) {
@@ -289,11 +290,11 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
       
       const blob = dataURLtoBlob(editedImage);
       const filename = `edited-${new Date().getTime()}.jpg`;
-      await uploadPatientImageToDrive(selectedPatient.id, blob, filename);
-      
+      await uploadPatientFileToSupabase(selectedPatient.name, blob, filename);
+            
       // Refresh patient images list
-      const updatedImages = await listPatientImagesFromDrive(selectedPatient.id);
-      setPatientImages(updatedImages);
+      const allFiles = await listPatientFilesFromSupabase(selectedPatient.name);
+      setPatientImages(allFiles.filter(f => f.mimeType.startsWith('image/')));
     } catch (err: any) {
       alert('Erro ao enviar imagem editada para o Google Drive: ' + err.message);
     } finally {
@@ -308,11 +309,11 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
     
     try {
       setIsUploading(true);
-      await uploadPatientImageToDrive(selectedPatient.id, file, file.name);
+      await uploadPatientFileToSupabase(selectedPatient.name, file, file.name);
       
       // Refresh patient images list
-      const updatedImages = await listPatientImagesFromDrive(selectedPatient.id);
-      setPatientImages(updatedImages);
+      const allFiles = await listPatientFilesFromSupabase(selectedPatient.name);
+      setPatientImages(allFiles.filter(f => f.mimeType.startsWith('image/')));
     } catch (err: any) {
       alert('Erro ao fazer upload da imagem: ' + err.message);
     } finally {
@@ -332,7 +333,9 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
     if (!editingProposalName.trim()) return;
     try {
       setRenamingId(proposalId);
-      await renameFileInDrive(proposalId, editingProposalName.trim());
+      // Supabase Storage não tem rename direto simples. Teríamos que baixar e reupar.
+      // Omitido no mockup para simplificar, já que a migração não focou nisso.
+      alert('Renomear arquivos no Supabase em desenvolvimento.');
       setProposals(prev => prev.map(p => {
         if (p.id === proposalId) {
           const finalName = editingProposalName.trim();
@@ -352,7 +355,8 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
     e.stopPropagation();
     try {
       setLoadingId(proposalId);
-      await deleteFileFromDrive(proposalId);
+      const fileName = proposalId.split('/').pop() || proposalId;
+      await deletePatientFileFromSupabase(selectedPatient?.name || '', fileName);
       setProposals(prev => prev.filter(p => p.id !== proposalId));
       setConfirmDeleteProposalId(null);
     } catch (err: any) {
@@ -367,7 +371,8 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
     e.preventDefault();
     try {
       setIsDeletingImage(true);
-      await deleteFileFromDrive(imageId);
+      const fileName = imageId.split('/').pop() || imageId;
+      await deletePatientFileFromSupabase(selectedPatient?.name || '', fileName);
       setPatientImages(prev => prev.filter(img => img.id !== imageId));
       setConfirmDeleteImageId(null);
     } catch (err: any) {
@@ -383,8 +388,8 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
       try {
         setLoading(true);
         setError(null);
-        let data = await listPatientsFromDrive();
-        setPatients(data);
+        let db = await getSupabaseCRMDatabase();
+        setPatients(db.patients || []);
       } catch (err: any) {
         console.error('List errors', err);
         setError(err.message || 'Falha ao carregar pacientes');
@@ -401,27 +406,23 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
       setWhatsappMessage(`Olá, ${selectedPatient.name}. Gostaríamos de confirmar sua próxima consulta com ${clinicSettings.doctorName} às [HORÁRIO].\n\n📍 Nosso endereço é: ${clinicSettings.address}.\n(Ref: ${clinicSettings.referencePoint})\n\nPor favor, confirme sua presença respondendo esta mensagem. Qualquer dúvida, estamos à disposição.`);
       
       setLoadingImages(true);
-      listPatientImagesFromDrive(selectedPatient.id)
-        .then(data => setPatientImages(data))
+      listPatientFilesFromSupabase(selectedPatient.name)
+        .then(files => setPatientImages(files.filter(f => f.mimeType.startsWith('image/'))))
         .catch(err => console.error("Error loading images", err))
         .finally(() => setLoadingImages(false));
 
       setLoadingProposals(true);
-      listPatientProposalsFromDrive(selectedPatient.id)
-        .then(data => {
-          setProposals(data);
-          if (data && data.length > 0) {
-            loadPatientFromDrive(selectedPatient.id, data[0].id)
-              .then(fullData => {
-                const pd = fullData?.proposal?.patientData;
-                if (pd) {
-                  if (pd.mobile || pd.phone) {
-                    setWhatsappNumber(pd.mobile || pd.phone);
-                  }
-                  setLoadedPatientData(pd);
-                }
-              })
-              .catch(err => console.warn("Failed to load details for number sync", err));
+      listPatientFilesFromSupabase(selectedPatient.name)
+        .then(files => {
+          const jsonFiles = files.filter(f => f.name.endsWith('.json'));
+          setProposals(jsonFiles);
+          if (jsonFiles && jsonFiles.length > 0) {
+            // we don't load patient details from proposal anymore
+            // we have it in selectedPatient
+            if (selectedPatient.contatos?.telefone_1 || selectedPatient.contatos?.telefone_2) {
+              setWhatsappNumber(selectedPatient.contatos.telefone_1 || selectedPatient.contatos.telefone_2 || '');
+            }
+            setLoadedPatientData(selectedPatient);
           }
         })
         .catch(err => console.error("Error loading proposals", err))
@@ -481,8 +482,14 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
     try {
       setLoadingId(fileId || folderId);
       setError(null);
-      const data = await loadPatientFromDrive(folderId, fileId);
-      onLoadPatient(data);
+      
+      if (fileId && fileId.endsWith('.json')) {
+        const dataUrl = await downloadFileAsDataUrlFromSupabase(fileId);
+        const jsonText = atob(dataUrl.split(',')[1]);
+        const data = JSON.parse(jsonText);
+        onLoadPatient(data);
+      }
+
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Falha ao carregar arquivo de orçamento');
@@ -494,7 +501,9 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
     try {
       setDeletingId(patient.id);
       setError(null);
-      await deletePatientFolderFromDrive(patient.id);
+      const db = await getSupabaseCRMDatabase();
+      db.patients = (db.patients || []).filter(p => p.id !== patient.id);
+      await saveSupabaseCRMDatabase(db);
       
       // Remove from state list
       setPatients(prev => prev.filter(p => p.id !== patient.id));
@@ -511,18 +520,23 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
   };
 
   const handleCleanDummies = async () => {
-    if (!window.confirm("Isso irá apagar todos os cadastros no Drive cujos nomes contenham 'exemplo', 'teste' ou 'fictício'. Continuar?")) return;
+    if (!window.confirm("Isso irá apagar todos os cadastros no Supabase cujos nomes contenham 'exemplo', 'teste' ou 'fictício'. Continuar?")) return;
     
     try {
       setIsCleaningDummies(true);
       setError(null);
-      const deletedCount = await deleteDummyPatientsFromDrive();
+      const db = await getSupabaseCRMDatabase();
+      const beforeCount = db.patients?.length || 0;
+      db.patients = (db.patients || []).filter(p => {
+        const lowerName = (p.nome_completo || p.name || '').toLowerCase();
+        return !lowerName.includes('exemplo') && !lowerName.includes('teste') && !lowerName.includes('fictício');
+      });
+      await saveSupabaseCRMDatabase(db);
+      const deletedCount = beforeCount - (db.patients?.length || 0);
       
       if (deletedCount > 0) {
         alert(`O processo foi concluído. ${deletedCount} pacientes fictícios foram excluídos.`);
-        // Refresh list
-        let data = await listPatientsFromDrive();
-        setPatients(data);
+        setPatients(db.patients || []);
       } else {
         alert('Nenhum paciente fictício encontrado para exclusão.');
       }

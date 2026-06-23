@@ -28,7 +28,7 @@ import {
 import { motion } from 'motion/react';
 import { ClinicSettings, TreatmentProposal } from '../types';
 import { listCalendarEvents } from '../lib/calendar';
-import { listPatientsFromDrive } from '../lib/drive';
+import { getSupabaseCRMDatabase } from '../lib/supabaseCrm';
 import { addDays, subDays, format, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -93,16 +93,22 @@ export default function DashboardView({
       setLoadingRealData(true);
       
       try {
-        // Fetch patients folders list from Google Drive
-        const drivePatients = await listPatientsFromDrive();
+        // Fetch patients folders list from Supabase
+        const drivePatients = await (async () => { const db = await getSupabaseCRMDatabase(); return db.patients || []; })();
         
-        const { loadPatientFromDrive } = await import('../lib/drive');
+        const { getPatientFileUrlFromSupabase } = await import('../lib/supabaseStorage');
         const enriched = await Promise.all((drivePatients || []).map(async (p: any) => {
           let totalVal = parseFloat(p.appProperties?.total || "0");
           
           if (isNaN(totalVal) || totalVal === 0) {
             try {
-                const data = await loadPatientFromDrive(p.id);
+                const data = await (async () => {
+    const url = await getPatientFileUrlFromSupabase(p.id, "orcamento.json");
+    if (!url) return null;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return await r.json();
+  })();
                 if (data?.simulations?.length > 0) {
                   totalVal = data.simulations[data.selectedPlanIndex || 0]?.custoTotal || data.simulations[0]?.custoTotal || 0;
                 }
@@ -678,7 +684,7 @@ export default function DashboardView({
               <div className="flex flex-col items-center justify-center py-12 gap-3 text-zinc-500 text-xs">
                 <Loader2 className="w-6 h-6 animate-spin text-[#B48C4D]" />
                 <span className="font-semibold text-zinc-600">Sincronizando...</span>
-                <span className="text-[10px] text-zinc-400">Puxando dados do Google Drive</span>
+                <span className="text-[10px] text-zinc-400">Puxando dados do Supabase</span>
               </div>
             ) : realPatients.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">

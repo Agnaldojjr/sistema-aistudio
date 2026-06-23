@@ -26,7 +26,7 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import { createCalendarEvent } from '../lib/calendar';
-import { saveTreatmentPlanToDrive, uploadPatientImageToDrive, getOrCreatePatientFolderByName } from '../lib/drive';
+import { uploadPatientFileToSupabase } from '../lib/supabaseStorage';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from '../types';
 import { format, parseISO, addMinutes } from 'date-fns';
 
@@ -109,7 +109,7 @@ export default function MobileWorkspace({
         end: { dateTime: endDateTime.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
       });
 
-      // 2. Initialize Patient Profile in Google Drive to auto-create folder structure
+      // 2. Initialize Patient Profile in Supabase (auto-create by saving dummy state)
       const stateToSave = {
         proposal: {
           ...proposal,
@@ -120,7 +120,9 @@ export default function MobileWorkspace({
         procedures
       };
       
-      await saveTreatmentPlanToDrive(formattedName, stateToSave);
+      const jsonStr = JSON.stringify(stateToSave);
+      const fileBlob = new Blob([jsonStr], { type: 'application/json' });
+      await uploadPatientFileToSupabase(formattedName, fileBlob, 'orcamento_mobile.json');
 
       // 3. Set active patient in flow
       setProposal(prev => ({
@@ -357,12 +359,11 @@ export default function MobileWorkspace({
             canvas.toBlob(async (blob) => {
               if (blob) {
                 try {
-                  const folderId = await getOrCreatePatientFolderByName(pName);
                   const filename = `${targetSectionId}_capture_${Date.now()}.jpg`;
-                  await uploadPatientImageToDrive(folderId, blob, filename);
-                  console.log(`Mobile webcam capture saved to patient ${pName} on Drive`);
+                  await uploadPatientFileToSupabase(pName, blob, filename);
+                  console.log(`Mobile webcam capture saved to patient ${pName} on Supabase`);
                 } catch (err) {
-                  console.warn("Failed to upload mobile webcam snapshot to Drive:", err);
+                  console.warn("Failed to upload mobile webcam snapshot to Supabase:", err);
                 }
               }
             }, 'image/jpeg', 0.9);
@@ -393,12 +394,11 @@ export default function MobileWorkspace({
         // Upload to Google Drive patient folder in the background
         const pName = proposal.patientName;
         if (pName) {
-          getOrCreatePatientFolderByName(pName).then(async (folderId) => {
-            const filename = `${targetSectionId}_upload_${Date.now()}_${file.name}`;
-            await uploadPatientImageToDrive(folderId, file, filename);
-            console.log(`Mobile upload saved to patient ${pName} on Drive`);
+          const filename = `${targetSectionId}_upload_${Date.now()}_${file.name}`;
+          uploadPatientFileToSupabase(pName, file, filename).then(() => {
+            console.log(`Mobile upload saved to patient ${pName} on Supabase`);
           }).catch(err => {
-            console.warn("Failed to upload mobile image upload to Drive:", err);
+            console.warn("Failed to upload mobile image upload to Supabase:", err);
           });
         }
       }
@@ -421,11 +421,7 @@ export default function MobileWorkspace({
 
     setSyncsLoading(prev => ({ ...prev, [sectionId]: true }));
     try {
-      // 1. Get or create patient folder
-      const dummyProps = { proposal, sections, procedures };
-      const folders = await saveTreatmentPlanToDrive(pName, dummyProps);
-      
-      // 2. Convert DataUrl to Blob
+      // 1. Convert DataUrl to Blob
       const arr = sec.image.split(',');
       const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
       const bstr = atob(arr[1]);
@@ -436,10 +432,10 @@ export default function MobileWorkspace({
       }
       const blob = new Blob([u8arr], { type: mime });
 
-      // 3. Upload to Drive
+      // 2. Upload to Supabase
       const d = format(new Date(), 'yyyy-MM-dd_HH-mm');
       const filename = `${sectionId}_capture_${d}.jpeg`;
-      await uploadPatientImageToDrive(folders.id, blob, filename);
+      await uploadPatientFileToSupabase(pName, blob, filename);
 
       setSyncsSuccess(prev => ({ ...prev, [sectionId]: true }));
       setTimeout(() => {
@@ -447,7 +443,7 @@ export default function MobileWorkspace({
       }, 3000);
     } catch (err: any) {
       console.error(err);
-      alert('Erro ao enviar imagem ao Drive: ' + err.message);
+      alert('Erro ao enviar imagem ao Supabase: ' + err.message);
     } finally {
       setSyncsLoading(prev => ({ ...prev, [sectionId]: false }));
     }

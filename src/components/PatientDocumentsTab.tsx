@@ -33,7 +33,8 @@ import {
 } from 'lucide-react';
 import MedicalDocumentModal from './MedicalDocumentModal';
 import * as XLSX from 'xlsx';
-import { saveTreatmentPlanToDrive, listPatientsFromDrive } from '../lib/drive';
+import { getSupabaseCRMDatabase } from '../lib/supabaseCrm';
+import { uploadPatientFileToSupabase } from '../lib/supabaseStorage';
 import { createCalendarEvent } from '../lib/calendar';
 import { usePatientContext } from '../context/PatientContext';
 
@@ -795,11 +796,11 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
       // 1. Fetch current patient folders to prevent duplication if requested
       let existingPatientsSet = new Set<string>();
       if (skipDuplicates) {
-        setImportLogs(prev => [...prev, '[INFO] Carregando lista de pacientes do Google Drive para prevenção de duplicados...']);
         try {
-          const driveData = await listPatientsFromDrive();
+          const db = await getSupabaseCRMDatabase();
+          const driveData = db.patients || [];
           existingPatientsSet = new Set(driveData.map(p => p.name.toLowerCase().trim()));
-          setImportLogs(prev => [...prev, `[INFO] ${driveData.length} pacientes carregados do Drive.`]);
+          setImportLogs(prev => [...prev, `[INFO] ${driveData.length} pacientes carregados do Supabase.`]);
         } catch (setupErr: any) {
           setImportLogs(prev => [...prev, `[AVISO] Não foi possível verificar duplicados: ${setupErr.message || setupErr}`]);
         }
@@ -829,7 +830,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
         if (skipDuplicates && existingPatientsSet.has(patientName.toLowerCase())) {
           skips++;
           setImportProgress(prev => ({ ...prev, skipped: skips }));
-          setImportLogs(prev => [...prev, `[PULADO] Paciente "${patientName}" já existe no Drive.`]);
+          setImportLogs(prev => [...prev, `[PULADO] Paciente "${patientName}" já existe no Supabase.`]);
           continue;
         }
 
@@ -936,8 +937,10 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
             procedures: []
           };
 
-          // Save to Drive
-          await saveTreatmentPlanToDrive(patientName, stateToSave);
+          // Save to Supabase Storage
+          const jsonStr = JSON.stringify(stateToSave);
+          const fileBlob = new Blob([jsonStr], { type: 'application/json' });
+          await uploadPatientFileToSupabase(patientName, fileBlob, 'orcamento_imported.json');
 
           // Handle conditional calendar event
           let isScheduled = false;
@@ -1363,7 +1366,9 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
          ]
       };
 
-      await saveTreatmentPlanToDrive(patName, mockTreatmentState);
+      const jsonStr = JSON.stringify(mockTreatmentState);
+      const fileBlob = new Blob([jsonStr], { type: 'application/json' });
+      await uploadPatientFileToSupabase(patName, fileBlob, 'orcamento_quickaction.json');
       
       setDriveSyncStatuses(prev => ({ ...prev, [patName]: 'synced' }));
       
@@ -1376,7 +1381,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
         timestamp: new Date().toLocaleTimeString('pt-BR')
       }, ...prev]);
 
-      setActionSuccessMessage(`Pasta clinica de ${patName} estruturada com sucesso no Google Drive!`);
+      setActionSuccessMessage(`Pasta clinica de ${patName} estruturada com sucesso no Supabase!`);
       setTimeout(() => setActionSuccessMessage(''), 4000);
     } catch (err: any) {
       console.error(err);
@@ -1978,7 +1983,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                   <div className="space-y-4" id="qa-tab-drive-block">
                     <div className="bg-[#FAF8F5] border border-[#D5CBB3]/50 p-2.5 rounded-lg flex gap-2">
                       <Database className="w-4 h-4 text-[#C09553] shrink-0 mt-0.5" />
-                      <p className="leading-relaxed">Dispare a modelagem e criação instantânea de pastas para cada paciente diretamente no servidor Google Drive da clínica, arquivando com segurança fichas cadastrais, orçamentos e dados clínicos estruturados.</p>
+                      <p className="leading-relaxed">Dispare a modelagem e criação instantânea de pastas para cada paciente diretamente no servidor Supabase da clínica, arquivando com segurança fichas cadastrais, orçamentos e dados clínicos estruturados.</p>
                     </div>
 
                     <div className="overflow-x-auto border border-zinc-200 rounded-xl bg-white max-h-64 overflow-y-auto">
@@ -2025,7 +2030,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                                   >
                                     {status === 'synced' && <Check className="w-3 h-3 text-emerald-700" />}
                                     {status === 'syncing' && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
-                                    {status === 'synced' ? 'Sincronizado ✓' : status === 'syncing' ? 'Sincronizando...' : 'Salvar no Drive'}
+                                    {status === 'synced' ? 'Sincronizado ✓' : status === 'syncing' ? 'Sincronizando...' : 'Salvar no Supabase'}
                                   </button>
                                 </td>
                               </tr>

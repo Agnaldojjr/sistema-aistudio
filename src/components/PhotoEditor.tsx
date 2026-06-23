@@ -7,7 +7,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Info, Camera, X, SwitchCamera, Zap, ZapOff, ZoomIn, Loader2, ImageIcon, Focus } from 'lucide-react';
 import { PhotoSection, ToothMarker, Procedure } from '../types';
 import { DEMO_SVG_PLACEHOLDERS } from '../constants';
-import { listPatientImagesByName, downloadFileAsDataUrl, getOrCreatePatientFolderByName, uploadPatientImageToDrive } from '../lib/drive';
+import { listPatientFilesFromSupabase, downloadFileAsDataUrlFromSupabase, uploadPatientFileToSupabase } from '../lib/supabaseStorage';
 import ImageMarkupEditor from './ImageMarkupEditor';
 
 interface PhotoEditorProps {
@@ -70,14 +70,14 @@ export default function PhotoEditor({
     setIsLoadingGallery(true);
     setGalleryError(null);
     try {
-      const imgs = await listPatientImagesByName(patientName);
+      const imgs = await listPatientFilesFromSupabase(patientName);
       setGalleryImages(imgs);
       if (imgs.length === 0) {
         setGalleryError(`Nenhuma imagem encontrada na galeria do paciente "${patientName}".`);
       }
     } catch (err: any) {
       console.error(err);
-      setGalleryError('Erro ao carregar galeria do Google Drive: ' + err.message);
+      setGalleryError('Erro ao carregar galeria do Supabase: ' + err.message);
     } finally {
       setIsLoadingGallery(false);
     }
@@ -86,7 +86,7 @@ export default function PhotoEditor({
   const handleSelectGalleryImage = async (fileId: string) => {
     try {
       setIsDownloadingFromGallery(fileId);
-      const dataUrl = await downloadFileAsDataUrl(fileId);
+      const dataUrl = await downloadFileAsDataUrlFromSupabase(fileId);
       onUpdateSection({ ...section, image: dataUrl, markers: [] });
       setShowGallerySelector(false);
     } catch (err: any) {
@@ -280,17 +280,16 @@ export default function PhotoEditor({
           onUpdateSection({ ...section, image: dataUrl, markers: [] });
           stopCamera();
 
-          // Upload to Google Drive patient folder in the background
+          // Upload to Supabase patient folder in the background
           if (patientName) {
             canvas.toBlob(async (blob) => {
               if (blob) {
                 try {
-                  const folderId = await getOrCreatePatientFolderByName(patientName);
                   const filename = `${section.id}_capture_${Date.now()}.jpg`;
-                  await uploadPatientImageToDrive(folderId, blob, filename);
-                  console.log(`Webcam capture saved to patient ${patientName} on Drive`);
+                  await uploadPatientFileToSupabase(patientName, blob, filename);
+                  console.log(`Webcam capture saved to patient ${patientName} on Supabase`);
                 } catch (err) {
-                  console.warn("Failed to upload quadrant webcam snapshot to Drive:", err);
+                  console.warn("Failed to upload quadrant webcam snapshot to Supabase:", err);
                 }
               }
             }, 'image/jpeg', 0.9);
@@ -309,7 +308,6 @@ export default function PhotoEditor({
 
     if (patientName) {
       try {
-        const folderId = await getOrCreatePatientFolderByName(patientName);
         const arr = editedImage.split(',');
         const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
         const bstr = atob(arr[1]);
@@ -320,10 +318,10 @@ export default function PhotoEditor({
         }
         const blob = new Blob([u8arr], { type: mime });
         const filename = `${section.id}_edited_${Date.now()}.jpg`;
-        await uploadPatientImageToDrive(folderId, blob, filename);
-        console.log(`Edited quadrant saved to patient ${patientName} on Drive`);
+        await uploadPatientFileToSupabase(patientName, blob, filename);
+        console.log(`Edited quadrant saved to patient ${patientName} on Supabase`);
       } catch (err) {
-        console.warn("Failed to upload edited quadrant to Drive:", err);
+        console.warn("Failed to upload edited quadrant to Supabase:", err);
       }
     }
   };
@@ -366,15 +364,14 @@ export default function PhotoEditor({
         image: dataUrl,
       });
 
-      // Upload to Google Drive patient folder in the background
+      // Upload to Supabase patient folder in the background
       if (patientName) {
         try {
-          const folderId = await getOrCreatePatientFolderByName(patientName);
           const filename = `${section.id}_upload_${Date.now()}_${file.name}`;
-          await uploadPatientImageToDrive(folderId, file, filename);
-          console.log(`Quadrant upload saved to patient ${patientName} on Drive`);
+          await uploadPatientFileToSupabase(patientName, file, filename);
+          console.log(`Quadrant upload saved to patient ${patientName} on Supabase`);
         } catch (err) {
-          console.warn("Failed to upload quadrant image upload to Drive:", err);
+          console.warn("Failed to upload quadrant image upload to Supabase:", err);
         }
       }
     };

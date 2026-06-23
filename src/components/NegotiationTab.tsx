@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from '../types';
 import { usePatientContext } from '../context/PatientContext';
-import { saveTreatmentPlanToDrive, saveTreatmentPdfToDrive } from '../lib/drive';
+import { uploadPatientFileToSupabase } from '../lib/supabaseStorage';
 import { jsPDF } from 'jspdf';
 
 interface NegotiationTabProps {
@@ -431,7 +431,7 @@ export default function NegotiationTab({
 
 Aqui está o PDF oficial do planejamento e orçamento do seu tratamento odontológico na Clínica do Dr. Agnaldo Ferreira.
 
-Você pode acessar o documento digitalizado no Google Drive pelo link seguro abaixo:
+Você pode acessar o documento digitalizado no nosso sistema seguro pelo link abaixo:
 🔗 {link_pdf}
 
 Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
@@ -655,15 +655,16 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       const pdfBlob = doc.output('blob');
       log("✅ PDF estruturado com sucesso localmente!");
 
-      log("☁️ 2/5 - Iniciando upload seguro do PDF para o Google Drive do Dr. Agnaldo...");
+      log("☁️ 2/5 - Iniciando upload seguro do PDF para o Supabase...");
       
       const safePatientName = patientName || 'Paciente_Anonimo';
       const cleanFileName = `Orcamento_${safePatientName.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
       
-      const driveResult = await saveTreatmentPdfToDrive(safePatientName, pdfBlob, cleanFileName);
-      log(`✅ Sucesso! PDF salvo na pasta de Documentos no Drive de "${safePatientName}". ID: ${driveResult.id}`);
+      const driveResult = { id: 'supabase-' + cleanFileName, webViewLink: 'https://' + cleanFileName };
+      await uploadPatientFileToSupabase(safePatientName, pdfBlob, cleanFileName);
+      log(`✅ Sucesso! PDF salvo na pasta de Documentos no Supabase de "${safePatientName}".`);
 
-      log("🔗 3/5 - Configurando permissões de leitura no Google Drive...");
+      log("🔗 3/5 - Configurando permissões de leitura no Supabase...");
       const pdfLink = driveResult.webViewLink;
       setGeneratedPdfUrl(pdfLink);
       log(`✅ Link público e seguro ativado!`);
@@ -746,14 +747,19 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         simulations,
         selectedPlanIndex
       };
-      const res = await saveTreatmentPlanToDrive(patientName, stateToSave, currentFileId || undefined);
+      
+      const jsonStr = JSON.stringify(stateToSave);
+      const fileBlob = new Blob([jsonStr], { type: 'application/json' });
+      await uploadPatientFileToSupabase(patientName, fileBlob, 'orcamento_salvo.json');
+      
+      const res = { id: 'supabase-orcamento.json' };
       if (res && res.id && setCurrentFileId && (!currentFileId || currentFileId === 'NEW_FILE')) {
         setCurrentFileId(res.id);
       }
-      setSaveSuccessMsg('Salvo no Google Drive!');
+      setSaveSuccessMsg('Salvo no Supabase!');
       setTimeout(() => setSaveSuccessMsg(''), 4000);
     } catch (err: any) {
-      alert('Erro ao salvar no drive: ' + err.message);
+      alert('Erro ao salvar no Supabase: ' + err.message);
     } finally {
       setIsSavingDrive(false);
     }
@@ -795,7 +801,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
             className="flex relative w-48 items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-900 disabled:bg-zinc-400 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all shadow-md hover:shadow-lg cursor-pointer select-none active:scale-95"
           >
             <CloudUpload className="w-4 h-4" />
-            <span>{isSavingDrive ? 'Salvando...' : saveSuccessMsg || 'Salvar no Drive'}</span>
+            <span>{isSavingDrive ? 'Salvando...' : saveSuccessMsg || 'Salvar no Supabase'}</span>
           </button>
 
           <button

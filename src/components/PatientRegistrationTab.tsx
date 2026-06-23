@@ -9,7 +9,7 @@ interface PatientRegistrationTabProps {
 }
 
 export default function PatientRegistrationTab({ proposal, setProposal }: PatientRegistrationTabProps) {
-  const { selectedPatient, setSelectedPatient, saveContextToDrive, isSavingToDrive } = usePatientContext();
+  const { selectedPatient, setSelectedPatient, saveContextToSupabase, isSavingToSupabase } = usePatientContext();
   
   // Use selectedPatient if available, otherwise fallback to proposal.patientData
   const pd: Partial<CRMPatient> = selectedPatient || proposal.patientData || {};
@@ -103,12 +103,12 @@ export default function PatientRegistrationTab({ proposal, setProposal }: Patien
           {selectedPatient && (
             <button
               type="button"
-              onClick={saveContextToDrive}
-              disabled={isSavingToDrive}
+              onClick={saveContextToSupabase}
+              disabled={isSavingToSupabase}
               className="flex items-center gap-1.5 px-3 py-1 bg-[#C09553] hover:bg-[#A88248] text-white rounded-lg text-[11px] font-bold shadow-sm transition-colors disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
-              {isSavingToDrive ? 'Salvando...' : 'Salvar no Drive'}
+              {isSavingToSupabase ? 'Salvando...' : 'Salvar no Drive'}
             </button>
           )}
         </div>

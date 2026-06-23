@@ -37,7 +37,8 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        scopes: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events',
+        // Não precisamos mais de escopos do Drive ou Calendar
+        // O Supabase por padrão já pede email e profile
         queryParams: {
           access_type: 'offline',
           prompt: 'consent'

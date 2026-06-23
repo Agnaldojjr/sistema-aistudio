@@ -43,8 +43,8 @@ interface PatientContextData {
   setActiveProposal: React.Dispatch<React.SetStateAction<TreatmentProposal>>;
   
   // Ações baseadas em "Botões de Salvar"
-  saveContextToDrive: () => Promise<void>;
-  isSavingToDrive: boolean;
+  saveContextToSupabase: () => Promise<void>;
+  isSavingToSupabase: boolean;
   
   // Função para recarregar tudo do Drive
   refreshPatientSubModules: (patientId: string) => Promise<void>;
@@ -87,7 +87,7 @@ export function PatientProvider({ children }: { children: ReactNode }) {
   const [odontogramaList, setOdontogramaList] = useState<any[]>([]);
   const [activeSections, setActiveSections] = useState<PhotoSection[]>(INITIAL_SECTIONS);
   const [activeProposal, setActiveProposal] = useState<TreatmentProposal>(INITIAL_PROPOSAL);
-  const [isSavingToDrive, setIsSavingToDrive] = useState(false);
+  const [isSavingToSupabase, setIsSavingToSupabase] = useState(false);
 
   const refreshPatientSubModules = useCallback(async (patientId: string) => {
     if (!patientId) return;
@@ -144,9 +144,9 @@ export function PatientProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedPatient, refreshPatientSubModules]);
 
-  const saveContextToDrive = async () => {
+  const saveContextToSupabase = async () => {
     if (!selectedPatient) return;
-    setIsSavingToDrive(true);
+    setIsSavingToSupabase(true);
     try {
       const crmData = await getSupabaseCRMDatabase();
       const pId = selectedPatient.id;
@@ -207,7 +207,7 @@ export function PatientProvider({ children }: { children: ReactNode }) {
       console.error("Erro ao salvar no Drive:", err);
       throw err; // Permite que a UI exiba o erro
     } finally {
-      setIsSavingToDrive(false);
+      setIsSavingToSupabase(false);
     }
   };
 
@@ -226,8 +226,8 @@ export function PatientProvider({ children }: { children: ReactNode }) {
       odontogramaList, setOdontogramaList,
       activeSections, setActiveSections,
       activeProposal, setActiveProposal,
-      saveContextToDrive,
-      isSavingToDrive,
+      saveContextToSupabase,
+      isSavingToSupabase,
       refreshPatientSubModules
     }}>
       {children}

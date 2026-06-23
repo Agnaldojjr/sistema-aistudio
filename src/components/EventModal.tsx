@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar as CalendarIcon, Clock, User, Phone, Mail, MessageCircle, AlertCircle, Save, Trash2 } from 'lucide-react';
 import { createCalendarEvent, deleteCalendarEvent } from '../lib/calendar';
 import { addHours, addMinutes, format, parseISO } from 'date-fns';
-import { getGoogleDriveCRMDatabase } from '../lib/driveCrm';
+import { getSupabaseCRMDatabase } from '../lib/supabaseCrm';
 
 const TIME_SLOTS = Array.from({ length: 48 }, (_, i) => {
   const h = Math.floor(i / 2).toString().padStart(2, '0');
@@ -69,7 +69,7 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
 
   useEffect(() => {
     if (!isEditing) {
-      getGoogleDriveCRMDatabase()
+      getSupabaseCRMDatabase()
         .then((db: any) => {
           if (db?.patients) {
             const sorted = [...db.patients].sort((a: any, b: any) =>

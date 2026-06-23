@@ -45,20 +45,12 @@ import * as XLSX from 'xlsx';
 import { CRMPatient, CRMAppointment, CRMClinicalHistory, CRMCommunication } from '../types';
 import { z } from 'zod';
 import {
-  listPatientsFromDrive,
-  loadPatientFromDrive,
-  listPatientImagesFromDrive,
-  deletePatientFolderFromDrive,
-  deleteDummyPatientsFromDrive,
-  listPatientProposalsFromDrive,
-  getOrCreatePatientFolderByName,
-  renameFileInDrive,
-  uploadPatientImageToDrive,
-  deleteFileFromDrive,
-  saveTreatmentPlanToDrive,
-  downloadFileAsDataUrl,
-  saveTreatmentPdfToDrive
-} from '../lib/drive';
+  listPatientFilesFromSupabase,
+  uploadPatientFileToSupabase,
+  deletePatientFileFromSupabase,
+  renamePatientFileInSupabase,
+  getPatientFileUrlFromSupabase
+} from '../lib/supabaseStorage';
 import ImageMarkupEditor from './ImageMarkupEditor';
 import { usePatientContext } from '../context/PatientContext';
 
@@ -228,21 +220,21 @@ export default function DentalCRMView({
     pagamentosList, setPagamentosList,
     tratamentosList, setTratamentosList,
     odontogramaList, setOdontogramaList,
-    saveContextToDrive,
-    isSavingToDrive,
+    saveContextToSupabase,
+    isSavingToSupabase,
     refreshPatientSubModules
   } = usePatientContext();
 
   const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'appointments' | 'anamnesis' | 'clinical' | 'communication' | 'financial' | 'docs_gallery' | 'drive_records' | 'treatment_plan'>('info');
 
-  // Google Drive integration states
-  const [driveFolderId, setDriveFolderId] = useState<string | null>(null);
-  const [driveProposals, setDriveProposals] = useState<any[]>([]);
-  const [isLoadingDriveProposals, setIsLoadingDriveProposals] = useState(false);
-  const [driveImages, setDriveImages] = useState<any[]>([]);
-  const [isLoadingDriveImages, setIsLoadingDriveImages] = useState(false);
-  const [isDriveUploading, setIsDriveUploading] = useState(false);
-  const [driveError, setDriveError] = useState<string | null>(null);
+  // Supabase integration states
+  const [driveFolderId, setSupabaseFolderId] = useState<string | null>(null);
+  const [driveProposals, setSupabaseProposals] = useState<any[]>([]);
+  const [isLoadingSupabaseProposals, setIsLoadingSupabaseProposals] = useState(false);
+  const [driveImages, setSupabaseImages] = useState<any[]>([]);
+  const [isLoadingSupabaseImages, setIsLoadingSupabaseImages] = useState(false);
+  const [isSupabaseUploading, setIsSupabaseUploading] = useState(false);
+  const [driveError, setSupabaseError] = useState<string | null>(null);
   const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
   const [editingProposalName, setEditingProposalName] = useState<string>('');
   const [isLoadingProposalAction, setIsLoadingProposalAction] = useState<string | null>(null);
@@ -337,7 +329,7 @@ export default function DentalCRMView({
     }
   }, [groupedAnamnese, selectedAnamnesisDate]);
 
-  const uploadAnamnesisPdfToDrive = async (patientName: string, date: string, questions: { question: string; answer: string }[], signatureBase64: string) => {
+  const uploadAnamnesisPdfToSupabase = async (patientName: string, date: string, questions: { question: string; answer: string }[], signatureBase64: string) => {
     try {
       const doc = new jsPDF({
         orientation: 'p',
@@ -429,9 +421,9 @@ export default function DentalCRMView({
 
       const pdfBlob = doc.output('blob');
       const filename = `Anamnese_${patientName.replace(/\s+/g, '_')}_${date.replace(/\//g, '-')}.pdf`;
-      await saveTreatmentPdfToDrive(patientName, pdfBlob, filename);
+      await uploadPatientFileToSupabase(patientName, pdfBlob, filename);
     } catch (err) {
-      console.error("Erro ao salvar PDF de anamnese no Drive:", err);
+      console.error("Erro ao salvar PDF de anamnese no Supabase:", err);
     }
   };
 
@@ -566,16 +558,16 @@ export default function DentalCRMView({
             addedCount++;
           });
 
-          // Upload PDF version of Anamnesis to Drive Documents folder
+          // Upload PDF version of Anamnesis to Supabase Documents folder
           try {
-            await uploadAnamnesisPdfToDrive(
+            await uploadAnamnesisPdfToSupabase(
               selectedPatient!.name,
               submissionDate,
               newQuestions.map((q: any) => ({ question: q.question, answer: q.answer })),
               data.signature || ''
             );
           } catch (pdfErr) {
-            console.error("Erro ao gerar/salvar PDF de anamnese no Drive:", pdfErr);
+            console.error("Erro ao gerar/salvar PDF de anamnese no Supabase:", pdfErr);
           }
           
           await supabase.from('public_anamnesis').delete().eq('id', data.id);
@@ -583,7 +575,7 @@ export default function DentalCRMView({
         
         if (addedCount > 0) {
           await saveSupabaseCRMDatabase(crmData);
-          alert(`Ficha de Anamnese Digital preenchida pelo paciente importada com sucesso! (${addedCount} respostas adicionadas e salvas em PDF no Google Drive)`);
+          alert(`Ficha de Anamnese Digital preenchida pelo paciente importada com sucesso! (${addedCount} respostas adicionadas e salvas em PDF no Supabase)`);
           refreshPatientSubModules(patientId);
         }
       }
@@ -619,7 +611,7 @@ export default function DentalCRMView({
   useEffect(() => {
     if (selectedPatient) {
       // refreshPatientSubModules(selectedPatient.id); - This is now handled by the useEffect inside PatientContext!
-      syncGoogleDriveDataForPatient(selectedPatient.name);
+      syncGoogleSupabaseDataForPatient(selectedPatient.name);
       syncAnamnesisFromFirestore(selectedPatient.id);
     } else {
       setAppointments([]);
@@ -632,10 +624,10 @@ export default function DentalCRMView({
       setPagamentosList([]);
       setTratamentosList([]);
       setOdontogramaList([]);
-      setDriveFolderId(null);
-      setDriveProposals([]);
-      setDriveImages([]);
-      setDriveError(null);
+      setSupabaseFolderId(null);
+      setSupabaseProposals([]);
+      setSupabaseImages([]);
+      setSupabaseError(null);
       setIsCameraActive(false);
       stopCameraStream();
       setActiveDetailTab('info');
@@ -660,7 +652,7 @@ export default function DentalCRMView({
       const loadPlanData = async () => {
         setIsLoadingPlanData(true);
         try {
-          const data = await loadPatientFromDrive(driveFolderId, selectedProposalId);
+          const data = await (async () => { const url = await getPatientFileUrlFromSupabase(driveFolderId, selectedProposalId); const r = await fetch(url); return await r.json(); })();
           setSelectedProposalData(data);
           // Set as active plan if it's the latest proposal for the dashboard
           if (driveProposals.length > 0 && selectedProposalId === driveProposals[0].id) {
@@ -738,7 +730,7 @@ export default function DentalCRMView({
     return instances;
   };
 
-  // Handler to update the status of a procedure and save it to Google Drive
+  // Handler to update the status of a procedure and save it to Supabase
   const handleUpdateProcedureStatus = async (
     proposalData: any,
     sectionId: string,
@@ -800,115 +792,115 @@ export default function DentalCRMView({
     }
 
     try {
-      await saveTreatmentPlanToDrive(selectedPatient!.name, updatedData, selectedProposalId);
+      await uploadPatientFileToSupabase(selectedPatient!.name, new Blob([JSON.stringify(updatedData)], {type: "application/json"}), selectedProposalId);
     } catch (err: any) {
-      alert("Erro ao salvar alteração de status no Drive: " + err.message);
+      alert("Erro ao salvar alteração de status no Supabase: " + err.message);
     }
   };
 
-  const syncGoogleDriveDataForPatient = async (patientName: string) => {
-    setDriveError(null);
-    setDriveFolderId(null);
-    setDriveProposals([]);
-    setDriveImages([]);
+  const syncGoogleSupabaseDataForPatient = async (patientName: string) => {
+    setSupabaseError(null);
+    setSupabaseFolderId(null);
+    setSupabaseProposals([]);
+    setSupabaseImages([]);
     
     try {
-      setIsLoadingDriveProposals(true);
-      setIsLoadingDriveImages(true);
+      setIsLoadingSupabaseProposals(true);
+      setIsLoadingSupabaseImages(true);
       
-      const folderId = await getOrCreatePatientFolderByName(patientName);
-      setDriveFolderId(folderId);
+      const folderId = patientName;
+      setSupabaseFolderId(folderId);
       
       // Load proposals
       try {
-        const proposals = await listPatientProposalsFromDrive(folderId);
-        setDriveProposals(proposals || []);
+        const proposals = await listPatientFilesFromSupabase(folderId);
+        setSupabaseProposals(proposals || []);
       } catch (err: any) {
         console.warn("Failed to load proposals for folder:", folderId, err);
       } finally {
-        setIsLoadingDriveProposals(false);
+        setIsLoadingSupabaseProposals(false);
       }
 
       // Load images
       try {
-        const images = await listPatientImagesFromDrive(folderId);
-        setDriveImages(images || []);
+        const images = await listPatientFilesFromSupabase(folderId);
+        setSupabaseImages(images || []);
       } catch (err: any) {
         console.warn("Failed to load images for folder:", folderId, err);
       } finally {
-        setIsLoadingDriveImages(false);
+        setIsLoadingSupabaseImages(false);
       }
     } catch (err: any) {
-      console.warn("Drive folder sync failed", err);
-      setDriveError("Não foi possível conectar com o Google Drive para este paciente.");
-      setIsLoadingDriveProposals(false);
-      setIsLoadingDriveImages(false);
+      console.warn("Supabase folder sync failed", err);
+      setSupabaseError("Não foi possível conectar com o Supabase para este paciente.");
+      setIsLoadingSupabaseProposals(false);
+      setIsLoadingSupabaseImages(false);
     }
   };
 
-  const uploadDriveFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadSupabaseFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!driveFolderId || !e.target.files || e.target.files.length === 0) return;
     try {
-      setIsDriveUploading(true);
+      setIsSupabaseUploading(true);
       const file = e.target.files[0];
       const name = file.name;
-      await uploadPatientImageToDrive(driveFolderId, file, name);
+      await uploadPatientFileToSupabase(driveFolderId, file, name);
       // Refresh
-      const images = await listPatientImagesFromDrive(driveFolderId);
-      setDriveImages(images || []);
+      const images = await listPatientFilesFromSupabase(driveFolderId);
+      setSupabaseImages(images || []);
     } catch (err: any) {
-      alert("Erro ao enviar imagem ao Drive: " + err.message);
+      alert("Erro ao enviar imagem ao Supabase: " + err.message);
     } finally {
-      setIsDriveUploading(false);
+      setIsSupabaseUploading(false);
     }
   };
 
-  const deleteDriveFile = async (fileId: string) => {
-    if (!window.confirm("Deseja realmente excluir este arquivo do Google Drive?")) return;
+  const deleteSupabaseFile = async (fileId: string) => {
+    if (!window.confirm("Deseja realmente excluir este arquivo do Supabase?")) return;
     try {
-      setIsDriveUploading(true);
-      await deleteFileFromDrive(fileId);
+      setIsSupabaseUploading(true);
+      await deletePatientFileFromSupabase(driveFolderId || selectedPatient?.name || "Unknown", fileId);
       if (driveFolderId) {
-        const images = await listPatientImagesFromDrive(driveFolderId);
-        setDriveImages(images || []);
+        const images = await listPatientFilesFromSupabase(driveFolderId);
+        setSupabaseImages(images || []);
       }
     } catch (err: any) {
       alert("Erro ao excluir arquivo: " + err.message);
     } finally {
-      setIsDriveUploading(false);
+      setIsSupabaseUploading(false);
     }
   };
 
-  const deleteDriveProposalFile = async (fileId: string) => {
-    if (!window.confirm("Deseja realmente excluir este orçamento/projeto do Google Drive?")) return;
+  const deleteSupabaseProposalFile = async (fileId: string) => {
+    if (!window.confirm("Deseja realmente excluir este orçamento/projeto do Supabase?")) return;
     try {
-      setIsLoadingDriveProposals(true);
-      await deleteFileFromDrive(fileId);
+      setIsLoadingSupabaseProposals(true);
+      await deletePatientFileFromSupabase(driveFolderId || selectedPatient?.name || "Unknown", fileId);
       if (driveFolderId) {
-        const proposals = await listPatientProposalsFromDrive(driveFolderId);
-        setDriveProposals(proposals || []);
+        const proposals = await listPatientFilesFromSupabase(driveFolderId);
+        setSupabaseProposals(proposals || []);
       }
     } catch (err: any) {
       alert("Erro ao excluir orçamento: " + err.message);
     } finally {
-      setIsLoadingDriveProposals(false);
+      setIsLoadingSupabaseProposals(false);
     }
   };
 
-  const renameDriveProposalFile = async (fileId: string, currentName: string) => {
+  const renameSupabaseProposalFile = async (fileId: string, currentName: string) => {
     const newName = window.prompt("Digite o novo nome para o arquivo (com extensão .json):", currentName);
     if (!newName || newName.trim() === '' || newName === currentName) return;
     try {
-      setIsLoadingDriveProposals(true);
-      await renameFileInDrive(fileId, newName.trim());
+      setIsLoadingSupabaseProposals(true);
+      await renamePatientFileInSupabase(driveFolderId || selectedPatient?.name || "Unknown", fileId, newName.trim());
       if (driveFolderId) {
-        const proposals = await listPatientProposalsFromDrive(driveFolderId);
-        setDriveProposals(proposals || []);
+        const proposals = await listPatientFilesFromSupabase(driveFolderId);
+        setSupabaseProposals(proposals || []);
       }
     } catch (err: any) {
       alert("Erro ao renomear orçamento: " + err.message);
     } finally {
-      setIsLoadingDriveProposals(false);
+      setIsLoadingSupabaseProposals(false);
     }
   };
 
@@ -916,7 +908,7 @@ export default function DentalCRMView({
     if (!onLoadPatientData) return;
     try {
       setIsLoadingProposalAction(fileId);
-      const data = await loadPatientFromDrive(driveFolderId || '', fileId);
+      const data = await (async () => { const url = await getPatientFileUrlFromSupabase(driveFolderId || '', fileId); const r = await fetch(url); return await r.json(); })();
       onLoadPatientData(data);
       if (onChangeView) {
         onChangeView('planning');
@@ -1051,7 +1043,15 @@ export default function DentalCRMView({
   const handleEditGalleryImage = async (imgId: string) => {
     try {
       setIsDownloadingForEdit(imgId);
-      const dataUrl = await downloadFileAsDataUrl(imgId);
+      const img = driveImages.find(i => i.id === imgId);
+      if (!img || !img.thumbnailLink) throw new Error('URL da imagem não encontrada');
+      const r = await fetch(img.thumbnailLink);
+      const blob = await r.blob();
+      const dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
       setEditingGalleryImageId(imgId);
       setEditingGalleryImageUrl(dataUrl);
     } catch (err: any) {
@@ -1064,7 +1064,7 @@ export default function DentalCRMView({
   const handleSaveEditedGalleryImage = async (editedImage: string) => {
     if (!driveFolderId) return;
     try {
-      setIsDriveUploading(true);
+      setIsSupabaseUploading(true);
       setEditingGalleryImageUrl(null);
       setEditingGalleryImageId(null);
 
@@ -1078,15 +1078,15 @@ export default function DentalCRMView({
       }
       const blob = new Blob([u8arr], { type: mime });
       const filename = `edited-${new Date().getTime()}.jpg`;
-      await uploadPatientImageToDrive(driveFolderId, blob, filename);
+      await uploadPatientFileToSupabase(driveFolderId, blob, filename);
 
       // Refresh gallery
-      const updatedImages = await listPatientImagesFromDrive(driveFolderId);
-      setDriveImages(updatedImages);
+      const updatedImages = await listPatientFilesFromSupabase(driveFolderId);
+      setSupabaseImages(updatedImages);
     } catch (err: any) {
       alert('Erro ao salvar imagem editada: ' + err.message);
     } finally {
-      setIsDriveUploading(false);
+      setIsSupabaseUploading(false);
     }
   };
 
@@ -1108,7 +1108,7 @@ export default function DentalCRMView({
   const captureCameraSnapshot = async () => {
     if (!videoRef.current || !canvasRef.current || !driveFolderId) return;
     try {
-      setIsDriveUploading(true);
+      setIsSupabaseUploading(true);
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const width = video.videoWidth || 640;
@@ -1157,18 +1157,18 @@ export default function DentalCRMView({
       
       const filename = `snapshot_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '_')}.jpg`;
       const file = new File([blob], filename, { type: 'image/jpeg' });
-      await uploadPatientImageToDrive(driveFolderId, file, filename);
+      await uploadPatientFileToSupabase(driveFolderId, file, filename);
       
       // Refresh list
-      const images = await listPatientImagesFromDrive(driveFolderId);
-      setDriveImages(images || []);
+      const images = await listPatientFilesFromSupabase(driveFolderId);
+      setSupabaseImages(images || []);
       
       setIsCameraActive(false);
       stopCameraStream();
     } catch (err: any) {
       alert("Erro ao salvar foto: " + err.message);
     } finally {
-      setIsDriveUploading(false);
+      setIsSupabaseUploading(false);
     }
   };
 
@@ -1275,7 +1275,7 @@ export default function DentalCRMView({
       try {
         crmData = await getSupabaseCRMDatabase();
       } catch (err: any) {
-        setImportErrors(["Falha ao carregar banco de dados base do Google Drive. Verifique autenticação."]);
+        setImportErrors(["Falha ao carregar banco de dados base do Supabase. Verifique autenticação."]);
         setImporting(false);
         return;
       }
@@ -1426,7 +1426,7 @@ export default function DentalCRMView({
       try {
         await saveSupabaseCRMDatabase(crmData);
       } catch (err: any) {
-        errors.push("Erro crítico: Falha ao salvar banco de dados do CRM no Drive: " + err.message);
+        errors.push("Erro crítico: Falha ao salvar banco de dados do CRM no Supabase: " + err.message);
       }
 
       setImportProgress(100);
@@ -1696,7 +1696,7 @@ export default function DentalCRMView({
     try {
       crmData = await getSupabaseCRMDatabase();
     } catch (err: any) {
-      setImportErrors(["Falha ao carregar banco de dados base do Google Drive. Verifique autenticação."]);
+      setImportErrors(["Falha ao carregar banco de dados base do Supabase. Verifique autenticação."]);
       setImporting(false);
       return;
     }
@@ -2156,12 +2156,12 @@ export default function DentalCRMView({
     }
 
     setImportProgress(60);
-    console.log("Saving generated CRM Database to Drive...");
+    console.log("Saving generated CRM Database to Supabase...");
 
     try {
       await saveSupabaseCRMDatabase(crmData);
     } catch (err: any) {
-      errors.push("Erro crítico: Falha ao salvar banco de dados do CRM no Drive: " + err.message);
+      errors.push("Erro crítico: Falha ao salvar banco de dados do CRM no Supabase: " + err.message);
     }
     
     setImportProgress(100);
@@ -2359,7 +2359,7 @@ export default function DentalCRMView({
             Gestão de Pacientes
           </h2>
           <p className="text-sm text-zinc-500 mt-1 ml-10">
-            {patients.length} paciente{patients.length !== 1 ? 's' : ''} cadastrado{patients.length !== 1 ? 's' : ''} · Sincronizado com Google Drive
+            {patients.length} paciente{patients.length !== 1 ? 's' : ''} cadastrado{patients.length !== 1 ? 's' : ''} · Sincronizado com Supabase
           </p>
         </div>
 
@@ -3264,7 +3264,7 @@ export default function DentalCRMView({
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 bg-amber-500/5 text-amber-900 font-semibold'
                     }`}
                   >
-                    ☁️ Galeria & Orçamentos (DRIVE) ({isLoadingDriveProposals || isLoadingDriveImages ? '...' : driveProposals.length + driveImages.length})
+                    ☁️ Galeria & Orçamentos (DRIVE) ({isLoadingSupabaseProposals || isLoadingSupabaseImages ? '...' : driveProposals.length + driveImages.length})
                   </button>
                 </div>
 
@@ -3334,7 +3334,7 @@ export default function DentalCRMView({
                         </div>
                       ) : (
                         <div className="bg-[#FAF8F5] p-4 rounded-xl border border-dashed border-[#E6DEC9] text-center text-xs text-zinc-500">
-                          ℹ️ Nenhum orçamento ou plano de tratamento ativo localizado para esta paciente no Drive. 
+                          ℹ️ Nenhum orçamento ou plano de tratamento ativo localizado para esta paciente no Supabase. 
                           Para gerar um plano, abra o planejador 3D e salve um novo orçamento.
                         </div>
                       )}
@@ -3927,7 +3927,7 @@ export default function DentalCRMView({
                         </>
                       ) : (
                         <div className="p-8 text-center bg-[#FAF8F5] border border-dashed rounded-2xl border-zinc-200">
-                          <p className="text-xs text-zinc-555 italic">Nenhum plano ou orçamento ativo localizado no Google Drive para esta paciente.</p>
+                          <p className="text-xs text-zinc-555 italic">Nenhum plano ou orçamento ativo localizado no Supabase para esta paciente.</p>
                           <p className="text-[10px] text-zinc-400 mt-1 max-w-sm mx-auto">Para gerar o plano de evolução, crie um orçamento clicando no botão abaixo ou abra o Planejador 3D.</p>
                           <button
                             onClick={() => {
@@ -4157,7 +4157,7 @@ export default function DentalCRMView({
                     </div>
                   )}
 
-                  {/* Panel H: Google Drive Unified Cloud Library & Proposals */}
+                  {/* Panel H: Supabase Unified Cloud Library & Proposals */}
                   {activeDetailTab === 'drive_records' && (
                     <div className="space-y-6">
                       
@@ -4166,7 +4166,7 @@ export default function DentalCRMView({
                         <div>
                           <p className="text-xs font-bold text-[#8B0000] flex items-center gap-1.5 uppercase font-mono">
                             <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping inline-block" />
-                            Pasta do Paciente Ativa no Google Drive
+                            Pasta do Paciente Ativa no Supabase
                           </p>
                           <p className="text-xs text-zinc-650 mt-0.5">
                             Diretório: <span className="font-mono font-semibold bg-[#FAF8F5] px-1.5 py-0.5 border rounded text-[#8B0000]">/Planejador Odontológico/{selectedPatient ? selectedPatient.name.replace(/[^a-zA-Z0-9 ]/g, '').trim() : ''}</span>
@@ -4201,11 +4201,11 @@ export default function DentalCRMView({
                           </button>
                         </div>
 
-                        {isLoadingDriveProposals ? (
+                        {isLoadingSupabaseProposals ? (
                           <div className="flex justify-center p-8 bg-[#FAF8F5] border border-dashed rounded-xl">
                             <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs">
                               <Loader2 className="w-4 h-4 animate-spin text-[#C09553]" />
-                              <span>Lendo arquivos de projeto no Google Drive...</span>
+                              <span>Lendo arquivos de projeto no Supabase...</span>
                             </div>
                           </div>
                         ) : driveProposals.length === 0 ? (
@@ -4256,7 +4256,7 @@ export default function DentalCRMView({
                                 <div className="flex items-center justify-end gap-1.5 mt-4 pt-3 border-t border-zinc-100">
                                   <button
                                     type="button"
-                                    onClick={() => renameDriveProposalFile(prop.id, prop.name)}
+                                    onClick={() => renameSupabaseProposalFile(prop.id, prop.name)}
                                     className="p-1 px-2 text-[10px] font-bold hover:bg-zinc-100 border rounded text-zinc-650 transition-colors cursor-pointer flex items-center gap-1"
                                     title="Renomear arquivo"
                                   >
@@ -4265,9 +4265,9 @@ export default function DentalCRMView({
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => deleteDriveProposalFile(prop.id)}
+                                    onClick={() => deleteSupabaseProposalFile(prop.id)}
                                     className="p-1 px-2 text-[10px] font-bold hover:bg-[#FAF8F5] border rounded text-[#8B0000] border-transparent hover:border-[#E6DEC9] transition-colors cursor-pointer flex items-center gap-1"
-                                    title="Excluir arquivo do Drive"
+                                    title="Excluir arquivo do Supabase"
                                   >
                                     <Trash2 className="w-3 h-3" />
                                     Excluir
@@ -4309,8 +4309,8 @@ export default function DentalCRMView({
                                 type="file" 
                                 className="hidden" 
                                 accept="image/*" 
-                                onChange={uploadDriveFile} 
-                                disabled={isDriveUploading} 
+                                onChange={uploadSupabaseFile} 
+                                disabled={isSupabaseUploading} 
                               />
                             </label>
 
@@ -4495,26 +4495,26 @@ export default function DentalCRMView({
                               <button
                                 type="button"
                                 onClick={captureCameraSnapshot}
-                                disabled={isDriveUploading}
+                                disabled={isSupabaseUploading}
                                 className="px-5 py-2.5 bg-[#C09553] hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shadow-md flex items-center gap-2"
                               >
-                                {isDriveUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-                                Capturar e Salvar no Drive
+                                {isSupabaseUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                                Capturar e Salvar no Supabase
                               </button>
                             </div>
                           </div>
                         )}
 
-                        {isLoadingDriveImages ? (
+                        {isLoadingSupabaseImages ? (
                           <div className="flex justify-center p-8 bg-[#FAF8F5] border border-dashed rounded-xl">
                             <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs">
                               <Loader2 className="w-4 h-4 animate-spin text-[#C09553]" />
-                              <span>Lendo fotos clínicas da pasta no Google Drive...</span>
+                              <span>Lendo fotos clínicas da pasta no Supabase...</span>
                             </div>
                           </div>
                         ) : driveImages.length === 0 ? (
                           <div className="p-10 text-center bg-[#FAF8F5] border border-dashed rounded-xl border-zinc-200">
-                            <p className="text-xs text-zinc-450 italic">Nenhuma imagem clínica localizada na pasta do Drive.</p>
+                            <p className="text-xs text-zinc-450 italic">Nenhuma imagem clínica localizada na pasta do Supabase.</p>
                             <p className="text-[10px] text-zinc-450 mt-1 max-w-md mx-auto">Use os botões de envio acima para anexar tomografias ou raios-x corporativos.</p>
                           </div>
                         ) : (
@@ -4582,7 +4582,7 @@ export default function DentalCRMView({
                                   )}
                                   <button
                                     type="button"
-                                    onClick={() => deleteDriveFile(img.id)}
+                                    onClick={() => deleteSupabaseFile(img.id)}
                                     className="p-1 px-1.5 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded text-rose-500 transition-colors cursor-pointer"
                                     title="Remover"
                                   >
