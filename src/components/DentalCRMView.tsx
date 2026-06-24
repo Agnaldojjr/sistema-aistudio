@@ -52,6 +52,7 @@ import {
   getPatientFileUrlFromSupabase
 } from '../lib/supabaseStorage';
 import ImageMarkupEditor from './ImageMarkupEditor';
+import { AIAssistedWhatsApp } from './AIAssistedWhatsApp';
 import { usePatientContext } from '../context/PatientContext';
 
 // --- ZOD SCHEMAS FOR HISTORICAL IMPORT CONTENT VALIDATION ---
@@ -916,7 +917,13 @@ export default function DentalCRMView({
     if (!onLoadPatientData) return;
     try {
       setIsLoadingProposalAction(fileId);
-      const data = await (async () => { const url = await getPatientFileUrlFromSupabase(driveFolderId || '', fileId); const r = await fetch(url); return await r.json(); })();
+      const data = await (async () => { 
+        const url = await getPatientFileUrlFromSupabase(driveFolderId || '', fileId); 
+        if (!url) throw new Error("Arquivo não encontrado ou sem permissão de leitura.");
+        const r = await fetch(url); 
+        if (!r.ok) throw new Error("Falha ao baixar o arquivo.");
+        return await r.json(); 
+      })();
       onLoadPatientData(data);
       if (onChangeView) {
         onChangeView('planning');
@@ -4094,8 +4101,15 @@ export default function DentalCRMView({
                   {activeDetailTab === 'communication' && (
                     <div className="space-y-6">
                       
-                      {/* Envio de WhatsApp e Confirmador */}
-                      <div className="space-y-4">
+                      {/* Envio de WhatsApp e Confirmador com IA */}
+                      {selectedPatient && (
+                        <AIAssistedWhatsApp 
+                          patientName={selectedPatient.name} 
+                          patientPhone={selectedPatient.mobile || selectedPatient.phone || ''} 
+                        />
+                      )}
+
+                      <div className="space-y-4 pt-4 border-t border-zinc-100">
                         <div className="border-b border-zinc-100 pb-3">
                           <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">REGISTROS DE CONTATOS</span>
                           <h4 className="font-serif font-bold text-lg text-[#8B0000]">Confirmações e Lembretes Enviados</h4>

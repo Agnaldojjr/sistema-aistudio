@@ -53,6 +53,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
   const [whatsappMessage, setWhatsappMessage] = useState('');
   const [loadedPatientData, setLoadedPatientData] = useState<any | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('confirmacao');
+  const [isGeneratingMessage, setIsGeneratingMessage] = useState(false);
 
   const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
   const [editingProposalName, setEditingProposalName] = useState<string>('');
@@ -382,6 +383,41 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
     }
   };
 
+  const handleGenerateMessageWithAI = async () => {
+    if (!selectedPatient) return;
+    setIsGeneratingMessage(true);
+    try {
+      let lastProcedure = "Tratamento Geral";
+      if (proposals && proposals.length > 0) {
+        lastProcedure = proposals[0].name.replace('.json', '');
+      }
+      
+      const response = await fetch('/api/ai/recall', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientName: selectedPatient.name,
+          lastProcedure,
+          lastVisitDate: selectedPatient.createdTime || new Date().toISOString(),
+          doctorName: clinicSettings.doctorName
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.message) {
+          setWhatsappMessage(data.message);
+        }
+      } else {
+        alert('Falha ao gerar mensagem com IA.');
+      }
+    } catch (error) {
+      console.error('Error generating AI message:', error);
+      alert('Erro na comunicação com a IA.');
+    } finally {
+      setIsGeneratingMessage(false);
+    }
+  };
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -817,7 +853,17 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                          />
                       </div>
 
-                      <div className="flex justify-end">
+                      <div className="flex justify-between items-center flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={handleGenerateMessageWithAI}
+                          disabled={isGeneratingMessage}
+                          className="w-full sm:w-auto px-6 py-2.5 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 cursor-pointer text-xs disabled:opacity-50"
+                        >
+                          {isGeneratingMessage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                          Gerar Mensagem de Retorno com IA
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => {

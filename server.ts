@@ -581,6 +581,67 @@ Procedimento realizado: ${procedure}`;
     }
   });
 
+  // ==========================================
+  // ROTAS DE IA PARA O CRM / WHATSAPP
+  // ==========================================
+  app.post("/api/ai/recall", async (req, res) => {
+    try {
+      const { patientName, lastProcedure, lastVisitDate, doctorName } = req.body;
+      
+      if (!patientName || !lastProcedure || !lastVisitDate || !doctorName) {
+        return res.status(400).json({ error: "Parâmetros incompletos." });
+      }
+
+      const prompt = `Você é um assistente de dentista ajudando o(a) Dr(a). ${doctorName}.
+O paciente ${patientName} fez o procedimento de ${lastProcedure} na data ${lastVisitDate}.
+Crie uma mensagem curta, calorosa e empática para WhatsApp, perguntando como o paciente está após o tratamento e sugerindo que agende uma consulta de retorno ou avaliação, se necessário.
+A mensagem deve ser direta, amigável e pronta para ser enviada no WhatsApp. Não inclua saudações iniciais suas.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          temperature: 0.7,
+        }
+      });
+
+      res.json({ message: response.text });
+    } catch (error: any) {
+      console.error("Gemini API Error (recall):", error);
+      res.status(500).json({ error: "Erro ao gerar mensagem de recall." });
+    }
+  });
+
+  app.post("/api/ai/budget-script", async (req, res) => {
+    try {
+      const { patientName, doctorName, procedures } = req.body;
+      
+      if (!patientName || !doctorName || !procedures || !Array.isArray(procedures)) {
+        return res.status(400).json({ error: "Parâmetros incompletos." });
+      }
+
+      const proceduresText = procedures.join(", ");
+      
+      const prompt = `Você é um assistente de clínica odontológica trabalhando para o(a) Dr(a). ${doctorName}.
+O paciente ${patientName} tem o seguinte plano de tratamento proposto: ${proceduresText}.
+Crie uma mensagem de texto persuasiva, clara e acolhedora para WhatsApp, explicando de modo simples os benefícios de realizar esses tratamentos e convidando o paciente para aprovar o orçamento e agendar a primeira sessão.
+Mantenha o tom profissional mas acessível. Não inclua saudações iniciais suas, apenas a mensagem final pronta para envio.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          temperature: 0.7,
+        }
+      });
+
+      res.json({ message: response.text });
+    } catch (error: any) {
+      console.error("Gemini API Error (budget-script):", error);
+      res.status(500).json({ error: "Erro ao gerar script de orçamento." });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

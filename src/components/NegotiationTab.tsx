@@ -170,6 +170,9 @@ export default function NegotiationTab({
   const [isSavingDrive, setIsSavingDrive] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
+  const [aiSalesScript, setAiSalesScript] = useState('');
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+
   // Sync to localStorage
   useEffect(() => {
     localStorage.setItem('ag_neg_sales_volume', salesVolume);
@@ -437,6 +440,38 @@ Você pode acessar o documento digitalizado no nosso sistema seguro pelo link ab
 Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
   });
   const [successStatus, setSuccessStatus] = useState<boolean>(false);
+
+  const handleGenerateSalesScriptWithAI = async () => {
+    setIsGeneratingScript(true);
+    try {
+      const response = await fetch('/api/ai/budget-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientName,
+          doctorName: clinicSettings.doctorName,
+          procedures: proceduresListOnMapeamento.map(p => p.procedureName),
+          totalValue: chosenSim.custoTotal,
+          installments: installments,
+          installmentValue: chosenSim.valorParcela
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.message) {
+          setAiSalesScript(data.message);
+        }
+      } else {
+        alert('Falha ao gerar argumentação de venda com IA.');
+      }
+    } catch (error) {
+      console.error('Error generating AI script:', error);
+      alert('Erro na comunicação com a IA.');
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem('ag_whatsapp_api_url', whatsappApiUrl);
@@ -1850,6 +1885,54 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
             </div>
           )}
         </div>
+      </div>
+
+      {/* ================= AI SALES SCRIPT GENERATOR ================= */}
+      <div className="mt-8 bg-purple-50 border border-purple-200 rounded-2xl p-5 sm:p-6 shadow-sm max-w-4xl mx-auto print:hidden space-y-4">
+        <div className="flex items-center gap-3 border-b border-purple-200/50 pb-3">
+          <div className="p-2 bg-purple-100 text-purple-700 rounded-lg">
+            <Zap className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="font-bold text-purple-900 text-sm">Gerar Argumentação de Venda (IA)</h4>
+            <p className="text-[11px] text-purple-700 mt-0.5">Crie um script personalizado para enviar junto ao orçamento no WhatsApp.</p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleGenerateSalesScriptWithAI}
+          disabled={isGeneratingScript}
+          className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl transition-colors flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer"
+        >
+          {isGeneratingScript ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+          Gerar Argumentação
+        </button>
+
+        {aiSalesScript && (
+          <div className="space-y-3 pt-3 animate-fade-in">
+            <label className="text-xs font-bold text-purple-900">Script Gerado:</label>
+            <textarea
+              value={aiSalesScript}
+              onChange={(e) => setAiSalesScript(e.target.value)}
+              className="w-full p-3 rounded-xl border border-purple-200 focus:border-purple-500 focus:ring focus:ring-purple-500/20 text-xs min-h-[120px] resize-y"
+            />
+            <div className="flex justify-end">
+              <button
+                onClick={() => {
+                  const phone = pd.mobile || pd.phone || '';
+                  const digitsOnly = phone.replace(/\D/g, '');
+                  const finalPhone = (digitsOnly.length === 10 || digitsOnly.length === 11) ? '55' + digitsOnly : digitsOnly;
+                  const msg = window.encodeURIComponent(aiSalesScript);
+                  window.open(`https://wa.me/${finalPhone}?text=${msg}`, '_blank');
+                }}
+                className="px-6 py-2.5 bg-[#25D366] text-white font-bold rounded-xl hover:bg-[#1ebd57] transition-colors flex items-center justify-center gap-2 cursor-pointer text-xs"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Enviar Script via WhatsApp
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-8 mb-16 flex flex-col sm:flex-row gap-4 justify-center print:hidden">
