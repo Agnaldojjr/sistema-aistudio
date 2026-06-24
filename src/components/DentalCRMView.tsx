@@ -1046,13 +1046,28 @@ export default function DentalCRMView({
       setIsDownloadingForEdit(imgId);
       const img = driveImages.find(i => i.id === imgId);
       if (!img || !img.thumbnailLink) throw new Error('URL da imagem não encontrada');
-      const r = await fetch(img.thumbnailLink);
-      const blob = await r.blob();
-      const dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
+      
+      let dataUrl = '';
+      try {
+        const r = await fetch(img.thumbnailLink);
+        const blob = await r.blob();
+        dataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch (err) {
+        console.warn('Direct fetch failed for Drive image, trying via CORS proxy...', err);
+        const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(img.thumbnailLink)}`;
+        const r = await fetch(proxyUrl);
+        const blob = await r.blob();
+        dataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      }
+
       setEditingGalleryImageId(imgId);
       setEditingGalleryImageUrl(dataUrl);
       setEditingImageSource('drive');
@@ -1074,13 +1089,27 @@ export default function DentalCRMView({
         setEditingGalleryImageUrl(img.url);
         setEditingImageSource('firestore');
       } else {
-        const r = await fetch(img.url);
-        const blob = await r.blob();
-        const dataUrl = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
+        let dataUrl = '';
+        try {
+          const r = await fetch(img.url);
+          const blob = await r.blob();
+          dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        } catch (err) {
+          console.warn('Direct fetch failed for Firestore image, trying via CORS proxy...', err);
+          const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(img.url)}`;
+          const r = await fetch(proxyUrl);
+          const blob = await r.blob();
+          dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        }
+
         setEditingGalleryImageId(imgId);
         setEditingGalleryImageUrl(dataUrl);
         setEditingImageSource('firestore');
