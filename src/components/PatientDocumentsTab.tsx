@@ -32,6 +32,7 @@ import {
   FileCheck
 } from 'lucide-react';
 import MedicalDocumentModal from './MedicalDocumentModal';
+import PatientGallery from './PatientGallery';
 import * as XLSX from 'xlsx';
 import { getSupabaseCRMDatabase } from '../lib/supabaseCrm';
 import { uploadPatientFileToSupabase } from '../lib/supabaseStorage';
@@ -3319,80 +3320,21 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                     });
 
                     return (
-                      <div className="space-y-6">
-                        {/* Selector top filter */}
-                        <div className="bg-[#8B0000]/5 border border-[#C09553]/30 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                          <div className="space-y-1">
-                            <label className="block text-zinc-600 font-bold text-[10px] uppercase font-mono tracking-wider">Filtrar Galeria de Fotos Clínicas</label>
-                            <select 
-                              value={selectedPatient}
-                              onChange={(e) => setSelectedPatientFilter(e.target.value)}
-                              className="border border-[#D5CBB3] bg-white rounded-lg p-2 font-serif text-sm font-bold focus:outline-none focus:border-[#C09553] text-[#8B0000]"
-                            >
-                              <option value="Todos">Visualizar Todos os Registros ({galleryRecords.length} fotos)</option>
-                              {uniquePatientsList.map(name => (
-                                <option key={name} value={name}>{name}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setIsRunningImport(true);
-                              alert("Estruturando as galerias dinâmicas dos pacientes no Google Drive. Suas fotos S3 originais serão copiadas como arquivos estáticos seguros em tempo de execução...");
-                              setTimeout(() => {
-                                setIsRunningImport(false);
-                                alert("Galeria sincronizada com o Google Drive!");
-                              }, 1600);
-                            }}
-                            className="w-full sm:w-auto px-4 py-2 border border-[#D5CBB3] rounded-lg bg-zinc-900 hover:bg-zinc-800 font-bold text-white text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                          >
-                            <Check className="w-3.5 h-3.5 text-[#C09553]" />
-                            Salvar Galeria de Imagens no Drive
-                          </button>
-                        </div>
-
-                        {/* Photograph Grid blocks */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                          {filteredPhotos.map((photo, idx) => (
-                            <div key={idx} className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between group">
-                              <div className="aspect-[4/3] bg-zinc-100 overflow-hidden relative border-b border-zinc-100 select-none">
-                                <img 
-                                  src={photo.url} 
-                                  alt={photo.label}
-                                  referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
-                                  onError={(e) => {
-                                    // Fallback block if URL gets unauthorized standard S3 response
-                                    e.currentTarget.src = "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=350&q=80";
-                                  }}
-                                />
-                                <span className="absolute top-2 left-2 bg-[#8B0000]/80 backdrop-blur-xs text-[#C09553] text-[8.5px] px-2 py-0.5 rounded font-bold uppercase font-mono tracking-widest">{photo.galeria}</span>
-                              </div>
-                              <div className="p-3.5 space-y-1.5">
-                                <h5 className="text-[11.5px] font-bold text-zinc-900 leading-tight">{photo.patient}</h5>
-                                <p className="text-[10px] text-zinc-500 font-medium italic truncate">{photo.label || 'Foto da consulta'}</p>
-                                
-                                <div className="pt-2 border-t border-zinc-100 flex gap-2">
-                                  <a 
-                                    href={photo.url} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="flex-1 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-lg text-zinc-700 hover:text-zinc-900 border border-zinc-200 text-[10px] font-bold text-center inline-flex items-center justify-center gap-1"
-                                  >
-                                    <Eye className="w-3 h-3 text-[#C09553]" />
-                                    Zoom Foto
-                                  </a>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          {filteredPhotos.length === 0 && (
-                            <div className="col-span-full py-12 text-center text-zinc-400">Nenhuma foto no backup corresponde aos critérios.</div>
-                          )}
-                        </div>
-                      </div>
+                      <PatientGallery 
+                        photos={filteredPhotos}
+                        uniquePatients={uniquePatientsList}
+                        selectedPatient={selectedPatient}
+                        setSelectedPatient={setSelectedPatientFilter}
+                        onSyncDrive={() => {
+                          setIsRunningImport(true);
+                          alert("Estruturando as galerias dinâmicas dos pacientes no Google Drive. Suas fotos S3 originais serão copiadas como arquivos estáticos seguros em tempo de execução...");
+                          setTimeout(() => {
+                            setIsRunningImport(false);
+                            alert("Galeria sincronizada com o Google Drive!");
+                          }, 1600);
+                        }}
+                        isRunningImport={isRunningImport}
+                      />
                     );
                   })()}
                 </div>
