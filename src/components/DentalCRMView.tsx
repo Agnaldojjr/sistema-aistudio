@@ -266,6 +266,13 @@ export default function DentalCRMView({
   const [editingGalleryImageUrl, setEditingGalleryImageUrl] = useState<string | null>(null);
   const [isDownloadingForEdit, setIsDownloadingForEdit] = useState<string | null>(null);
   const [editingImageSource, setEditingImageSource] = useState<'drive' | 'firestore' | null>(null);
+  const [expandedImage, setExpandedImage] = useState<{
+    url: string;
+    title: string;
+    date?: string;
+    id: string;
+    source: 'drive' | 'firestore';
+  } | null>(null);
 
   // Global search & filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -4267,7 +4274,10 @@ export default function DentalCRMView({
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                             {galeriaList.map((g) => (
                               <div key={g.id} className="bg-[#FAF8F5] border border-zinc-200 rounded-xl overflow-hidden shadow-2xs relative group">
-                                <div className="aspect-square bg-zinc-200/90 relative flex items-center justify-center overflow-hidden">
+                                <div 
+                                  className="aspect-square bg-zinc-200/90 relative flex items-center justify-center overflow-hidden cursor-pointer"
+                                  onClick={() => setExpandedImage({ url: g.url, title: g.description || 'Imagem Clínica', date: g.date, id: g.id, source: 'firestore' })}
+                                >
                                   {g.url && (g.url.startsWith('http') || g.url.startsWith('data:')) ? (
                                     <img 
                                       src={g.url} 
@@ -4684,7 +4694,10 @@ export default function DentalCRMView({
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                             {driveImages.map((img) => (
                               <div key={img.id} className="bg-white border rounded-xl overflow-hidden border-[#E6DEC9] shadow-2xs hover:shadow-xs transition-all group text-left relative flex flex-col justify-between">
-                                <div className="aspect-square bg-zinc-200 relative flex items-center justify-center overflow-hidden">
+                                <div 
+                                  className="aspect-square bg-zinc-200 relative flex items-center justify-center overflow-hidden cursor-pointer"
+                                  onClick={() => setExpandedImage({ url: img.thumbnailLink ? img.thumbnailLink.replace('=s220', '=s1000') : '', title: img.name, date: img.createdTime, id: img.id, source: 'drive' })}
+                                >
                                   {img.thumbnailLink ? (
                                     <img 
                                       src={img.thumbnailLink.replace('=s220', '=s600')} 
@@ -4784,6 +4797,75 @@ export default function DentalCRMView({
           }}
           title="Editor Clínico - Galeria do Paciente"
         />
+      )}
+
+      {expandedImage && (
+        <div 
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md p-4 sm:p-6"
+          onClick={() => setExpandedImage(null)}
+        >
+          {/* Close Button */}
+          <button
+            type="button"
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer z-10"
+            onClick={() => setExpandedImage(null)}
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          {/* Centered Image Container */}
+          <div 
+            className="relative max-w-4xl max-h-[80vh] w-full flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={expandedImage.url}
+              alt={expandedImage.title}
+              className="max-h-[80vh] max-w-full object-contain rounded-2xl shadow-2xl border border-white/10"
+            />
+          </div>
+
+          {/* Bottom Caption and Actions */}
+          <div 
+            className="mt-4 text-center max-w-xl space-y-2 text-white px-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 className="font-serif font-bold text-base sm:text-lg text-[#C09553]">{expandedImage.title}</h4>
+            {expandedImage.date && (
+              <p className="text-[10px] text-zinc-400 font-mono uppercase">
+                Data: {normalizeDateDisplay(expandedImage.date)}
+              </p>
+            )}
+            
+            <div className="pt-2 flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const imgId = expandedImage.id;
+                  const source = expandedImage.source;
+                  setExpandedImage(null); // Close lightbox
+                  if (source === 'firestore') {
+                    handleEditFirestoreImage(imgId);
+                  } else {
+                    handleEditGalleryImage(imgId);
+                  }
+                }}
+                className="px-4 py-2 bg-[#C09553] hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                <span>Editar Imagem</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setExpandedImage(null)}
+                className="px-4 py-2 bg-zinc-850 hover:bg-zinc-800 text-zinc-300 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer border border-zinc-700"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
