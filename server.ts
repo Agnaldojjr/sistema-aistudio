@@ -311,6 +311,43 @@ async function startServer() {
   setupReminderScheduler();
 
   // ==========================================
+  // WHATSAPP WEBHOOK (META)
+  // ==========================================
+  app.get("/api/webhook", (req, res) => {
+    // Esse é o Token que você vai colar na Etapa 2 lá no painel da Meta:
+    const verify_token = process.env.WHATSAPP_VERIFY_TOKEN || "senha_secreta_webhook_123";
+    
+    let mode = req.query["hub.mode"];
+    let token = req.query["hub.verify_token"];
+    let challenge = req.query["hub.challenge"];
+
+    if (mode && token) {
+      if (mode === "subscribe" && token === verify_token) {
+        console.log("WEBHOOK_VERIFIED");
+        res.status(200).send(challenge);
+      } else {
+        res.sendStatus(403);
+      }
+    } else {
+      res.sendStatus(400);
+    }
+  });
+
+  app.post("/api/webhook", (req, res) => {
+    let body = req.body;
+    if (body.object) {
+      if (body.entry && body.entry[0].changes && body.entry[0].changes[0].value.messages && body.entry[0].changes[0].value.messages[0]) {
+        const message = body.entry[0].changes[0].value.messages[0];
+        console.log("Nova mensagem no WhatsApp:", JSON.stringify(message, null, 2));
+        // Aqui o sistema recebe a mensagem (podemos integrar com IA ou repassar pro n8n depois)
+      }
+      res.sendStatus(200);
+    } else {
+      res.sendStatus(404);
+    }
+  });
+
+  // ==========================================
   // ROTAS DE INTEGRAÇÃO CRM - TYPEBOT / N8N
   // ==========================================
 
