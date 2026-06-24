@@ -27,46 +27,5 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
 
-  db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_DB=evolution
-      - POSTGRES_USER=evolution
-      - POSTGRES_PASSWORD=evolution_secret_password_123
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U evolution"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  evolution-api:
-    image: atendai/evolution-api:v2.2.3
-    ports:
-      - "8080:8080"
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      - SERVER_URL=http://localhost:8080
-      - DOCKER_ENV=true
-      - LOG_LEVEL=ERROR,WARN,DEBUG,INFO,LOG,VERBOSE,DARK,FATAL
-      - AUTHENTICATION_API_KEY=evolution_secret_key_123
-      - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://evolution:evolution_secret_password_123@db:5432/evolution?schema=public
-      - CACHE_REDIS_ENABLED=false
-      - CACHE_LOCAL_ENABLED=true
-      - CORS_ORIGIN=*
-      - CORS_METHODS=GET,POST,PUT,DELETE
-      - CORS_CREDENTIALS=true
-      # - CONFIG_SESSION_PHONE_VERSION=2.3000.1041976118 (Comentado para evitar rejeição do QR Code por versão desatualizada)
-    volumes:
-      - evolution_instances:/evolution/instances
-      - evolution_store:/evolution/store
-
 volumes:
   n8n_data:
-  evolution_instances:
-  evolution_store:
-  postgres_data:

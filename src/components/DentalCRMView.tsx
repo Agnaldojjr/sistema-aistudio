@@ -265,6 +265,7 @@ export default function DentalCRMView({
   const [editingGalleryImageId, setEditingGalleryImageId] = useState<string | null>(null);
   const [editingGalleryImageUrl, setEditingGalleryImageUrl] = useState<string | null>(null);
   const [isDownloadingForEdit, setIsDownloadingForEdit] = useState<string | null>(null);
+  const [editingImageSource, setEditingImageSource] = useState<'drive' | 'firestore' | null>(null);
 
   // Global search & filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -1054,6 +1055,36 @@ export default function DentalCRMView({
       });
       setEditingGalleryImageId(imgId);
       setEditingGalleryImageUrl(dataUrl);
+      setEditingImageSource('drive');
+    } catch (err: any) {
+      alert('Erro ao carregar imagem para edição: ' + err.message);
+    } finally {
+      setIsDownloadingForEdit(null);
+    }
+  };
+
+  const handleEditFirestoreImage = async (imgId: string) => {
+    try {
+      setIsDownloadingForEdit(imgId);
+      const img = galeriaList.find(g => g.id === imgId);
+      if (!img || !img.url) throw new Error('URL da imagem não encontrada');
+      
+      if (img.url.startsWith('data:')) {
+        setEditingGalleryImageId(imgId);
+        setEditingGalleryImageUrl(img.url);
+        setEditingImageSource('firestore');
+      } else {
+        const r = await fetch(img.url);
+        const blob = await r.blob();
+        const dataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+        setEditingGalleryImageId(imgId);
+        setEditingGalleryImageUrl(dataUrl);
+        setEditingImageSource('firestore');
+      }
     } catch (err: any) {
       alert('Erro ao carregar imagem para edição: ' + err.message);
     } finally {
@@ -1062,11 +1093,44 @@ export default function DentalCRMView({
   };
 
   const handleSaveEditedGalleryImage = async (editedImage: string) => {
+    if (editingImageSource === 'firestore') {
+      if (!selectedPatient) return;
+      try {
+        setIsSupabaseUploading(true);
+        setEditingGalleryImageUrl(null);
+        setEditingGalleryImageId(null);
+        setEditingImageSource(null);
+
+        const originalItem = galeriaList.find(g => g.id === editingGalleryImageId);
+        const newGalleryItem = {
+          id: `gal-edited-${Date.now()}`,
+          patientId: selectedPatient.id,
+          url: editedImage,
+          description: `Editada: ${originalItem?.description || 'Imagem'}`,
+          date: new Date().toISOString()
+        };
+
+        const updatedList = [...galeriaList, newGalleryItem];
+        setGaleriaList(updatedList);
+
+        const crmData = await getSupabaseCRMDatabase();
+        crmData.galeria = [...(crmData.galeria || []).filter((g: any) => g.patientId !== selectedPatient.id), ...updatedList];
+        await saveSupabaseCRMDatabase(crmData);
+        alert('Imagem editada salva com sucesso na galeria do paciente!');
+      } catch (err: any) {
+        alert('Erro ao salvar imagem editada: ' + err.message);
+      } finally {
+        setIsSupabaseUploading(false);
+      }
+      return;
+    }
+
     if (!driveFolderId) return;
     try {
       setIsSupabaseUploading(true);
       setEditingGalleryImageUrl(null);
       setEditingGalleryImageId(null);
+      setEditingImageSource(null);
 
       const arr = editedImage.split(',');
       const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
@@ -1087,6 +1151,38 @@ export default function DentalCRMView({
       alert('Erro ao salvar imagem editada: ' + err.message);
     } finally {
       setIsSupabaseUploading(false);
+    }
+  };
+
+  const handleUploadProfilePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedPatient) return;
+    
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string;
+        
+        // Update local state
+        const updatedPatient = { ...selectedPatient, photoUrl: base64 };
+        setSelectedPatient(updatedPatient);
+        
+        // Save to Supabase CRM JSON database
+        const crmData = await getSupabaseCRMDatabase();
+        if (crmData.patients) {
+          const idx = crmData.patients.findIndex((p: any) => p.id === selectedPatient.id);
+          if (idx !== -1) {
+            crmData.patients[idx] = { ...crmData.patients[idx], photoUrl: base64 };
+          } else {
+            crmData.patients.push(updatedPatient);
+          }
+          await saveSupabaseCRMDatabase(crmData);
+        }
+        alert('Foto de perfil atualizada com sucesso!');
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      alert('Erro ao atualizar foto de perfil: ' + err.message);
     }
   };
 
@@ -3126,8 +3222,24 @@ export default function DentalCRMView({
                 {/* File Header */}
                 <div className="bg-[#8B0000] text-[#FAF8F5] p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-[#FAF8F5]/10 border border-[#FAF8F5]/20 flex items-center justify-center text-[#B48C4D]">
-                      <User className="w-6 h-6" />
+                    <div className="w-12 h-12 rounded-full bg-[#FAF8F5]/10 border border-[#FAF8F5]/20 flex items-center justify-center text-[#B48C4D] overflow-hidden relative group/avatar">
+                      {selectedPatient.photoUrl ? (
+                        <img src={selectedPatient.photoUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-6 h-6" />
+                      )}
+                      
+                      {/* Upload overlay */}
+                      <label className="absolute inset-0 bg-black/60 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-[8px] text-white font-bold uppercase font-sans text-center px-1">
+                        <Camera className="w-3.5 h-3.5 mb-0.5 text-[#C09553]" />
+                        Alterar
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleUploadProfilePhoto}
+                        />
+                      </label>
                     </div>
                     <div>
                       <h3 className="font-serif font-bold text-base uppercase leading-tight">{selectedPatient.name}</h3>
@@ -4141,8 +4253,30 @@ export default function DentalCRMView({
                                       <span className="text-[10px] font-mono uppercase bg-[#8B0000]/5 px-2 py-0.5 rounded text-[#8B0000] font-bold">Imagem de Exame</span>
                                     </div>
                                   )}
-                                  <div className="absolute right-2 top-2 bg-zinc-950/70 text-white text-[8px] font-mono px-1.5 py-0.5 rounded uppercase font-bold">
+                                  <div className="absolute right-2 top-2 bg-zinc-950/70 text-white text-[8px] font-mono px-1.5 py-0.5 rounded uppercase font-bold z-10">
                                     {normalizeDateDisplay(g.date)}
+                                  </div>
+                                  
+                                  {/* Edit Photo Button Overlay */}
+                                  <div className="absolute top-2 left-2 z-10">
+                                    {isDownloadingForEdit === g.id ? (
+                                      <div className="w-8 h-8 rounded-xl bg-white/95 text-zinc-600 flex items-center justify-center shadow-md border border-zinc-200/80">
+                                        <Loader2 className="w-4 h-4 animate-spin text-[#C09553]" />
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                          handleEditFirestoreImage(g.id);
+                                        }}
+                                        className="w-8 h-8 rounded-xl bg-white/95 text-[#B48C4D] hover:text-[#4E1119] flex items-center justify-center shadow-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer border border-zinc-200/80"
+                                        title="Editar imagem (Marcações/Adesivos)"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="p-3 bg-white text-xs space-y-1 border-t">
