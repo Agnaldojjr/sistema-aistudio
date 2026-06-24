@@ -1,4 +1,4 @@
-import { schedule } from "@netlify/functions";
+export const config = { runtime: 'edge' };
 import { createClient } from "@supabase/supabase-js";
 import { format, addDays } from "date-fns";
 
@@ -125,13 +125,13 @@ const handler = async (event: any) => {
     const userId = process.env.DEFAULT_USER_ID;
     if (!userId) {
       console.log("[Scheduled reminders] DEFAULT_USER_ID não configurado no Netlify. Pulando.");
-      return { statusCode: 200, body: "DEFAULT_USER_ID missing" };
+      return new Response("DEFAULT_USER_ID missing", { status: 500 });
     }
 
     const db = await getCRMDatabase(userId);
     if (!db || !db.appointments) {
       console.log("[Scheduled reminders] Sem agendamentos para processar.");
-      return { statusCode: 200, body: "No appointments found" };
+      return new Response("No appointments found", { status: 200 });
     }
 
     // Calcula amanhã no formato YYYY-MM-DD
@@ -147,8 +147,6 @@ const handler = async (event: any) => {
     console.log(`[Scheduled reminders] Encontradas ${tomorrowAppointments.length} consultas agendadas.`);
 
     let dbChanged = false;
-    const crypto = require("crypto");
-
     for (const app of tomorrowAppointments) {
       const patient = db.patients.find((p: any) => p.id === app.patientId);
       if (!patient) continue;
@@ -200,13 +198,12 @@ const handler = async (event: any) => {
     }
 
     console.log("[Scheduled reminders] Rotina concluída.");
-    return { statusCode: 200, body: "Reminders processed successfully" };
+    return new Response("Reminders processed successfully", { status: 200 });
 
   } catch (error: any) {
     console.error("[Scheduled reminders] Erro crítico:", error);
-    return { statusCode: 500, body: error.message || "Internal Server Error" };
+    return new Response(error.message || "Internal Server Error", { status: 500 });
   }
 };
 
-// Configura para executar diariamente às 12:00 UTC (09:00 Horário de Brasília)
-export default schedule("0 12 * * *", handler);
+export default handler;

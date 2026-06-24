@@ -1,3 +1,5 @@
+export const config = { runtime: 'edge' };
+
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
@@ -199,7 +201,6 @@ export default async (req: Request) => {
         return jsonResponse({ error: "O horário selecionado já está reservado por outro paciente." }, 400);
       }
 
-      const crypto = require("crypto");
       const newAppointment = {
         id: crypto.randomUUID(),
         patientId,

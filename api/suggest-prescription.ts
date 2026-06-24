@@ -1,3 +1,4 @@
+export const config = { runtime: 'edge' };
 import { GoogleGenAI } from "@google/genai";
 
 export default async (req: Request) => {
