@@ -38,6 +38,7 @@ interface DashboardViewProps {
   onNavigateToPlanning: (patientName?: string, status?: string) => void;
   onOpenRegistry: () => void;
   onOpenPatientsList: () => void;
+  onOpenCalendar: () => void;
   isMobileOptimized: boolean;
   setIsMobileOptimized: (v: boolean) => void;
 }
@@ -68,6 +69,7 @@ export default function DashboardView({
   onNavigateToPlanning,
   onOpenRegistry,
   onOpenPatientsList,
+  onOpenCalendar,
   isMobileOptimized,
   setIsMobileOptimized,
 }: DashboardViewProps) {
@@ -273,14 +275,23 @@ export default function DashboardView({
               Cadastrar Novo Paciente
             </button>
             <div className="flex flex-col gap-2">
-              <button
-                id="btn-dash-patients"
-                onClick={onOpenPatientsList}
-                className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-[#FAF8F5] font-bold text-xs px-5 py-3.5 rounded-xl transition-all cursor-pointer active:scale-95"
-              >
-                <Users className="w-4 h-4" />
-                Galeria de Pacientes
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={onOpenCalendar}
+                  className="flex-1 flex items-center justify-center gap-2 bg-[#8B0000] hover:bg-[#5C0000] border border-white/20 text-[#FAF8F5] font-bold text-xs px-4 py-3.5 rounded-xl transition-all shadow-md cursor-pointer active:scale-95"
+                >
+                  <Calendar className="w-4 h-4" />
+                  Agendar Consulta
+                </button>
+                <button
+                  id="btn-dash-patients"
+                  onClick={onOpenPatientsList}
+                  className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-[#FAF8F5] font-bold text-xs px-4 py-3.5 rounded-xl transition-all cursor-pointer active:scale-95"
+                >
+                  <Users className="w-4 h-4" />
+                  Galeria
+                </button>
+              </div>
               <button
                 onClick={() => setIsMobileOptimized(!isMobileOptimized)}
                 className="flex items-center justify-center gap-2 bg-[#C09553]/20 hover:bg-[#C09553]/30 border border-[#C09553]/35 text-[#FAF8F5] font-bold text-xs px-5 py-2.5 rounded-xl transition-all cursor-pointer active:scale-95"

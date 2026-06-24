@@ -8,6 +8,7 @@
         "id": { "type": "string", "description": "Unique identifier, same as patient ID or auto ID" },
         "codigo_paciente": { "type": "string", "description": "Legacy client code (e.g. codigo_cliente)" },
         "name": { "type": "string", "description": "Full name of the patient" },
+        "photoUrl": { "type": "string", "description": "Profile photo URL" },
         "phone": { "type": "string", "description": "Landline phone number" },
         "mobile": { "type": "string", "description": "Mobile phone number" },
         "healthInsurance": { "type": "string", "description": "Insurance operator name or PARTICULAR" },

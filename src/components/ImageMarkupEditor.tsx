@@ -26,7 +26,7 @@ interface Shape {
 
 interface Sticker {
   id: string;
-  type: 'implant' | 'molar' | 'premolar' | 'incisor' | 'bracket' | 'extraction' | 'arrow' | 'caries';
+  type: 'implant' | 'molar' | 'premolar' | 'incisor' | 'bracket' | 'extraction' | 'arrow' | 'caries' | 'veneer' | 'crown' | 'rootcanal' | 'lesion';
   x: number; // percentage 0-100
   y: number; // percentage 0-100
   scale: number;
@@ -93,6 +93,26 @@ const STICKER_SVGS: Record<string, string> = {
 
   caries: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
     <path d="M30 40c0-10 15-20 25-10c10-10 25-5 20 15c-5 20-20 25-25 15c-5 10-20 0-20-20z" fill="#78350f" opacity="0.85" stroke="#451a03" stroke-width="3"/>
+  </svg>`,
+
+  veneer: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+    <path d="M30 20h40v35c0 15-10 25-20 35c-10-10-20-20-20-35V20z" fill="#f8fafc" stroke="#38bdf8" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M25 50Q50 65 75 50" fill="none" stroke="#38bdf8" stroke-width="2" opacity="0.6"/>
+  </svg>`,
+
+  crown: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+    <path d="M20 25c0-10 10-15 20-10c5-5 15-5 20 0c10-5 20 0 20 10c0 15-5 25-10 35c-5 10-5 18-5 25H35c0-7 0-15-5-25c-5-10-10-20-10-35z" fill="#fef08a" stroke="#ca8a04" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M25 45h50M30 60h40" stroke="#ca8a04" stroke-width="2" opacity="0.5"/>
+  </svg>`,
+
+  rootcanal: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+    <path d="M30 45c10 5 30 5 40 0M50 20v25" stroke="#dc2626" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <path d="M42 45v40M58 45v40" stroke="#dc2626" stroke-width="4" stroke-linecap="round" fill="none"/>
+  </svg>`,
+
+  lesion: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+    <circle cx="50" cy="85" r="10" fill="#fca5a5" stroke="#dc2626" stroke-width="3" opacity="0.8"/>
+    <path d="M45 80L55 90M55 80L45 90" stroke="#dc2626" stroke-width="2"/>
   </svg>`
 };
 
@@ -680,73 +700,71 @@ export default function ImageMarkupEditor({
                 </button>
 
                 {/* Stickers Grid */}
-                <div className="space-y-1.5 pt-2">
+                <div className="space-y-3 pt-2 pb-6">
                   <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">Adesivos Odontológicos</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => addSticker('implant')}
-                      className="p-2.5 bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl text-left flex flex-col items-center gap-1.5 transition-all cursor-pointer group"
-                    >
-                      <div className="w-8 h-8 flex items-center justify-center text-[#C09553] group-hover:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.implant }} />
-                      <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-400 group-hover:text-white">Implante</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => addSticker('molar')}
-                      className="p-2.5 bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl text-left flex flex-col items-center gap-1.5 transition-all cursor-pointer group"
-                    >
-                      <div className="w-8 h-8 flex items-center justify-center group-hover:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.molar }} />
-                      <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-400 group-hover:text-white">Molar</span>
-                    </button>
+                  
+                  {/* Diagnóstico Geral */}
+                  <details className="group bg-zinc-900/40 border border-zinc-800 rounded-xl overflow-hidden" open>
+                    <summary className="text-[11px] font-bold text-zinc-300 p-3 cursor-pointer select-none hover:bg-zinc-800/50 transition-colors flex justify-between items-center">
+                      Diagnóstico Geral
+                      <span className="text-zinc-500 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <div className="grid grid-cols-3 gap-2 p-3 pt-0">
+                      <button onClick={() => addSticker('molar')} className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-left flex flex-col items-center gap-1 transition-all group/btn"><div className="w-6 h-6 flex items-center justify-center group-hover/btn:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.molar }} /><span className="text-[8px] font-bold uppercase tracking-wide text-zinc-400 group-hover/btn:text-white">Molar</span></button>
+                      <button onClick={() => addSticker('premolar')} className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-left flex flex-col items-center gap-1 transition-all group/btn"><div className="w-6 h-6 flex items-center justify-center group-hover/btn:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.premolar }} /><span className="text-[8px] font-bold uppercase tracking-wide text-zinc-400 group-hover/btn:text-white">Pré-Molar</span></button>
+                      <button onClick={() => addSticker('incisor')} className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-left flex flex-col items-center gap-1 transition-all group/btn"><div className="w-6 h-6 flex items-center justify-center group-hover/btn:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.incisor }} /><span className="text-[8px] font-bold uppercase tracking-wide text-zinc-400 group-hover/btn:text-white">Incisivo</span></button>
+                      <button onClick={() => addSticker('extraction')} className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-left flex flex-col items-center gap-1 transition-all group/btn"><div className="w-6 h-6 flex items-center justify-center group-hover/btn:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.extraction }} /><span className="text-[8px] font-bold uppercase tracking-wide text-zinc-400 group-hover/btn:text-white">Extração</span></button>
+                      <button onClick={() => addSticker('arrow')} className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-left flex flex-col items-center gap-1 transition-all group/btn"><div className="w-6 h-6 flex items-center justify-center group-hover/btn:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.arrow }} /><span className="text-[8px] font-bold uppercase tracking-wide text-zinc-400 group-hover/btn:text-white">Seta</span></button>
+                      <button onClick={() => addSticker('caries')} className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-left flex flex-col items-center gap-1 transition-all group/btn"><div className="w-6 h-6 flex items-center justify-center group-hover/btn:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.caries }} /><span className="text-[8px] font-bold uppercase tracking-wide text-zinc-400 group-hover/btn:text-white">Cárie</span></button>
+                    </div>
+                  </details>
 
-                    <button
-                      onClick={() => addSticker('premolar')}
-                      className="p-2.5 bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl text-left flex flex-col items-center gap-1.5 transition-all cursor-pointer group"
-                    >
-                      <div className="w-8 h-8 flex items-center justify-center group-hover:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.premolar }} />
-                      <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-400 group-hover:text-white">Pré-Molar</span>
-                    </button>
+                  {/* Implantodontia */}
+                  <details className="group bg-zinc-900/40 border border-zinc-800 rounded-xl overflow-hidden">
+                    <summary className="text-[11px] font-bold text-zinc-300 p-3 cursor-pointer select-none hover:bg-zinc-800/50 transition-colors flex justify-between items-center">
+                      Implantodontia
+                      <span className="text-zinc-500 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <div className="grid grid-cols-3 gap-2 p-3 pt-0">
+                      <button onClick={() => addSticker('implant')} className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-left flex flex-col items-center gap-1 transition-all group/btn"><div className="w-6 h-6 flex items-center justify-center text-[#C09553] group-hover/btn:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.implant }} /><span className="text-[8px] font-bold uppercase tracking-wide text-zinc-400 group-hover/btn:text-white">Implante</span></button>
+                    </div>
+                  </details>
 
-                    <button
-                      onClick={() => addSticker('incisor')}
-                      className="p-2.5 bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl text-left flex flex-col items-center gap-1.5 transition-all cursor-pointer group"
-                    >
-                      <div className="w-8 h-8 flex items-center justify-center group-hover:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.incisor }} />
-                      <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-400 group-hover:text-white">Incisivo</span>
-                    </button>
+                  {/* Ortodontia */}
+                  <details className="group bg-zinc-900/40 border border-zinc-800 rounded-xl overflow-hidden">
+                    <summary className="text-[11px] font-bold text-zinc-300 p-3 cursor-pointer select-none hover:bg-zinc-800/50 transition-colors flex justify-between items-center">
+                      Ortodontia
+                      <span className="text-zinc-500 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <div className="grid grid-cols-3 gap-2 p-3 pt-0">
+                      <button onClick={() => addSticker('bracket')} className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-left flex flex-col items-center gap-1 transition-all group/btn"><div className="w-6 h-6 flex items-center justify-center group-hover/btn:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.bracket }} /><span className="text-[8px] font-bold uppercase tracking-wide text-zinc-400 group-hover/btn:text-white">Braquete</span></button>
+                    </div>
+                  </details>
 
-                    <button
-                      onClick={() => addSticker('bracket')}
-                      className="p-2.5 bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl text-left flex flex-col items-center gap-1.5 transition-all cursor-pointer group"
-                    >
-                      <div className="w-8 h-8 flex items-center justify-center group-hover:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.bracket }} />
-                      <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-400 group-hover:text-white">Braquete</span>
-                    </button>
+                  {/* Estética e Prótese */}
+                  <details className="group bg-zinc-900/40 border border-zinc-800 rounded-xl overflow-hidden">
+                    <summary className="text-[11px] font-bold text-zinc-300 p-3 cursor-pointer select-none hover:bg-zinc-800/50 transition-colors flex justify-between items-center">
+                      Estética e Prótese
+                      <span className="text-zinc-500 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <div className="grid grid-cols-3 gap-2 p-3 pt-0">
+                      <button onClick={() => addSticker('veneer')} className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-left flex flex-col items-center gap-1 transition-all group/btn"><div className="w-6 h-6 flex items-center justify-center group-hover/btn:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.veneer }} /><span className="text-[8px] font-bold uppercase tracking-wide text-zinc-400 group-hover/btn:text-white">Faceta</span></button>
+                      <button onClick={() => addSticker('crown')} className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-left flex flex-col items-center gap-1 transition-all group/btn"><div className="w-6 h-6 flex items-center justify-center group-hover/btn:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.crown }} /><span className="text-[8px] font-bold uppercase tracking-wide text-zinc-400 group-hover/btn:text-white">Coroa</span></button>
+                    </div>
+                  </details>
 
-                    <button
-                      onClick={() => addSticker('extraction')}
-                      className="p-2.5 bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl text-left flex flex-col items-center gap-1.5 transition-all cursor-pointer group"
-                    >
-                      <div className="w-8 h-8 flex items-center justify-center group-hover:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.extraction }} />
-                      <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-400 group-hover:text-white">Extração (X)</span>
-                    </button>
+                  {/* Endodontia */}
+                  <details className="group bg-zinc-900/40 border border-zinc-800 rounded-xl overflow-hidden">
+                    <summary className="text-[11px] font-bold text-zinc-300 p-3 cursor-pointer select-none hover:bg-zinc-800/50 transition-colors flex justify-between items-center">
+                      Endodontia
+                      <span className="text-zinc-500 group-open:rotate-180 transition-transform">▼</span>
+                    </summary>
+                    <div className="grid grid-cols-3 gap-2 p-3 pt-0">
+                      <button onClick={() => addSticker('rootcanal')} className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-left flex flex-col items-center gap-1 transition-all group/btn"><div className="w-6 h-6 flex items-center justify-center group-hover/btn:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.rootcanal }} /><span className="text-[8px] font-bold uppercase tracking-wide text-zinc-400 group-hover/btn:text-white">Canal</span></button>
+                      <button onClick={() => addSticker('lesion')} className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-left flex flex-col items-center gap-1 transition-all group/btn"><div className="w-6 h-6 flex items-center justify-center group-hover/btn:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.lesion }} /><span className="text-[8px] font-bold uppercase tracking-wide text-zinc-400 group-hover/btn:text-white">Lesão</span></button>
+                    </div>
+                  </details>
 
-                    <button
-                      onClick={() => addSticker('arrow')}
-                      className="p-2.5 bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl text-left flex flex-col items-center gap-1.5 transition-all cursor-pointer group"
-                    >
-                      <div className="w-8 h-8 flex items-center justify-center group-hover:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.arrow }} />
-                      <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-400 group-hover:text-white">Seta</span>
-                    </button>
-
-                    <button
-                      onClick={() => addSticker('caries')}
-                      className="p-2.5 bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl text-left flex flex-col items-center gap-1.5 transition-all cursor-pointer group"
-                    >
-                      <div className="w-8 h-8 flex items-center justify-center group-hover:scale-105 transition-transform" dangerouslySetInnerHTML={{ __html: STICKER_SVGS.caries }} />
-                      <span className="text-[9px] font-bold uppercase tracking-wide text-zinc-400 group-hover:text-white">Cárie</span>
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>

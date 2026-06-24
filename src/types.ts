@@ -49,6 +49,7 @@ export interface ClinicSettings {
 
 export interface PatientData {
   // Dados Cadastrais
+  photoUrl?: string; // URL da foto de perfil
   birthDate?: string;
   gender?: string;
   status?: string;

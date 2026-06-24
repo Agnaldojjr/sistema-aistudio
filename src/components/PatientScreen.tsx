@@ -309,8 +309,17 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
             <h2 className="text-2xl font-serif text-[#4E1119] font-bold uppercase tracking-tight leading-tight">
               Plano de Tratamento
             </h2>
-            <div className="text-sm text-zinc-600 font-sans mt-0.5">
-              Paciente: <strong className="text-zinc-800">{proposal.patientName || 'Não Informado'}</strong>
+            <div className="flex items-center gap-3 mt-2">
+              <div className="w-12 h-12 rounded-full overflow-hidden bg-zinc-200 border-2 border-white shadow-sm flex items-center justify-center flex-shrink-0">
+                {proposal.patientData?.photoUrl ? (
+                  <img src={proposal.patientData.photoUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-zinc-400 font-serif text-lg">{proposal.patientName ? proposal.patientName.charAt(0).toUpperCase() : '?'}</span>
+                )}
+              </div>
+              <div className="text-sm text-zinc-600 font-sans">
+                Paciente: <br /><strong className="text-zinc-800 text-base">{proposal.patientName || 'Não Informado'}</strong>
+              </div>
             </div>
           </div>
           

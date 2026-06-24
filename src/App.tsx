@@ -700,6 +700,7 @@ export default function App() {
               }}
               onOpenRegistry={() => { setCurrentAppView('planning'); setActiveTab('registration'); }}
               onOpenPatientsList={() => { setCurrentAppView('crm'); }}
+              onOpenCalendar={() => setCurrentAppView('calendar')}
               isMobileOptimized={isMobileOptimized}
               setIsMobileOptimized={setIsMobileOptimized}
             />

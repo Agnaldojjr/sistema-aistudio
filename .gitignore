@@ -11,3 +11,9 @@ coverage/
 backup_bluedental_20260616_142151/
 consolidated_crm_import.json
 consolidate_bluedental.cjs
+
+# Credentials and secrets
+*-credential.json
+*-credentials.json
+*.pem
+*.key
