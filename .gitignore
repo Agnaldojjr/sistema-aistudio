@@ -17,3 +17,6 @@ consolidate_bluedental.cjs
 *-credentials.json
 *.pem
 *.key
+
+# Local Netlify folder
+.netlify
