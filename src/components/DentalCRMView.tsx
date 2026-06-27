@@ -201,7 +201,14 @@ export default function DentalCRMView({
   onNewProposal,
   onChangeView,
   clinicSettings,
-  onNewAppointment
+  onNewAppointment,
+  initialPatientName,
+  onClearInitialPatient,
+  procedures,
+  setProcedures,
+  setClinicSettings,
+  currentFileId,
+  setCurrentFileId
 }: {
   onLoadPatientData?: (data: any) => void;
   onNewProposal?: (patientName: string) => void;
