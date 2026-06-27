@@ -22,6 +22,7 @@ import {
   Smartphone,
   Monitor,
   Settings,
+  ArrowRight,
 } from 'lucide-react';
 import ProcedureManager from './components/ProcedureManager';
 import PhotoEditor from './components/PhotoEditor';
