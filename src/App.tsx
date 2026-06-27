@@ -428,7 +428,7 @@ export default function App() {
     setSections(INITIAL_SECTIONS);
     setProposal({ ...INITIAL_PROPOSAL, patientName });
     setCurrentFileId('NEW_FILE');
-    setCurrentAppView('planning');
+    setCurrentAppView('crm');
     setActiveTab('registration');
     setShowPatientsModal(false);
   };
@@ -447,7 +447,7 @@ export default function App() {
     if (data.selectedPlanIndex !== undefined) {
       localStorage.setItem('ag_neg_selected_plan', data.selectedPlanIndex.toString());
     }
-    setCurrentAppView('planning');
+    setCurrentAppView('crm');
     setActiveTab('editor');
     setShowPatientsModal(false);
   };

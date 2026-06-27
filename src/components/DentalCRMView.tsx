@@ -248,7 +248,7 @@ export default function DentalCRMView({
     refreshPatientSubModules
   } = usePatientContext();
 
-  const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'appointments' | 'anamnesis' | 'clinical' | 'communication' | 'financial' | 'docs_gallery' | 'drive_records' | 'treatment_plan'>('info');
+  const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'appointments' | 'anamnesis' | 'clinical' | 'communication' | 'financial' | 'docs_gallery' | 'drive_records' | 'treatment_plan' | 'plan_editor' | 'plan_negotiation' | 'plan_documents'>('info');
 
   // Supabase integration states
   const [driveFolderId, setSupabaseFolderId] = useState<string | null>(null);
@@ -4180,6 +4180,64 @@ export default function DentalCRMView({
                           </button>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* Panel: Mapeamento Clínico (PhotoEditor) */}
+                  {activeDetailTab === 'plan_editor' && (
+                    <div className="space-y-4">
+                      {activeSections && activeSections.length > 0 ? (
+                        <div className="space-y-6">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-sm font-bold text-[#8B0000] uppercase tracking-wider">✨ Mapeamento Clínico</h3>
+                            <span className="text-[10px] text-zinc-400">{activeSections.filter(s => s.image).length} de {activeSections.length} fotos carregadas</span>
+                          </div>
+                          {activeSections.map((section, idx) => (
+                            <PhotoEditor
+                              key={section.id}
+                              section={section}
+                              procedures={procedures || []}
+                              onUpdateSection={(updatedSection) => {
+                                const newSections = [...activeSections];
+                                newSections[idx] = updatedSection;
+                                setActiveSections(newSections);
+                              }}
+                              patientName={selectedPatient?.name || ''}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-16 text-zinc-400">
+                          <p className="text-sm">Nenhuma seção de foto disponível.</p>
+                          <p className="text-xs mt-1">Selecione um paciente para iniciar o mapeamento clínico.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Panel: Emissão de Orçamento (NegotiationTab) */}
+                  {activeDetailTab === 'plan_negotiation' && (
+                    <div>
+                      <NegotiationTab
+                        sections={activeSections || []}
+                        procedures={procedures || []}
+                        proposal={activeProposal || { patientName: selectedPatient?.name || '', status: 'Em Andamento', notes: '', installments: [], paymentEntries: [] }}
+                        setProposal={setActiveProposal}
+                        clinicSettings={clinicSettings || {}}
+                        currentFileId={currentFileId}
+                        setCurrentFileId={setCurrentFileId}
+                      />
+                    </div>
+                  )}
+
+                  {/* Panel: Contratos & Termos (PatientDocumentsTab) */}
+                  {activeDetailTab === 'plan_documents' && (
+                    <div>
+                      <PatientDocumentsTab
+                        proposal={activeProposal || { patientName: selectedPatient?.name || '', status: 'Em Andamento', notes: '', installments: [], paymentEntries: [] }}
+                        clinicSettings={clinicSettings || {}}
+                        setClinicSettings={setClinicSettings || (() => {})}
+                      />
                     </div>
                   )}
 
