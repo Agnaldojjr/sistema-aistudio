@@ -23,7 +23,8 @@ import {
   Send,
   Loader2,
   Monitor,
-  Smartphone
+  Smartphone,
+  Search
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ClinicSettings, TreatmentProposal } from '../types';
@@ -41,6 +42,8 @@ interface DashboardViewProps {
   onOpenCalendar: () => void;
   isMobileOptimized: boolean;
   setIsMobileOptimized: (v: boolean) => void;
+  onOpenRegistry: () => void;
+  onOpenPatient: (patientName: string) => void;
 }
 
 // Beautiful simulated mock list of appointments today representing a fully-populated workspace
@@ -89,6 +92,16 @@ export default function DashboardView({
   const [loadingRealData, setLoadingRealData] = useState(false);
   const [selectedAgendaDate, setSelectedAgendaDate] = useState<Date>(new Date());
   const [loadingAgenda, setLoadingAgenda] = useState(false);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
+  const filteredPatients = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return realPatients.filter((p: any) => p.name?.toLowerCase().includes(q) || p.appProperties?.phone?.includes(q));
+  }, [searchQuery, realPatients]);
 
   useEffect(() => {
     const loadRealDashboardData = async () => {
@@ -244,10 +257,12 @@ export default function DashboardView({
     <div className="space-y-8 font-sans print:hidden">
       
       {/* ================= HERO GREETING BLOCK ================= */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-[#8B0000] to-[#5C0000] border border-[#C09553]/40 rounded-3xl p-6 sm:p-8 text-[#FAF8F5] shadow-xl">
+      <div className="relative bg-gradient-to-r from-[#8B0000] to-[#5C0000] border border-[#C09553]/40 rounded-3xl p-6 sm:p-8 text-[#FAF8F5] shadow-xl">
         {/* Abstract background graphics with branding patterns */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-[#C09553]/10 to-transparent rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-64 h-64 bg-gradient-to-tr from-[#C09553]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-[#C09553]/10 to-transparent rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-64 h-64 bg-gradient-to-tr from-[#C09553]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
+        </div>
         
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="space-y-2">
@@ -263,6 +278,49 @@ export default function DashboardView({
             <p className="text-sm text-[#FAF8F5]/80 max-w-xl font-medium">
               Acompanhe as métricas do dia, os orçamentos em negociação e gerencie o fluxo de retorno periódico para manter a clínica altamente rentável.
             </p>
+            
+            {/* SEARCH FIELD */}
+            <div className="relative mt-4 w-full max-w-md pt-2">
+              <div className="relative flex items-center">
+                <Search className="w-5 h-5 absolute left-3 text-[#FAF8F5]/60" />
+                <input 
+                  type="text"
+                  placeholder="Buscar paciente por nome ou telefone..."
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setShowSearchResults(true); }}
+                  onFocus={() => setShowSearchResults(true)}
+                  onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
+                  className="w-full bg-black/20 border border-white/20 text-white placeholder-white/50 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#C09553] focus:border-transparent transition-all backdrop-blur-sm"
+                />
+              </div>
+              {showSearchResults && searchQuery.trim().length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl overflow-hidden z-50 max-h-64 overflow-y-auto border border-zinc-200">
+                   {filteredPatients.length > 0 ? (
+                      filteredPatients.map(p => (
+                         <button 
+                           key={p.id}
+                           onMouseDown={() => { // Using onMouseDown to fire before onBlur
+                             onOpenPatient(p.name);
+                             setSearchQuery('');
+                             setShowSearchResults(false);
+                           }}
+                           className="w-full text-left px-4 py-3 hover:bg-zinc-50 border-b border-zinc-100 last:border-0 flex items-center gap-3 transition-colors"
+                         >
+                           <div className="w-9 h-9 rounded-full bg-[#8B0000]/10 flex items-center justify-center text-[#8B0000] font-bold shrink-0">
+                             {p.name ? p.name.charAt(0).toUpperCase() : '?'}
+                           </div>
+                           <div className="truncate">
+                             <p className="text-sm font-bold text-zinc-800 truncate">{p.name}</p>
+                             <p className="text-xs text-zinc-500 truncate">{p.appProperties?.phone || 'Sem telefone'}</p>
+                           </div>
+                         </button>
+                      ))
+                   ) : (
+                      <div className="px-4 py-4 text-sm text-zinc-500 text-center font-medium">Nenhum paciente encontrado</div>
+                   )}
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
@@ -594,7 +652,7 @@ export default function DashboardView({
           </div>
 
           <button
-            onClick={onOpenRegistry}
+            onClick={() => onOpenRegistry()}
             className="w-full mt-2 bg-[#8B0000] hover:bg-[#6c1b26] text-white text-xs font-bold py-3.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
           >
             <UserPlus className="w-4 h-4 text-[#C09553]" />

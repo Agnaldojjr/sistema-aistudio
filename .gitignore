@@ -20,3 +20,4 @@ consolidate_bluedental.cjs
 
 # Local Netlify folder
 .netlify
+.vercel

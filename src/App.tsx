@@ -65,13 +65,12 @@ const AFLogoSVG = ({ className = '', light = false }: { className?: string; ligh
 // ─── Initial State ─────────────────────────────────────────────────────────
 
 // ─── Navigation Config ──────────────────────────────────────────────────────
-type AppView = 'dashboard' | 'calendar' | 'planning' | 'crm' | 'settings';
+type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings';
 
 const NAV_ITEMS = [
   { id: 'dashboard' as AppView, label: 'Painel', icon: LayoutDashboard, section: 'principal' },
   { id: 'crm'       as AppView, label: 'Pacientes', icon: Users,           section: 'principal' },
   { id: 'calendar'  as AppView, label: 'Agenda',    icon: Calendar,        section: 'principal' },
-  { id: 'planning'  as AppView, label: 'Planejamento', icon: ClipboardEdit, section: 'clinica' },
   { id: 'settings'  as AppView, label: 'Ajustes',   icon: Settings,        section: 'principal' },
 ];
 
@@ -195,12 +194,11 @@ interface TopBarProps {
   setIsMobileOptimized: (v: boolean) => void;
 }
 
-function TopBar({ currentView, proposal, activeTab, onOpenMobileMenu, isMobileOptimized, setIsMobileOptimized }: TopBarProps) {
+function TopBar({ currentView, proposal, onChangeView, onOpenMobileMenu, isMobileOptimized, setIsMobileOptimized }: TopBarProps) {
   const VIEW_LABELS: Record<AppView, string> = {
     dashboard: 'Painel Geral',
     crm: 'Gestão de Pacientes',
     calendar: 'Agenda',
-    planning: 'Planejamento Clínico',
     settings: 'Configurações',
   };
 
@@ -219,19 +217,23 @@ function TopBar({ currentView, proposal, activeTab, onOpenMobileMenu, isMobileOp
         <h2 className="text-[15px] font-semibold text-zinc-800 truncate">
           {VIEW_LABELS[currentView]}
         </h2>
-        {currentView === 'planning' && proposal.patientName && (
-          <p className="text-[11px] text-zinc-500 truncate mt-0.5">
-            Paciente: <span className="font-semibold text-[#8B0000]">{proposal.patientName}</span>
-            {proposal.status && (
-              <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold"
-                style={{
-                  background: (proposal.status === 'Aprovado (paciente pagou)' || proposal.status === 'Concluído') ? '#DCFCE7' : '#FEE2E2',
-                  color: (proposal.status === 'Aprovado (paciente pagou)' || proposal.status === 'Concluído') ? '#166534' : '#991B1B',
-                }}>
+        {/* Header Action Button */}
+        {currentView === 'dashboard' && (
+          <button onClick={() => onChangeView('calendar')} className="btn-primary w-full shadow-sm group">
+            <span className="flex-1 text-center font-semibold text-[13px] tracking-wide">NOVA CONSULTA</span>
+            <ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+          </button>
+        )}
+        {currentView === 'crm' && proposal.patientName && (
+          <div className="bg-[#FAF8F5] border border-[#E6DEC9] p-3 rounded-lg shadow-sm">
+            <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1 flex items-center justify-between">
+              Plano Ativo
+              <span className={`px-1.5 py-0.5 rounded text-[9px] ${proposal.status === 'Em Andamento' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
                 {proposal.status}
               </span>
-            )}
-          </p>
+            </p>
+            <p className="text-sm font-bold text-[#8B0000] truncate">{proposal.patientName}</p>
+          </div>
         )}
       </div>
 
@@ -245,123 +247,12 @@ function TopBar({ currentView, proposal, activeTab, onOpenMobileMenu, isMobileOp
           {isMobileOptimized ? <Monitor className="w-3.5 h-3.5" /> : <Smartphone className="w-3.5 h-3.5" />}
           {isMobileOptimized ? 'Desktop' : 'Celular'}
         </button>
-
-        {currentView === 'planning' && (
-          <button
-            type="button"
-            onClick={() => window.open(window.location.href.split('?')[0] + '?mode=patient_mapping', '_blank', 'width=1100,height=800')}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-lg border-2 text-[#8B0000] border-[#C09553] bg-white hover:bg-[#FAF8F5] transition-colors"
-            title="Pop-up do Paciente"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>Pop-up Paciente</span>
-          </button>
-        )}
       </div>
     </header>
   );
 }
 
-// ─── Planning Tabs Bar ────────────────────────────────────────────────────────
-interface PlanningTabsProps {
-  activeTab: 'registration' | 'editor' | 'negotiation' | 'documents';
-  setActiveTab: (t: 'registration' | 'editor' | 'negotiation' | 'documents') => void;
-  hasMarkers: boolean;
-  proposal: TreatmentProposal;
-  setProposal: React.Dispatch<React.SetStateAction<TreatmentProposal>>;
-}
 
-function PlanningTabs({ activeTab, setActiveTab, hasMarkers, proposal, setProposal }: PlanningTabsProps) {
-  const tabs = [
-    { id: 'registration' as const, label: 'Cadastro', icon: UserIcon, shortLabel: '1.' },
-    { id: 'editor'       as const, label: 'Mapeamento', icon: Layers, shortLabel: '2.' },
-    { id: 'negotiation'  as const, label: 'Orçamento', icon: Coins,  shortLabel: '3.' },
-    { id: 'documents'    as const, label: 'Documentos', icon: BookOpen, shortLabel: '4.' },
-  ];
-
-  return (
-    <div className="print:hidden">
-      {/* Tab row */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 justify-between bg-white border border-[#E6DEC9] p-2.5 rounded-2xl shadow-sm mb-6">
-        <div className="tab-bar w-full sm:w-auto">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                id={`tab-btn-${tab.id}`}
-                onClick={() => setActiveTab(tab.id)}
-                className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{tab.label}</span>
-                <span className="sm:hidden">{tab.shortLabel} {tab.label}</span>
-                {tab.id === 'negotiation' && hasMarkers && (
-                  <span className="w-2 h-2 rounded-full bg-[#C09553] animate-pulse" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Active patient controls (inline) */}
-        {proposal.patientName && (
-          <div className="hidden lg:flex items-center gap-3 px-3">
-            <div className="h-5 w-px bg-[#E6DEC9]" />
-            <select
-              id="panel-proposal-status"
-              value={proposal.status || 'Aberto (paciente não pagou)'}
-              onChange={(e) => setProposal((prev) => ({ ...prev, status: e.target.value as any }))}
-              className="text-[11px] font-bold rounded-lg px-2 py-1 border focus:outline-none transition-colors"
-              style={{
-                background: (proposal.status === 'Aprovado (paciente pagou)' || proposal.status === 'Concluído') ? '#DCFCE7' : '#FEF9F9',
-                color: (proposal.status === 'Aprovado (paciente pagou)' || proposal.status === 'Concluído') ? '#166534' : '#991B1B',
-                borderColor: (proposal.status === 'Aprovado (paciente pagou)' || proposal.status === 'Concluído') ? '#86EFAC' : '#FECACA',
-              }}
-            >
-              <option value="Aberto (paciente não pagou)">🔴 Aberto</option>
-              <option value="Aprovado (paciente pagou)">🟢 Aprovado</option>
-              <option value="Aguardando Aprovação">⏳ Aguardando</option>
-              <option value="Em Andamento">🔄 Em Andamento</option>
-              <option value="Concluído">✅ Concluído</option>
-              <option value="Arquivado">📁 Arquivado</option>
-            </select>
-          </div>
-        )}
-      </div>
-
-      {/* Patient name + notes (compact) */}
-      {(activeTab === 'editor' || activeTab === 'negotiation') && (
-        <div className="bg-white border border-[#E6DEC9] rounded-xl p-4 shadow-sm mb-6 animate-fade-in">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="field-label">Nome do Paciente</label>
-              <input
-                id="input-patient-name"
-                type="text"
-                placeholder="Ex: VALDERMON DA SILVA LOPES"
-                value={proposal.patientName}
-                onChange={(e) => setProposal((prev) => ({ ...prev, patientName: e.target.value.toUpperCase() }))}
-                className="field-input"
-              />
-            </div>
-            <div>
-              <label className="field-label">Observações do Orçamento</label>
-              <input
-                id="input-notes"
-                type="text"
-                placeholder="Ex: Orçamento feito sem radiografia..."
-                value={proposal.notes}
-                onChange={(e) => setProposal((prev) => ({ ...prev, notes: e.target.value }))}
-                className="field-input"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin, isLoggingIn }: { onLogin: () => void; isLoggingIn: boolean }) {
@@ -449,6 +340,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'registration' | 'editor' | 'negotiation' | 'documents'>('registration');
   const [showPatientsModal, setShowPatientsModal] = useState(false);
   const [currentAppView, setCurrentAppView] = useState<AppView>('dashboard');
+  const [appointmentPatientName, setAppointmentPatientName] = useState<string | undefined>();
+  const [crmPatientName, setCrmPatientName] = useState<string | undefined>();
   const [currentTheme, setCurrentTheme] = useState(() => {
     const saved = localStorage.getItem('agnaldo_dent_theme') || 'padrao';
     if (saved === 'bordo-escuro') return 'bordo-nobre';
@@ -456,7 +349,6 @@ export default function App() {
     if (saved === 'azul-noturno') return 'bordo-imperial';
     return saved;
   });
-  const [appointmentPatientName, setAppointmentPatientName] = useState<string | undefined>(undefined);
   const [currentFileId, setCurrentFileId] = useState<string | null>(null);
 
   const { activeSections: sections, setActiveSections: setSections, activeProposal: proposal, setActiveProposal: setProposal } = usePatientContext();
@@ -698,7 +590,14 @@ export default function App() {
                 setCurrentAppView('planning');
                 setActiveTab('negotiation');
               }}
-              onOpenRegistry={() => { setCurrentAppView('planning'); setActiveTab('registration'); }}
+              onOpenPatient={(patientName) => {
+                setCrmPatientName(patientName);
+                setCurrentAppView('crm');
+              }}
+              onOpenRegistry={() => { 
+                setCurrentAppView('planning'); 
+                setActiveTab('registration'); 
+              }}
               onOpenPatientsList={() => { setCurrentAppView('crm'); }}
               onOpenCalendar={() => setCurrentAppView('calendar')}
               isMobileOptimized={isMobileOptimized}
@@ -715,10 +614,17 @@ export default function App() {
               onNewProposal={handleNewProposalForPatient}
               onChangeView={setCurrentAppView}
               clinicSettings={clinicSettings}
+              setClinicSettings={setClinicSettings}
+              initialPatientName={crmPatientName}
+              onClearInitialPatient={() => setCrmPatientName(undefined)}
               onNewAppointment={(patientName) => {
                 setAppointmentPatientName(patientName);
                 setCurrentAppView('calendar');
               }}
+              procedures={procedures}
+              setProcedures={setProcedures}
+              currentFileId={currentFileId}
+              setCurrentFileId={setCurrentFileId}
             />
           </main>
         )}
@@ -745,130 +651,7 @@ export default function App() {
           </main>
         )}
 
-        {/* ── Planning ─────────────────────────────────────────── */}
-        {currentAppView === 'planning' && (
-          <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 max-w-7xl w-full mx-auto">
-
-            <PlanningTabs
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              hasMarkers={hasAnyMarkers}
-              proposal={proposal}
-              setProposal={setProposal}
-            />
-
-            {/* Tab: Cadastro */}
-            <div className={`${activeTab === 'registration' ? 'block animate-fade-in-up' : 'hidden'} print:hidden`}>
-              <PatientRegistrationTab proposal={proposal} setProposal={setProposal} />
-            </div>
-
-            {/* Tab: Documentos */}
-            <div className={activeTab === 'documents' ? 'block print:block animate-fade-in-up' : 'hidden'}>
-              <PatientDocumentsTab
-                proposal={proposal}
-                clinicSettings={clinicSettings}
-                setClinicSettings={setClinicSettings}
-              />
-            </div>
-
-            {/* Tab: Mapeamento Clínico */}
-            <div className={`${activeTab === 'editor' ? 'block animate-fade-in-up' : 'hidden'} print:hidden`}>
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                <div className="lg:col-span-8 space-y-6">
-
-                  {/* Instructional card */}
-                  <div className="bg-[#8B0000]/5 border border-[#C09553]/30 p-4 rounded-xl flex items-start gap-3">
-                    <div className="px-2.5 py-0.5 rounded-md bg-[#8B0000] text-white font-bold text-sm flex-shrink-0">1</div>
-                    <div>
-                      <h4 className="text-xs font-bold text-[#8B0000] uppercase tracking-wide">Como construir o plano de tratamento</h4>
-                      <p className="text-[11.5px] text-zinc-600 mt-1 leading-relaxed">
-                        Carregue as fotos reais da arcada do seu paciente usando os slots em cada quadrante. Selecione os dentes e preencha os procedimentos correspondentes.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Marker size */}
-                  <div className="bg-white border border-[#E6DEC9] p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
-                    <div>
-                      <h4 className="text-xs font-bold text-[#8B0000] uppercase tracking-wide flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#C09553] inline-block" />
-                        Tamanho das Marcações
-                      </h4>
-                      <p className="text-[11px] text-zinc-500 mt-0.5">Ajuste o tamanho das bolinhas nos dentes.</p>
-                    </div>
-                    <div className="flex items-center gap-3 bg-[#FAF8F5] border border-[#D5CBB3] rounded-lg px-4 py-1.5 min-w-[240px]">
-                      <input
-                        id="map-marker-size"
-                        type="range"
-                        min="18" max="42" step="1"
-                        value={proposal.markerSize || 26}
-                        onChange={(e) => setProposal((prev) => ({ ...prev, markerSize: parseInt(e.target.value) || 26 }))}
-                        className="w-full h-1 bg-[#E6DEC9] rounded-lg appearance-none cursor-pointer accent-[#8B0000]"
-                      />
-                      <span className="text-xs font-mono font-bold text-[#8B0000] min-w-[36px] text-right">{proposal.markerSize || 26}px</span>
-                    </div>
-                  </div>
-
-                  {sections.map((sec) => (
-                    <PhotoEditor
-                      key={sec.id}
-                      section={sec}
-                      procedures={procedures}
-                      onUpdateSection={handleUpdateSection}
-                      markerSize={proposal.markerSize || 26}
-                      patientName={proposal.patientName}
-                    />
-                  ))}
-
-                  <ClinicalAttendanceManager
-                    sections={sections}
-                    procedures={procedures}
-                    onUpdateSections={setSections}
-                    proposal={proposal}
-                    setProposal={setProposal}
-                  />
-
-                  {hasAnyMarkers && (
-                    <div className="bg-gradient-to-r from-[#FAF8F5] to-[#F3EFE9] border border-[#E6DEC9] p-5 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-4">
-                      <div>
-                        <p className="text-xs font-bold text-[#8B0000] uppercase tracking-wide">Mapeamento Concluído!</p>
-                        <p className="text-xs text-zinc-500 mt-0.5">Mapeamento feito. Veja o orçamento consolidado?</p>
-                      </div>
-                      <button
-                        id="btn-goto-negotiation"
-                        onClick={() => setActiveTab('negotiation')}
-                        className="btn-primary whitespace-nowrap"
-                      >
-                        Ver Orçamento & Negociação
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="lg:col-span-4 lg:sticky lg:top-8">
-                  <ProcedureManager
-                    procedures={procedures}
-                    setProcedures={setProcedures}
-                    onResetProcedures={handleResetProcedures}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Tab: Negociação */}
-            <div className={activeTab === 'negotiation' ? 'block print:block animate-fade-in-up' : 'hidden'}>
-              <NegotiationTab
-                sections={sections}
-                procedures={procedures}
-                proposal={proposal}
-                setProposal={setProposal}
-                clinicSettings={clinicSettings}
-                currentFileId={currentFileId}
-                setCurrentFileId={setCurrentFileId}
-              />
-            </div>
-          </main>
-        )}
+        {/* Planning Module has been migrated into CRM */}
 
         {/* Footer */}
         <footer className="bg-white border-t border-[#E6DEC9] py-4 px-6 print:hidden mt-auto">

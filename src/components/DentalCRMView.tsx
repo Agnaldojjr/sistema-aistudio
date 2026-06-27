@@ -39,6 +39,12 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
+import { updateSupabaseCRMDatabase } from '../lib/supabaseStorage';
+import PhotoEditor from './PhotoEditor';
+import PatientDocumentsTab from './PatientDocumentsTab';
+import NegotiationTab from './NegotiationTab';
+import ProcedureManager from './ProcedureManager';
+import ClinicalAttendanceManager from './ClinicalAttendanceManager';
 import { jsPDF } from 'jspdf';
 import { supabase } from '../lib/supabase';
 import * as XLSX from 'xlsx';
@@ -201,7 +207,14 @@ export default function DentalCRMView({
   onNewProposal?: (patientName: string) => void;
   onChangeView?: (view: any) => void;
   clinicSettings?: any;
+  setClinicSettings?: (s: any) => void;
   onNewAppointment?: (patientName: string) => void;
+  initialPatientName?: string;
+  onClearInitialPatient?: () => void;
+  procedures?: any;
+  setProcedures?: (p: any) => void;
+  currentFileId?: string | null;
+  setCurrentFileId?: (id: string | null) => void;
 } = {}) {
   // Navigation
   const [activeSubTab, setActiveSubTab] = useState<'import' | 'crm'>('crm'); // Default directly to CRM for quick review!
@@ -221,6 +234,8 @@ export default function DentalCRMView({
     pagamentosList, setPagamentosList,
     tratamentosList, setTratamentosList,
     odontogramaList, setOdontogramaList,
+    activeSections, setActiveSections,
+    activeProposal, setActiveProposal,
     saveContextToSupabase,
     isSavingToSupabase,
     refreshPatientSubModules
@@ -235,6 +250,21 @@ export default function DentalCRMView({
   const [driveImages, setSupabaseImages] = useState<any[]>([]);
   const [isLoadingSupabaseImages, setIsLoadingSupabaseImages] = useState(false);
   const [isSupabaseUploading, setIsSupabaseUploading] = useState(false);
+
+  // Helper functions for planning
+  const getSectionsWithInstallments = () => {
+    return activeSections.map(sec => ({
+      ...sec,
+      installments: sec.installments || 1
+    }));
+  };
+
+  const updateSectionInstallments = (sectionId: string, installments: number) => {
+    setActiveSections(prev => 
+      prev.map(sec => sec.id === sectionId ? { ...sec, installments } : sec)
+    );
+  };
+
   const [driveError, setSupabaseError] = useState<string | null>(null);
   const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
   const [editingProposalName, setEditingProposalName] = useState<string>('');
@@ -615,6 +645,19 @@ export default function DentalCRMView({
   useEffect(() => {
     loadPatientsFromFirestore();
   }, []);
+
+  // Handle initial patient selection from outside (like Dashboard search)
+  useEffect(() => {
+    if (initialPatientName && patients.length > 0) {
+      const patient = patients.find(p => p.name.toLowerCase() === initialPatientName.toLowerCase());
+      if (patient && (!selectedPatient || selectedPatient.id !== patient.id)) {
+        setSelectedPatient(patient);
+        if (onClearInitialPatient) {
+          onClearInitialPatient();
+        }
+      }
+    }
+  }, [initialPatientName, patients, selectedPatient, onClearInitialPatient, setSelectedPatient]);
 
   // Sync related lists when selected patient changes
   useEffect(() => {
@@ -3321,22 +3364,22 @@ export default function DentalCRMView({
                 </div>
 
                 {/* Sub-Tabs Grid Layout */}
-                <div className="bg-[#FAF8F5] flex flex-wrap border-t border-l border-zinc-200">
+                <div className="bg-[#FAF8F5] grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-0 border-t border-l border-zinc-200">
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('info')}
-                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
+                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'info'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    📇 Cadastro Completo
+                    📇 Cadastro
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('appointments')}
-                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
+                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'appointments'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -3347,7 +3390,7 @@ export default function DentalCRMView({
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('anamnesis')}
-                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
+                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'anamnesis'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -3358,29 +3401,64 @@ export default function DentalCRMView({
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('clinical')}
-                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
+                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'clinical'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    🦷 Evolução & Odontograma ({clinicalHistory.length + odontogramaList.length})
+                    🦷 Histórico ({clinicalHistory.length + odontogramaList.length})
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('treatment_plan')}
-                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
+                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'treatment_plan'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    🛠️ Plano de Tratamento
+                    🛠️ Planos Antigos
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveDetailTab('plan_editor')}
+                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
+                      activeDetailTab === 'plan_editor'
+                        ? 'bg-amber-100 text-amber-900 shadow-inner'
+                        : 'text-zinc-600 hover:bg-amber-50 hover:text-amber-800'
+                    }`}
+                  >
+                    ✨ Mapeamento Clínico
                   </button>
                   <button
                     type="button"
+                    onClick={() => setActiveDetailTab('plan_negotiation')}
+                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
+                      activeDetailTab === 'plan_negotiation'
+                        ? 'bg-amber-100 text-amber-900 shadow-inner'
+                        : 'text-zinc-600 hover:bg-amber-50 hover:text-amber-800'
+                    }`}
+                  >
+                    💰 Emissão Orçamento
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveDetailTab('plan_documents')}
+                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
+                      activeDetailTab === 'plan_documents'
+                        ? 'bg-amber-100 text-amber-900 shadow-inner'
+                        : 'text-zinc-600 hover:bg-amber-50 hover:text-amber-800'
+                    }`}
+                  >
+                    📝 Contratos & Termos
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setActiveDetailTab('communication')}
-                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
+                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'communication'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -3390,36 +3468,37 @@ export default function DentalCRMView({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveDetailTab('financial')}
-                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
-                      activeDetailTab === 'financial'
-                        ? 'bg-[#8B0000] text-[#FAF8F5]'
-                        : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
-                    }`}
-                  >
-                    💰 Financeiro ({pagamentosList.length})
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setActiveDetailTab('docs_gallery')}
-                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
+                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'docs_gallery'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    📂 Arquivos FIRESTORE ({documentosList.length + galeriaList.length})
+                    📂 Arquivos ({documentosList.length + galeriaList.length})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveDetailTab('financial')}
+                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
+                      activeDetailTab === 'financial'
+                        ? 'bg-[#8B0000] text-[#FAF8F5]'
+                        : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
+                    }`}
+                  >
+                    💵 Financeiro ({pagamentosList.length})
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveDetailTab('drive_records')}
-                    className={`flex-1 min-w-[110px] sm:min-w-[130px] px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
+                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
                       activeDetailTab === 'drive_records'
                         ? 'bg-[#8B0000] text-[#FAF8F5]'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 bg-amber-500/5 text-amber-900 font-semibold'
                     }`}
                   >
-                    ☁️ Galeria & Orçamentos (DRIVE) ({isLoadingSupabaseProposals || isLoadingSupabaseImages ? '...' : driveProposals.length + driveImages.length})
+                    ☁️ Cloud Drive ({isLoadingSupabaseProposals || isLoadingSupabaseImages ? '...' : driveProposals.length + driveImages.length})
                   </button>
                 </div>
 
