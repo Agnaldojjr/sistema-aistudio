@@ -564,7 +564,12 @@ export default function DashboardView({
                         
                         {/* Patient detail */}
                         <td className="py-3.5">
-                          <div className="font-bold text-zinc-800 uppercase">{appt.patientName}</div>
+                          <div 
+                            className="font-bold text-zinc-800 uppercase cursor-pointer hover:text-[#8B0000] hover:underline"
+                            onClick={() => onOpenPatient(appt.patientName)}
+                          >
+                            {appt.patientName}
+                          </div>
                           <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{appt.phone}</div>
                         </td>
                         
@@ -697,7 +702,10 @@ export default function DashboardView({
                 return (
                   <div key={ret.id} className="pt-3 first:pt-0 flex justify-between items-start gap-4 text-xs font-sans">
                     <div className="space-y-0.5">
-                      <div className="font-bold text-zinc-800 uppercase text-xs truncate max-w-[200px]">
+                      <div 
+                        className="font-bold text-zinc-800 uppercase text-xs truncate max-w-[200px] cursor-pointer hover:text-[#8B0000] hover:underline"
+                        onClick={() => onOpenPatient(ret.patientName)}
+                      >
                         {ret.patientName}
                       </div>
                       <div className="text-[10px] text-zinc-400 font-mono">

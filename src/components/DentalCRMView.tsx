@@ -4225,7 +4225,17 @@ export default function DentalCRMView({
                       {activeSections && activeSections.length > 0 ? (
                         <div className="space-y-6">
                           <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-sm font-bold text-[#8B0000] uppercase tracking-wider">✨ Mapeamento Clínico</h3>
+                            <div className="flex items-center gap-3">
+                              <h3 className="text-sm font-bold text-[#8B0000] uppercase tracking-wider">✨ Mapeamento Clínico</h3>
+                              <button
+                                onClick={() => setActiveDetailTab('info')}
+                                className="px-3 py-1 bg-zinc-50 hover:bg-zinc-100 text-zinc-600 hover:text-[#8B0000] text-xs font-bold rounded-lg transition-colors border border-zinc-200 hover:border-[#8B0000]/30 flex items-center gap-1.5 shadow-sm"
+                                title="Voltar para a Tela do Paciente (Ficha Cadastral)"
+                              >
+                                <User className="w-3.5 h-3.5" />
+                                Tela do Paciente
+                              </button>
+                            </div>
                             <span className="text-[10px] text-zinc-400">{activeSections.filter(s => s.image).length} de {activeSections.length} fotos carregadas</span>
                           </div>
                           {activeSections.map((section, idx) => (
