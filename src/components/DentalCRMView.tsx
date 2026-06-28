@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
+  ExternalLink,
   Upload, 
   FileSpreadsheet, 
   Search, 
@@ -4228,11 +4229,14 @@ export default function DentalCRMView({
                             <div className="flex items-center gap-3">
                               <h3 className="text-sm font-bold text-[#8B0000] uppercase tracking-wider">✨ Mapeamento Clínico</h3>
                               <button
-                                onClick={() => setActiveDetailTab('info')}
-                                className="px-3 py-1 bg-zinc-50 hover:bg-zinc-100 text-zinc-600 hover:text-[#8B0000] text-xs font-bold rounded-lg transition-colors border border-zinc-200 hover:border-[#8B0000]/30 flex items-center gap-1.5 shadow-sm"
-                                title="Voltar para a Tela do Paciente (Ficha Cadastral)"
+                                type="button"
+                                onClick={() => {
+                                  window.open(window.location.href.split('?')[0] + '?mode=patient', '_blank', 'width=1100,height=800');
+                                }}
+                                className="px-3 py-1 bg-[#FAF8F5] text-[#8B0000] text-xs font-bold rounded-lg transition-colors border-2 border-[#C09553]/30 hover:border-[#C09553] flex items-center gap-1.5 shadow-sm cursor-pointer select-none"
+                                title="Abrir pop-up da Tela do Paciente"
                               >
-                                <User className="w-3.5 h-3.5" />
+                                <ExternalLink className="w-3.5 h-3.5" />
                                 Tela do Paciente
                               </button>
                             </div>
