@@ -37,6 +37,7 @@ export interface PhotoSection {
   subtitle: string;
   image: string | null; // Data URL or reference image path
   markers: ToothMarker[];
+  installments?: number;
 }
 
 export interface ClinicSettings {

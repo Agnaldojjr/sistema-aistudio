@@ -189,7 +189,7 @@ function Sidebar({
 interface TopBarProps {
   currentView: AppView;
   proposal: TreatmentProposal;
-  activeTab: string;
+  onChangeView: (view: AppView) => void;
   onOpenMobileMenu: () => void;
   isMobileOptimized: boolean;
   setIsMobileOptimized: (v: boolean) => void;
@@ -532,7 +532,7 @@ export default function App() {
           <TopBar
             currentView={currentAppView}
             proposal={proposal}
-            activeTab={activeTab}
+            onChangeView={setCurrentAppView}
             onOpenMobileMenu={() => setMobileSidebarOpen(true)}
             isMobileOptimized={isMobileOptimized}
             setIsMobileOptimized={setIsMobileOptimized}
@@ -572,7 +572,7 @@ export default function App() {
         <TopBar
           currentView={currentAppView}
           proposal={proposal}
-          activeTab={activeTab}
+          onChangeView={setCurrentAppView}
           onOpenMobileMenu={() => setMobileSidebarOpen(true)}
           isMobileOptimized={isMobileOptimized}
           setIsMobileOptimized={setIsMobileOptimized}
@@ -588,16 +588,14 @@ export default function App() {
                 if (patientName) {
                   setProposal((prev) => ({ ...prev, patientName, status: (status || 'Em Andamento') as any }));
                 }
-                setCurrentAppView('planning');
-                setActiveTab('negotiation');
+                setCurrentAppView('crm');
               }}
               onOpenPatient={(patientName) => {
                 setCrmPatientName(patientName);
                 setCurrentAppView('crm');
               }}
               onOpenRegistry={() => { 
-                setCurrentAppView('planning'); 
-                setActiveTab('registration'); 
+                setCurrentAppView('crm'); 
               }}
               onOpenPatientsList={() => { setCurrentAppView('crm'); }}
               onOpenCalendar={() => setCurrentAppView('calendar')}
@@ -634,7 +632,7 @@ export default function App() {
         {currentAppView === 'calendar' && (
           <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 w-full h-[calc(100vh-60px)] animate-fade-in-up">
             <CalendarView
-              onNewPatient={() => { handleResetAll(); setCurrentAppView('planning'); }}
+              onNewPatient={() => { handleResetAll(); setCurrentAppView('crm'); }}
               initialPatientName={appointmentPatientName}
               onClearInitialPatient={() => setAppointmentPatientName(undefined)}
             />

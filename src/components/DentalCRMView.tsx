@@ -39,7 +39,6 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
-import { updateSupabaseCRMDatabase } from '../lib/supabaseStorage';
 import PhotoEditor from './PhotoEditor';
 import PatientDocumentsTab from './PatientDocumentsTab';
 import NegotiationTab from './NegotiationTab';
@@ -316,6 +315,7 @@ export default function DentalCRMView({
   const [searchQuery, setSearchQuery] = useState('');
   const [insuranceFilter, setInsuranceFilter] = useState('ALL');
   const [isLoadingCRM, setIsLoadingCRM] = useState(false);
+  const [showPatientSearch, setShowPatientSearch] = useState(false);
   
   // File upload states
   const [dragActive, setDragActive] = useState(false);
@@ -3126,53 +3126,85 @@ export default function DentalCRMView({
 
       {/* -------------------- TAB 2: GENERAL DENTAL CRM VIEW -------------------- */}
       {activeSubTab === 'crm' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="relative">
           
-          {/* Patients Listing column (LHS) */}
-          <div className="lg:col-span-4 space-y-4">
-            
-            <div className="bg-white border border-[#E6DEC9] p-4 rounded-xl shadow-xs space-y-3">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                  <input
-                    type="text"
-                    placeholder="Pesquisar paciente por nome, celular..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-[#FAF8F5] border border-zinc-200 focus:border-[#8B0000] rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none transition-all"
-                  />
+          {/* Top Search Bar / Floating Popup Trigger */}
+          <div className="w-full mb-6">
+            <div className="bg-white border border-[#E6DEC9] p-3 rounded-xl shadow-xs flex items-center justify-between">
+              <div 
+                className="flex-1 max-w-xl relative cursor-pointer" 
+                onClick={() => setShowPatientSearch(true)}
+              >
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                <div className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg pl-9 pr-3 py-2 text-xs text-zinc-500 cursor-text">
+                  {selectedPatient ? `Paciente selecionado: ${selectedPatient.name}` : 'Clique para buscar paciente...'}
                 </div>
-                
-                {/* Advanced filter select */}
-                <select
-                  value={insuranceFilter}
-                  onChange={(e) => setInsuranceFilter(e.target.value)}
-                  className="bg-[#FAF8F5] border border-zinc-200 rounded-lg text-xs px-2 focus:outline-none"
-                >
-                  <option value="ALL">Convênios</option>
-                  <option value="PARTICULAR">Particular</option>
-                  {getInsurancesList().map(ins => (
-                    ins !== 'PARTICULAR' && <option key={ins} value={ins}>{ins}</option>
-                  ))}
-                </select>
               </div>
-
-              <div className="flex justify-between items-center pt-2 border-t border-zinc-100">
-                <span className="text-[10px] text-zinc-400 font-bold uppercase">Encontrados: {filteredPatients.length} pacientes</span>
-                <button
-                  type="button"
-                  onClick={() => setIsAddingPatient(true)}
-                  className="text-[10px] font-bold text-[#8B0000] hover:text-[#a32c3d] flex items-center gap-0.5 cursor-pointer"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Novo Cadastro</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddingPatient(true)}
+                className="text-[10px] font-bold text-[#8B0000] hover:text-[#a32c3d] flex items-center gap-1 cursor-pointer px-4"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Novo Cadastro</span>
+              </button>
             </div>
+          </div>
 
-            {/* Patients dynamic scroll list */}
-            <div className="bg-white border border-[#E6DEC9] rounded-xl overflow-hidden max-h-[60vh] overflow-y-auto divide-y divide-zinc-100">
+          {/* Floating Patient Search Popup */}
+          {showPatientSearch && (
+            <div className="fixed inset-0 z-[120] flex items-start justify-center p-4 sm:p-10 pt-20 bg-black/40 backdrop-blur-sm" onClick={() => setShowPatientSearch(false)}>
+              <div 
+                className="w-full max-w-2xl bg-[#FAF8F5] border border-[#E6DEC9] rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden" 
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Search Header */}
+                <div className="bg-white border-b border-[#E6DEC9] p-4 flex flex-col gap-3">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-serif font-bold text-[#8B0000] flex items-center gap-2">
+                      <Search className="w-4 h-4" />
+                      Buscar Paciente
+                    </h3>
+                    <button 
+                      onClick={() => setShowPatientSearch(false)}
+                      className="text-zinc-400 hover:text-zinc-600 p-1"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Pesquisar paciente por nome, celular..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none transition-all"
+                      />
+                    </div>
+                    
+                    {/* Advanced filter select */}
+                    <select
+                      value={insuranceFilter}
+                      onChange={(e) => setInsuranceFilter(e.target.value)}
+                      className="bg-white border border-zinc-200 rounded-lg text-xs px-3 focus:outline-none"
+                    >
+                      <option value="ALL">Convênios</option>
+                      <option value="PARTICULAR">Particular</option>
+                      {getInsurancesList().map(ins => (
+                        ins !== 'PARTICULAR' && <option key={ins} value={ins}>{ins}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="text-[10px] text-zinc-400 font-bold uppercase text-right">
+                    Encontrados: {filteredPatients.length} pacientes
+                  </div>
+                </div>
+
+                {/* Patients dynamic scroll list */}
+                <div className="flex-1 overflow-y-auto divide-y divide-zinc-100 bg-white">
               {isLoadingCRM ? (
                 <div className="p-8 text-center space-y-2">
                   <Loader2 className="w-6 h-6 mx-auto animate-spin text-[#C09553]" />
@@ -3188,7 +3220,10 @@ export default function DentalCRMView({
                   return (
                     <div
                       key={p.id}
-                      onClick={() => setSelectedPatient(p)}
+                      onClick={() => {
+                        setSelectedPatient(p);
+                        setShowPatientSearch(false);
+                      }}
                       className={`p-3.5 text-left cursor-pointer transition-colors ${
                         isSelected ? 'bg-[#8B0000]/5 border-l-4 border-l-[#8B0000]' : 'hover:bg-zinc-50'
                       }`}
@@ -3304,11 +3339,12 @@ export default function DentalCRMView({
                 </form>
               </div>
             )}
+              </div>
+            </div>
+          )}
 
-          </div>
-
-          {/* Consolidated Patient File Panels (RHS Column) */}
-          <div className="lg:col-span-8">
+          {/* Consolidated Patient File Panels (Full Width) */}
+          <div className="w-full">
             {selectedPatient ? (
               <div className="bg-white border border-[#E6DEC9] rounded-2xl shadow-sm overflow-hidden text-left flex flex-col min-h-[50vh]">
                 
@@ -4221,7 +4257,7 @@ export default function DentalCRMView({
                       <NegotiationTab
                         sections={activeSections || []}
                         procedures={procedures || []}
-                        proposal={activeProposal || { patientName: selectedPatient?.name || '', status: 'Em Andamento', notes: '', installments: [], paymentEntries: [] }}
+                        proposal={activeProposal || { patientName: selectedPatient?.name || '', status: 'Em Andamento', notes: '', discountPercent: 5, pixDiscountLabel: '5% DESCONTO NO PIX', installments: 12, installmentsLabel: 'Parcelamento em até 12x (com taxas)', customDiscountAmount: 0, showTotalBySection: false }}
                         setProposal={setActiveProposal}
                         clinicSettings={clinicSettings || {}}
                         currentFileId={currentFileId}
@@ -4234,7 +4270,7 @@ export default function DentalCRMView({
                   {activeDetailTab === 'plan_documents' && (
                     <div>
                       <PatientDocumentsTab
-                        proposal={activeProposal || { patientName: selectedPatient?.name || '', status: 'Em Andamento', notes: '', installments: [], paymentEntries: [] }}
+                        proposal={activeProposal || { patientName: selectedPatient?.name || '', status: 'Em Andamento', notes: '', discountPercent: 5, pixDiscountLabel: '5% DESCONTO NO PIX', installments: 12, installmentsLabel: 'Parcelamento em até 12x (com taxas)', customDiscountAmount: 0, showTotalBySection: false }}
                         clinicSettings={clinicSettings || {}}
                         setClinicSettings={setClinicSettings || (() => {})}
                       />

@@ -42,7 +42,6 @@ interface DashboardViewProps {
   onOpenCalendar: () => void;
   isMobileOptimized: boolean;
   setIsMobileOptimized: (v: boolean) => void;
-  onOpenRegistry: () => void;
   onOpenPatient: (patientName: string) => void;
 }
 
@@ -75,6 +74,7 @@ export default function DashboardView({
   onOpenCalendar,
   isMobileOptimized,
   setIsMobileOptimized,
+  onOpenPatient,
 }: DashboardViewProps) {
   
   // Real-time local date details
