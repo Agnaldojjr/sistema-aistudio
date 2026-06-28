@@ -144,6 +144,14 @@ export function PatientProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedPatient, refreshPatientSubModules]);
 
+  useEffect(() => {
+    localStorage.setItem('agnaldo_dent_sections', JSON.stringify(activeSections));
+  }, [activeSections]);
+
+  useEffect(() => {
+    localStorage.setItem('agnaldo_dent_proposal', JSON.stringify(activeProposal));
+  }, [activeProposal]);
+
   const saveContextToSupabase = async () => {
     if (!selectedPatient) return;
     setIsSavingToSupabase(true);
