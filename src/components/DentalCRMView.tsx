@@ -4253,6 +4253,9 @@ export default function DentalCRMView({
                                 setActiveSections(newSections);
                               }}
                               patientName={selectedPatient?.name || ''}
+                              onAddProcedure={setProcedures ? (newProc) => {
+                                setProcedures((prev: any) => [...prev, newProc]);
+                              } : undefined}
                             />
                           ))}
                         </div>

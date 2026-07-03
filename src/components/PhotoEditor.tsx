@@ -4,7 +4,7 @@
  */
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Info, Camera, X, SwitchCamera, Zap, ZapOff, ZoomIn, Loader2, ImageIcon, Focus } from 'lucide-react';
+import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Info, Camera, X, SwitchCamera, Zap, ZapOff, ZoomIn, Loader2, ImageIcon, Focus, Plus } from 'lucide-react';
 import { PhotoSection, ToothMarker, Procedure } from '../types';
 import { DEMO_SVG_PLACEHOLDERS } from '../constants';
 import { listPatientFilesFromSupabase, downloadFileAsDataUrlFromSupabase, uploadPatientFileToSupabase } from '../lib/supabaseStorage';
@@ -16,6 +16,7 @@ interface PhotoEditorProps {
   onUpdateSection: (updatedSection: PhotoSection) => void;
   markerSize?: number;
   patientName?: string;
+  onAddProcedure?: (proc: Procedure) => void;
 }
 
 export default function PhotoEditor({
@@ -24,6 +25,7 @@ export default function PhotoEditor({
   onUpdateSection,
   markerSize = 26,
   patientName = '',
+  onAddProcedure,
 }: PhotoEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -59,6 +61,29 @@ export default function PhotoEditor({
   const [isLoadingGallery, setIsLoadingGallery] = useState(false);
   const [galleryError, setGalleryError] = useState<string | null>(null);
   const [isDownloadingFromGallery, setIsDownloadingFromGallery] = useState<string | null>(null);
+
+  // Inline new procedure form state
+  const [showInlineAddProc, setShowInlineAddProc] = useState(false);
+  const [inlineProcName, setInlineProcName] = useState('');
+  const [inlineProcPrice, setInlineProcPrice] = useState<number | string>('');
+
+  const INLINE_COLORS = ['#22C55E', '#A855F7', '#EC4899', '#3B82F6', '#F97316', '#EAB308', '#06B6D4', '#EF4444'];
+
+  const handleInlineAddProcedure = () => {
+    if (!inlineProcName.trim() || !onAddProcedure) return;
+    const parsedPrice = typeof inlineProcPrice === 'number' ? inlineProcPrice : parseFloat(String(inlineProcPrice)) || 0;
+    const colorIndex = procedures.length % INLINE_COLORS.length;
+    const newProc: Procedure = {
+      id: 'p-' + Date.now().toString(),
+      name: inlineProcName.trim(),
+      price: Math.max(0, parsedPrice),
+      color: INLINE_COLORS[colorIndex],
+    };
+    onAddProcedure(newProc);
+    setInlineProcName('');
+    setInlineProcPrice('');
+    setShowInlineAddProc(false);
+  };
 
   const handleOpenGallery = async () => {
     if (!patientName || patientName.trim() === '') {
@@ -1168,6 +1193,66 @@ export default function PhotoEditor({
                   );
                 })}
               </div>
+
+              {/* Inline Add New Procedure */}
+              {onAddProcedure && (
+                <div className="pt-1">
+                  {!showInlineAddProc ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowInlineAddProc(true)}
+                      className="w-full flex items-center justify-center gap-1.5 p-2 rounded-lg border border-dashed border-[#C09553]/40 text-[11px] font-semibold text-[#B48C4D] hover:bg-amber-50/30 hover:border-[#C09553] transition-all cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Novo Procedimento / Valor</span>
+                    </button>
+                  ) : (
+                    <div className="bg-[#FAF8F5] border border-[#E6DEC9] rounded-lg p-3 space-y-2 animate-fadeIn">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-[#4E1119] uppercase tracking-wide">Novo Procedimento</span>
+                        <button
+                          type="button"
+                          onClick={() => { setShowInlineAddProc(false); setInlineProcName(''); setInlineProcPrice(''); }}
+                          className="text-zinc-400 hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Nome do procedimento"
+                        value={inlineProcName}
+                        onChange={(e) => setInlineProcName(e.target.value)}
+                        className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-md px-2.5 py-1.5 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none transition-all"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-zinc-400">R$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            placeholder="Valor"
+                            value={inlineProcPrice}
+                            onChange={(e) => setInlineProcPrice(e.target.value)}
+                            className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-md pl-7 pr-2.5 py-1.5 text-xs font-mono text-zinc-800 placeholder-zinc-400 focus:outline-none transition-all"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleInlineAddProcedure}
+                          disabled={!inlineProcName.trim()}
+                          className="px-3 py-1.5 bg-[#4E1119] hover:bg-[#6c1b26] text-white text-xs font-semibold rounded-md flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Inserir</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Mini calculation for this single tooth */}
               <div className="flex justify-between items-center text-[11px] pt-1 border-t border-dashed border-zinc-100">

@@ -41,6 +41,7 @@ import PatientAnamnesisForm from './components/PatientAnamnesisForm';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from './types';
 import { DEFAULT_PROCEDURES, DEMO_SVG_PLACEHOLDERS, DEFAULT_CLINIC_SETTINGS, INITIAL_PROPOSAL, INITIAL_SECTIONS } from './constants';
 import { initAuth, googleSignIn, logout } from './firebase';
+import TreatmentPlanning3D from './TreatmentPlanning3D';
 
 import type { User } from '@supabase/supabase-js';
 import { usePatientContext } from './context/PatientContext';
@@ -66,12 +67,13 @@ const AFLogoSVG = ({ className = '', light = false }: { className?: string; ligh
 // ─── Initial State ─────────────────────────────────────────────────────────
 
 // ─── Navigation Config ──────────────────────────────────────────────────────
-type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings';
+type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings' | '3d-planning';
 
 const NAV_ITEMS = [
   { id: 'dashboard' as AppView, label: 'Painel', icon: LayoutDashboard, section: 'principal' },
   { id: 'crm'       as AppView, label: 'Pacientes', icon: Users,           section: 'principal' },
   { id: 'calendar'  as AppView, label: 'Agenda',    icon: Calendar,        section: 'principal' },
+  { id: '3d-planning' as AppView, label: 'Arcada 3D', icon: Layers,        section: 'principal' },
   { id: 'settings'  as AppView, label: 'Ajustes',   icon: Settings,        section: 'principal' },
 ];
 
@@ -201,6 +203,7 @@ function TopBar({ currentView, proposal, onChangeView, onOpenMobileMenu, isMobil
     crm: 'Gestão de Pacientes',
     calendar: 'Agenda',
     settings: 'Configurações',
+    '3d-planning': 'Planejamento 3D',
   };
 
   return (
@@ -650,7 +653,12 @@ export default function App() {
           </main>
         )}
 
-        {/* Planning Module has been migrated into CRM */}
+        {/* ── 3D Planning Module (Sprint 1) ────────────────────── */}
+        {currentAppView === '3d-planning' && (
+          <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 w-full animate-fade-in-up">
+            <TreatmentPlanning3D />
+          </main>
+        )}
 
         {/* Footer */}
         <footer className="bg-white border-t border-[#E6DEC9] py-4 px-6 print:hidden mt-auto">
