@@ -106,25 +106,7 @@ export function ToothActionMenu() {
               <span className="text-sm font-semibold">Ver Anatomia Individual</span>
             </button>
 
-            <button
-              onClick={() => {
-                toggleMissingTooth(toothNumber);
-                selectTooth(null);
-              }}
-              className="w-full flex items-center justify-start gap-3 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition-all border border-slate-700 hover:border-slate-500"
-            >
-              {isMissing ? (
-                <>
-                  <Eye className="w-5 h-5 text-emerald-400" />
-                  <span className="text-sm font-semibold">Restaurar Dente</span>
-                </>
-              ) : (
-                <>
-                  <EyeOff className="w-5 h-5 text-rose-400" />
-                  <span className="text-sm font-semibold">Ocultar Dente</span>
-                </>
-              )}
-            </button>
+
 
             <button
               onClick={() => setView('PROCEDURES')}

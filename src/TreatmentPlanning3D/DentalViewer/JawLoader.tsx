@@ -35,125 +35,12 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
     clone.traverse((child: any) => {
       if (child.isMesh) {
         child.material = child.material.clone();
-        
-        // Ativa customDepthMaterial para garantir que a sombra respeite o discard
-        child.customDepthMaterial = new THREE.MeshDepthMaterial({
-          depthPacking: THREE.RGBADepthPacking,
-          alphaTest: 0.5
-        });
-
-        const patchShader = (shader: any) => {
-          child.material.userData.shader = shader;
-          shader.uniforms.uMissingCount = { value: 0 };
-          // FIX: Do not use .fill(new Vector3()), as it uses the exact same reference for all elements!
-          shader.uniforms.uMissingCenters = { value: Array.from({ length: 32 }, () => new THREE.Vector3()) };
-          
-          shader.vertexShader = `
-            varying vec3 vWorldPos;
-            ${shader.vertexShader}
-          `.replace(
-            `#include <worldpos_vertex>`,
-            `
-            #include <worldpos_vertex>
-            // Use the internally computed worldPosition to be safe
-            vWorldPos = worldPosition.xyz;
-            `
-          );
-
-          shader.fragmentShader = `
-            uniform int uMissingCount;
-            uniform vec3 uMissingCenters[32];
-            varying vec3 vWorldPos;
-            ${shader.fragmentShader}
-          `.replace(
-            `#include <clipping_planes_fragment>`,
-            `
-            #include <clipping_planes_fragment>
-            for(int i = 0; i < 32; i++) {
-              if(i >= uMissingCount) break;
-              // Cria uma borracha oval (mais alta no eixo Y) para apagar o dente inteiro
-              vec3 diff = vWorldPos - uMissingCenters[i];
-              diff.y *= 0.5; // Faz o buraco ser 2x mais alto (raio Y = 2.0)
-              if(length(diff) < 1.2) { // Raio X e Z = 1.2
-                discard;
-              }
-            }
-            `
-          );
-        };
-
-        child.material.onBeforeCompile = patchShader;
-        child.customDepthMaterial.onBeforeCompile = patchShader;
       }
     });
     return clone;
   }, [scene]);
 
-  // 2. Agora calculamos os centros baseados na clonedScene
-  const missingCenters = React.useMemo(() => {
-    // Generate accurate centers based on the model's bounding box
-    const box = new THREE.Box3().setFromObject(clonedScene);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
 
-    return (viewerState.missingTeeth || []).map(num => {
-      // 100% pixel-perfect hit point from the user's click!
-      if (viewerState.missingTeethCoords?.[num]) {
-        return viewerState.missingTeethCoords[num];
-      }
-
-      const isUpper = num < 30;
-      const quadrant = Math.floor(num / 10);
-      const index = num % 10;
-
-      // Approximate angles for each tooth index
-      const angles = [0, 7.5, 22.5, 37.5, 55, 75, 97.5, 122.5, 150];
-      let deg = angles[index] || 0;
-
-      // Right side of patient (screen left) is negative X -> negative angle
-      if (quadrant === 1 || quadrant === 4) {
-        deg = -deg;
-      }
-
-      const rad = (deg * Math.PI) / 180;
-      
-      // Radius based on model size (slightly inside the bounding box)
-      const rx = (size.x / 2) * 0.85;
-      const rz = (size.z / 2) * 0.85;
-
-      // Local positions (unscaled)
-      const localX = center.x + rx * Math.sin(rad);
-      const localZ = center.z + rz * Math.cos(rad);
-      const localY = center.y + (isUpper ? (size.y * 0.25) : -(size.y * 0.25));
-
-      // The group wrapper applies scale=85 and position=[0, -0.2, 0] + [0, 0, 1.5]
-      const worldX = localX * modelScale;
-      const worldY = localY * modelScale - 0.2;
-      const worldZ = localZ * modelScale + 1.5;
-
-      // The returned Vector3 is in world space, perfect for the shader
-      return new THREE.Vector3(worldX, worldY, worldZ);
-    });
-  }, [viewerState.missingTeeth, viewerState.missingTeethCoords, clonedScene]);
-
-  // Atualizar os uniforms quando missingTeeth mudar
-  React.useEffect(() => {
-    clonedScene.traverse((child: any) => {
-      if (child.isMesh && child.material.userData.shader) {
-        child.material.userData.shader.uniforms.uMissingCount.value = missingCenters.length;
-        // Atualizar o array (Three.js aceita array de Vector3)
-        const padded = [...missingCenters];
-        while(padded.length < 32) padded.push(new THREE.Vector3());
-        child.material.userData.shader.uniforms.uMissingCenters.value = padded;
-      }
-      if (child.isMesh && child.customDepthMaterial && child.customDepthMaterial.userData.shader) {
-        child.customDepthMaterial.userData.shader.uniforms.uMissingCount.value = missingCenters.length;
-        const padded = [...missingCenters];
-        while(padded.length < 32) padded.push(new THREE.Vector3());
-        child.customDepthMaterial.userData.shader.uniforms.uMissingCenters.value = padded;
-      }
-    });
-  }, [missingCenters, clonedScene]);
 
   return (
     <group position={[0, -0.2, 0]}>
