@@ -108,9 +108,8 @@ function DetailedToothGLB({ toothNumber, variant }: { toothNumber: number, varia
   // If variant === 'endodontic', we could maybe apply a material change or transparency to show root canals if we had them.
   // Since we only downloaded anatomic, we'll just show anatomic for both.
   
-  // scaleX to mirror if right side
   return (
-    <primitive object={clonedScene} scale={[20 * scaleX, 20, 20]} />
+    <primitive object={clonedScene} scale={[3 * scaleX, 3, 3]} />
   );
 }
 

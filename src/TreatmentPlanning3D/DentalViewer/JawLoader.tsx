@@ -30,13 +30,39 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
   const modelScale = 85.0; 
 
   const missingCenters = React.useMemo(() => {
+    // Generate accurate centers based on the model's bounding box
+    const box = new THREE.Box3().setFromObject(clonedScene);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+
     return (viewerState.missingTeeth || []).map(num => {
-      const pos = getToothPosition(num).position;
-      // As the hitboxes are within a group with position={[0, -0.2, 0]},
-      // their world position would be y - 0.2.
-      return new THREE.Vector3(pos[0], pos[1] - 0.2, pos[2]);
+      const isUpper = num < 30;
+      const quadrant = Math.floor(num / 10);
+      const index = num % 10;
+
+      // Approximate angles for each tooth index
+      const angles = [0, 7.5, 22.5, 37.5, 55, 75, 97.5, 122.5, 150];
+      let deg = angles[index] || 0;
+
+      // Right side of patient (screen left) is negative X -> negative angle
+      if (quadrant === 1 || quadrant === 4) {
+        deg = -deg;
+      }
+
+      const rad = (deg * Math.PI) / 180;
+      
+      // Radius based on model size (slightly inside the bounding box)
+      const rx = (size.x / 2) * 0.85;
+      const rz = (size.z / 2) * 0.85;
+
+      const x = center.x + rx * Math.sin(rad);
+      const z = center.z + rz * Math.cos(rad);
+      const y = center.y + (isUpper ? 0.8 : -0.8);
+
+      // The returned Vector3 is in world space, perfect for the shader
+      return new THREE.Vector3(x, y, z);
     });
-  }, [viewerState.missingTeeth, getToothPosition]);
+  }, [viewerState.missingTeeth, clonedScene]);
 
   // Clonamos a cena para não afetar outras instâncias e injetamos o shader
   const clonedScene = React.useMemo(() => {
