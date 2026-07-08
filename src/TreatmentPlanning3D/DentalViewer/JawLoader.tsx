@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGLTF } from '@react-three/drei';
+import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { usePlanning3D } from '../hooks/usePlanning3D';
 
@@ -18,14 +19,124 @@ try {
 interface JawLoaderProps {
   getToothPosition: (fdiCode: number) => { position: [number, number, number]; rotation: [number, number, number] };
   isCalibrating?: boolean;
+  onUpdateToothPosition?: (fdiCode: number, position: [number, number, number]) => void;
 }
 
 // Geometria procedural leve para o highlight e hitbox
 const hitBoxGeo = new THREE.SphereGeometry(0.35, 16, 16);
 
-export function JawLoader({ getToothPosition, isCalibrating = false }: JawLoaderProps) {
+// Componente da Esfera Arrastável 3D
+function DraggableSphere({
+  toothNum,
+  initialPosition,
+  geometry,
+  color,
+  emissive,
+  opacity,
+  depthTest,
+  onDoubleClick,
+  onDrag
+}: {
+  toothNum: number;
+  initialPosition: [number, number, number];
+  geometry: THREE.BufferGeometry;
+  color: string;
+  emissive: string;
+  opacity: number;
+  depthTest: boolean;
+  onDoubleClick: (e: any) => void;
+  onDrag: (position: [number, number, number]) => void;
+}) {
+  const { camera, raycaster } = useThree();
+  const [isDragging, setIsDragging] = React.useState(false);
+  const meshRef = React.useRef<THREE.Mesh>(null);
+  
+  // Guardamos o plano de arrasto e o ponto de interseção
+  const planeRef = React.useRef(new THREE.Plane());
+  const intersectionRef = React.useRef(new THREE.Vector3());
+
+  // Posiciona inicialmente de acordo com a posição vinda do pai
+  const [pos, setPos] = React.useState<[number, number, number]>(initialPosition);
+
+  // Sincroniza se a posição inicial vinda do pai mudar (ex: recalibração de sliders gerais)
+  React.useEffect(() => {
+    setPos(initialPosition);
+  }, [initialPosition]);
+
+  return (
+    <mesh
+      ref={meshRef}
+      position={pos}
+      geometry={geometry}
+      onDoubleClick={onDoubleClick}
+      onPointerDown={(e: any) => {
+        e.stopPropagation();
+        // Captura o ponteiro para receber eventos de movimento mesmo fora do mesh
+        e.target.setPointerCapture(e.pointerId);
+        setIsDragging(true);
+
+        // Desativa OrbitControls temporariamente do canvas
+        const canvas = e.target.ownerDocument?.querySelector('canvas');
+        const controls = canvas?.__r3f?.controls;
+        if (controls) controls.enabled = false;
+
+        // Cria um plano paralelo à câmera passando pela posição atual da bolinha
+        const normal = camera.getWorldDirection(new THREE.Vector3()).negate();
+        const worldPos = meshRef.current?.getWorldPosition(new THREE.Vector3()) || new THREE.Vector3(...pos);
+        planeRef.current.setFromNormalAndCoplanarPoint(normal, worldPos);
+      }}
+      onPointerMove={(e: any) => {
+        if (!isDragging) return;
+        e.stopPropagation();
+
+        // Faz o raycast contra o plano paralelo à tela
+        raycaster.setFromCamera(e.pointer, camera);
+        if (raycaster.ray.intersectPlane(planeRef.current, intersectionRef.current)) {
+          // Converte o ponto do espaço mundial de volta para o espaço local do pai do mesh
+          const parent = meshRef.current?.parent;
+          if (parent) {
+            const localPoint = parent.worldToLocal(intersectionRef.current.clone());
+            const newPos: [number, number, number] = [localPoint.x, localPoint.y, localPoint.z];
+            setPos(newPos);
+            onDrag(newPos);
+          }
+        }
+      }}
+      onPointerUp={(e: any) => {
+        if (!isDragging) return;
+        e.stopPropagation();
+        e.target.releasePointerCapture(e.pointerId);
+        setIsDragging(false);
+
+        // Reativa o OrbitControls
+        const canvas = e.target.ownerDocument?.querySelector('canvas');
+        const controls = canvas?.__r3f?.controls;
+        if (controls) controls.enabled = true;
+      }}
+      onPointerOver={(e: any) => {
+        e.stopPropagation();
+        document.body.style.cursor = 'move';
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = 'default';
+      }}
+    >
+      <meshStandardMaterial 
+        color={isDragging ? '#ef4444' : color} 
+        emissive={isDragging ? '#ef4444' : emissive}
+        emissiveIntensity={0.5} 
+        transparent 
+        opacity={opacity} 
+        depthWrite={false}
+        depthTest={depthTest} 
+      />
+    </mesh>
+  );
+}
+
+export function JawLoader({ getToothPosition, isCalibrating = false, onUpdateToothPosition }: JawLoaderProps) {
   const { scene } = useGLTF('/models/boca_ortodoncia.glb') as any;
-  const { procedures, selectTooth, viewerState } = usePlanning3D();
+  const { procedures, selectTooth, viewerState, toggleMissingTooth } = usePlanning3D();
   
   const groupRef = React.useRef<THREE.Group>(null);
 
@@ -64,6 +175,9 @@ export function JawLoader({ getToothPosition, isCalibrating = false }: JawLoader
             let minDistance = Infinity;
             
             ALL_TEETH.forEach((toothNum) => {
+              const isMissing = viewerState.missingTeeth?.includes(toothNum);
+              if (isMissing) return; // Não clica em dentes ocultados/excluídos
+
               const { position } = getToothPosition(toothNum);
               const dx = localPoint.x - position[0];
               const dy = localPoint.y - position[1];
@@ -93,6 +207,9 @@ export function JawLoader({ getToothPosition, isCalibrating = false }: JawLoader
       {/* Grupo com translação de +1.5 Z para alinhar perfeitamente com a malha do modelo realista */}
       <group position={[0, 0, 1.5]}>
         {ALL_TEETH.map((toothNum) => {
+          const isMissing = viewerState.missingTeeth?.includes(toothNum);
+          if (isMissing) return null; // Exclui a bolinha visualmente
+
           const toothProcedures = procedures.filter(p => p.tooth_id === String(toothNum));
           const hasBudget = toothProcedures.length > 0;
           const isSelected = viewerState.activeTooth === toothNum;
@@ -116,17 +233,21 @@ export function JawLoader({ getToothPosition, isCalibrating = false }: JawLoader
           }
 
           return (
-            <mesh key={toothNum} position={position} geometry={hitBoxGeo}>
-              <meshStandardMaterial 
-                color={color} 
-                emissive={emissive} 
-                emissiveIntensity={0.5} 
-                transparent 
-                opacity={opacity} 
-                depthWrite={false}
-                depthTest={!isCalibrating} // Se calibrando, renderiza por cima para visualizarmos melhor
-              />
-            </mesh>
+            <DraggableSphere
+              key={toothNum}
+              toothNum={toothNum}
+              initialPosition={position}
+              geometry={hitBoxGeo}
+              color={color}
+              emissive={emissive}
+              opacity={opacity}
+              depthTest={!isCalibrating}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                toggleMissingTooth(toothNum);
+              }}
+              onDrag={(newPos) => onUpdateToothPosition?.(toothNum, newPos)}
+            />
           );
         })}
       </group>

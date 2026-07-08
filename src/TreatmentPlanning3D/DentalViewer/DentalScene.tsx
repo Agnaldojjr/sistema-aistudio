@@ -283,6 +283,9 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
   const [lowerArchConfig, setLowerArchConfig] = useState<ArchConfig>(DEFAULT_ARCH_CONFIG);
   const [activeCalibratingArch, setActiveCalibratingArch] = useState<'upper' | 'lower'>('upper');
 
+  // Posições arrastadas individualmente
+  const [customPositions, setCustomPositions] = useState<Record<number, [number, number, number]>>({});
+
   const isDetailedView = viewerState.activeTooth !== null && viewerState.viewingAnatomy;
   const showActionMenu = viewerState.activeTooth !== null && !viewerState.viewingAnatomy;
 
@@ -291,9 +294,16 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
     setVariant('anatomic'); 
   };
 
-  // getToothPosition adaptada para usar as arcadas independentes
-  const getDynamicToothPosition = (fdiCode: number) => 
-    getToothPosition(fdiCode, upperArchConfig, lowerArchConfig);
+  // getToothPosition adaptada para usar as arcadas independentes e posições customizadas
+  const getDynamicToothPosition = (fdiCode: number) => {
+    if (customPositions[fdiCode]) {
+      return {
+        position: customPositions[fdiCode],
+        rotation: getToothPosition(fdiCode, upperArchConfig, lowerArchConfig).rotation
+      };
+    }
+    return getToothPosition(fdiCode, upperArchConfig, lowerArchConfig);
+  };
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 w-full min-h-[550px] relative">
@@ -361,7 +371,7 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
         )}
 
         <div className="absolute bottom-4 left-4 z-10 bg-slate-900/80 backdrop-blur border border-slate-800 text-slate-400 text-[10px] px-3 py-1.5 rounded-lg pointer-events-none">
-          Clique para selecionar dente • Arraste para rotacionar
+          Clique no dente para abrir ações • Arraste bolinhas para mover • Dois cliques para ocultar bolinha
         </div>
 
         <Canvas
@@ -389,6 +399,12 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
                 <JawLoader 
                   getToothPosition={getDynamicToothPosition} 
                   isCalibrating={isCalibrating} 
+                  onUpdateToothPosition={(fdiCode, position) => {
+                    setCustomPositions(prev => ({
+                      ...prev,
+                      [fdiCode]: position
+                    }));
+                  }}
                 />
               )}
             </SceneErrorBoundary>
