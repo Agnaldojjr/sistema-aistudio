@@ -13,8 +13,16 @@ export function ToothActionMenu() {
   const toothNumber = viewerState.activeTooth;
   const isMissing = viewerState.missingTeeth?.includes(toothNumber);
 
+  // Use the stored coordinates or fallback to center
+  const style = viewerState.activeToothPos 
+    ? { top: viewerState.activeToothPos.y - 120, left: viewerState.activeToothPos.x }
+    : { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+
   return (
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center animate-in zoom-in-95 fade-in duration-200">
+    <div 
+      className={`fixed z-[60] flex flex-col items-center animate-in zoom-in-95 fade-in duration-200 ${viewerState.activeToothPos ? '-translate-x-1/2' : ''}`}
+      style={style}
+    >
       <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700 p-5 rounded-2xl shadow-2xl flex flex-col gap-3 min-w-[280px] max-w-[320px]">
         
         <div className="flex justify-between items-center mb-1">

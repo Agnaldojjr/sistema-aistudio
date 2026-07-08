@@ -38,6 +38,7 @@ export type LayerConfig = Record<LayerKey, LayerState>;
 
 export interface Viewer3DState {
   activeTooth: number | null;
+  activeToothPos?: { x: number, y: number } | null;
   viewingAnatomy?: boolean;
   activeSurfaces: ToothSurface[];
   transparencyMode: boolean;

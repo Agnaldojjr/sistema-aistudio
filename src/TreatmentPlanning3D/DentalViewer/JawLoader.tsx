@@ -111,12 +111,21 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
       const rx = (size.x / 2) * 0.85;
       const rz = (size.z / 2) * 0.85;
 
-      const x = center.x + rx * Math.sin(rad);
-      const z = center.z + rz * Math.cos(rad);
-      const y = center.y + (isUpper ? 0.8 : -0.8);
+      // Local positions (unscaled)
+      const localX = center.x + rx * Math.sin(rad);
+      const localZ = center.z + rz * Math.cos(rad);
+      const localY = center.y + (isUpper ? (size.y * 0.25) : -(size.y * 0.25));
+
+      // The group wrapper applies scale=85 and position=[0, -0.2, 0] + [0, 0, 1.5]
+      // W.x = P.x * 85
+      // W.y = P.y * 85 - 0.2
+      // W.z = P.z * 85 + 1.5
+      const worldX = localX * modelScale;
+      const worldY = localY * modelScale - 0.2;
+      const worldZ = localZ * modelScale + 1.5;
 
       // The returned Vector3 is in world space, perfect for the shader
-      return new THREE.Vector3(x, y, z);
+      return new THREE.Vector3(worldX, worldY, worldZ);
     });
   }, [viewerState.missingTeeth, clonedScene]);
 
@@ -159,42 +168,41 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
             // Upper ou Lower (Y)
             const isUpper = point.y > center.y;
             
-            // X (Esquerda/Direita) e Z (Frente/Trás)
-            // atan2(x, z) dá o ângulo no plano horizontal
-            // z positivo é a frente da boca (incisivos)
+            // Calcula o ângulo a partir do centro (no plano XZ)
             const dx = point.x - center.x;
             const dz = point.z - center.z;
+            const angle = Math.atan2(dx, dz);
             
-            const angle = Math.atan2(dx, dz); // radianos
-            
-            // Convert angle to degrees for easier slicing
+            // Converte ângulo para graus
             let deg = (angle * 180) / Math.PI;
             
-            // O quadrante depende do Y (isUpper) e do X (deg positivo = direita da tela = esquerda do paciente)
-            let quadrant = 0;
-            if (isUpper) {
-              quadrant = deg > 0 ? 2 : 1; // 2: Sup Esquerdo (Paciente), 1: Sup Direito (Paciente)
-            } else {
-              quadrant = deg > 0 ? 3 : 4; // 3: Inf Esquerdo (Paciente), 4: Inf Direito (Paciente)
-            }
-            
-            // O índice do dente (1 a 8) depende do valor absoluto do ângulo
-            // 0 = centro da frente. 90 = fundo.
+            // Ajusta o mapeamento de dentes baseado na geometria real do arco
             const absDeg = Math.abs(deg);
             
-            // Mapeamento aproximado do arco dentário
+            // 0 = centro da frente. 90 = fundo.
             let toothIndex = 1;
             if (absDeg < 15) toothIndex = 1;      // Incisivo Central
             else if (absDeg < 30) toothIndex = 2; // Incisivo Lateral
             else if (absDeg < 45) toothIndex = 3; // Canino
             else if (absDeg < 65) toothIndex = 4; // 1º Pré-molar
             else if (absDeg < 85) toothIndex = 5; // 2º Pré-molar
-            else if (absDeg < 110) toothIndex = 6;// 1º Molar
-            else if (absDeg < 135) toothIndex = 7;// 2º Molar
-            else toothIndex = 8;                  // 3º Molar
+            else if (absDeg < 110) toothIndex = 6; // 1º Molar
+            else if (absDeg < 135) toothIndex = 7; // 2º Molar
+            else toothIndex = 8;                  // 3º Molar (Siso)
+            
+            // Determina o quadrante (1 a 4)
+            // deg negativo é o lado direito do paciente (nossa esquerda na tela)
+            let quadrant;
+            if (isUpper) {
+              quadrant = deg < 0 ? 1 : 2;
+            } else {
+              quadrant = deg < 0 ? 4 : 3;
+            }
             
             const selectedTooth = (quadrant * 10) + toothIndex;
-            selectTooth(selectedTooth);
+            
+            // Pass the 2D coordinates of the click so the menu can float there
+            selectTooth(selectedTooth, { x: e.clientX, y: e.clientY });
           }}
           onPointerOver={(e: any) => {
             e.stopPropagation();

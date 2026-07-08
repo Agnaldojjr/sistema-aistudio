@@ -9,7 +9,7 @@ interface Planning3DContextType {
   globalProcedures: any[];
   viewerState: Viewer3DState;
   setActivePlan: (plan: TreatmentPlan | null) => void;
-  selectTooth: (toothNumber: number | null) => void;
+  selectTooth: (toothNumber: number | null, pos?: { x: number, y: number }) => void;
   selectSurface: (surface: ToothSurface) => void;
   updateToothCondition: (toothNumber: number, condition: ToothCondition, notes?: string) => void;
   updateToothSurfaceCondition: (toothNumber: number, surface: ToothSurface, condition: ToothCondition) => void;
@@ -167,11 +167,12 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
     });
   };
 
-  const selectTooth = (toothNumber: number | null) => {
+  const selectTooth = (toothNumber: number | null, pos?: { x: number, y: number }) => {
     if (viewerState.presentationMode) return;
     setViewerState((prev) => ({
       ...prev,
       activeTooth: toothNumber,
+      activeToothPos: toothNumber === null ? null : pos,
       activeSurfaces: [],
     }));
   };
