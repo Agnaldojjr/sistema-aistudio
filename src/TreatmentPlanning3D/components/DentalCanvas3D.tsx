@@ -14,11 +14,11 @@ function getToothPosition(fdiCode: number): { position: [number, number, number]
   // Mapear dentes de -8 (molar esquerdo) a 8 (molar direito)
   let index = 0;
   if (quadrant === 1 || quadrant === 4) {
-    // Lado Direito (FDI 11-18, 41-48) -> index positivo
-    index = positionIndex;
-  } else {
-    // Lado Esquerdo (FDI 21-28, 31-38) -> index negativo
+    // Lado Direito (FDI 11-18, 41-48) -> index negativo (esquerdo na tela)
     index = -positionIndex;
+  } else {
+    // Lado Esquerdo (FDI 21-28, 31-38) -> index positivo (direito na tela)
+    index = positionIndex;
   }
 
   // Ângulo baseado no dente (de -PI/2.5 a PI/2.5 para distribuir os dentes no arco)

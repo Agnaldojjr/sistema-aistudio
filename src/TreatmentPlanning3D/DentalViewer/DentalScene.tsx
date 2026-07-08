@@ -39,9 +39,9 @@ export function getToothPosition(
 
   let index = 0;
   if (quadrant === 1 || quadrant === 4) {
-    index = positionIndex;
+    index = -positionIndex; // 11-18 e 41-48 ficam no lado esquerdo da tela (X negativo)
   } else {
-    index = -positionIndex;
+    index = positionIndex;  // 21-28 e 31-38 ficam no lado direito da tela (X positivo)
   }
 
   const maxAngle = Math.PI / config.maxAngleDivider;
@@ -286,6 +286,9 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
   // Posições arrastadas individualmente
   const [customPositions, setCustomPositions] = useState<Record<number, [number, number, number]>>({});
 
+  // Controla se a rotação geral do cenário está ativa ou pausada
+  const [controlsEnabled, setControlsEnabled] = useState(true);
+
   const isDetailedView = viewerState.activeTooth !== null && viewerState.viewingAnatomy;
   const showActionMenu = viewerState.activeTooth !== null && !viewerState.viewingAnatomy;
 
@@ -405,12 +408,14 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
                       [fdiCode]: position
                     }));
                   }}
+                  setControlsEnabled={setControlsEnabled}
                 />
               )}
             </SceneErrorBoundary>
           </Suspense>
 
           <OrbitControls
+            enabled={controlsEnabled}
             enableDamping
             dampingFactor={0.05}
             maxPolarAngle={isDetailedView ? Math.PI : Math.PI / 1.6}

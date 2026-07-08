@@ -21,6 +21,7 @@ interface JawLoaderProps {
   getToothPosition: (fdiCode: number) => { position: [number, number, number]; rotation: [number, number, number] };
   isCalibrating?: boolean;
   onUpdateToothPosition?: (fdiCode: number, position: [number, number, number]) => void;
+  setControlsEnabled?: (enabled: boolean) => void;
 }
 
 // Geometria procedural leve para o highlight e hitbox
@@ -36,7 +37,8 @@ function DraggableSphere({
   opacity,
   depthTest,
   onDoubleClick,
-  onDrag
+  onDrag,
+  setControlsEnabled
 }: {
   toothNum: number;
   initialPosition: [number, number, number];
@@ -47,6 +49,7 @@ function DraggableSphere({
   depthTest: boolean;
   onDoubleClick: (e: any) => void;
   onDrag: (position: [number, number, number]) => void;
+  setControlsEnabled?: (enabled: boolean) => void;
 }) {
   const { camera, raycaster } = useThree();
   const [isDragging, setIsDragging] = React.useState(false);
@@ -75,10 +78,8 @@ function DraggableSphere({
         e.target.setPointerCapture(e.pointerId);
         setIsDragging(true);
 
-        // Desativa OrbitControls temporariamente
-        const canvas = e.target.ownerDocument?.querySelector('canvas');
-        const controls = canvas?.__r3f?.controls;
-        if (controls) controls.enabled = false;
+        // Desativa OrbitControls temporariamente via React state
+        setControlsEnabled?.(false);
 
         const normal = camera.getWorldDirection(new THREE.Vector3()).negate();
         const worldPos = meshRef.current?.getWorldPosition(new THREE.Vector3()) || new THREE.Vector3(...pos);
@@ -105,10 +106,8 @@ function DraggableSphere({
         e.target.releasePointerCapture(e.pointerId);
         setIsDragging(false);
 
-        // Reativa OrbitControls
-        const canvas = e.target.ownerDocument?.querySelector('canvas');
-        const controls = canvas?.__r3f?.controls;
-        if (controls) controls.enabled = true;
+        // Reativa OrbitControls via React state
+        setControlsEnabled?.(true);
       }}
       onPointerOver={(e: any) => {
         e.stopPropagation();
@@ -136,12 +135,14 @@ function JawModelRenderer({
   modelPath,
   getToothPosition,
   isCalibrating,
-  onUpdateToothPosition
+  onUpdateToothPosition,
+  setControlsEnabled
 }: {
   modelPath: string;
   getToothPosition: any;
   isCalibrating: boolean;
   onUpdateToothPosition: any;
+  setControlsEnabled?: (enabled: boolean) => void;
 }) {
   const { scene } = useGLTF(modelPath) as any;
   const { procedures, selectTooth, viewerState, toggleMissingTooth } = usePlanning3D();
@@ -247,6 +248,7 @@ function JawModelRenderer({
                 toggleMissingTooth(toothNum);
               }}
               onDrag={(newPos) => onUpdateToothPosition?.(toothNum, newPos)}
+              setControlsEnabled={setControlsEnabled}
             />
           );
         })}
@@ -256,7 +258,7 @@ function JawModelRenderer({
 }
 
 // Componente exportado principal com detecção inteligente de arquivo
-export function JawLoader({ getToothPosition, isCalibrating = false, onUpdateToothPosition }: JawLoaderProps) {
+export function JawLoader({ getToothPosition, isCalibrating = false, onUpdateToothPosition, setControlsEnabled }: JawLoaderProps) {
   const [modelPath, setModelPath] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -283,6 +285,7 @@ export function JawLoader({ getToothPosition, isCalibrating = false, onUpdateToo
       getToothPosition={getToothPosition}
       isCalibrating={isCalibrating}
       onUpdateToothPosition={onUpdateToothPosition}
+      setControlsEnabled={setControlsEnabled}
     />
   );
 }
