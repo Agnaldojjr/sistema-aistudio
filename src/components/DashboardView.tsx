@@ -25,7 +25,9 @@ import {
   Monitor,
   Smartphone,
   Search,
-  Trash2
+  Trash2,
+  CalendarClock,
+  XCircle
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ClinicSettings, TreatmentProposal } from '../types';
@@ -52,7 +54,7 @@ interface Appointment {
   patientName: string;
   time: string;
   service: string;
-  status: 'Confirmado' | 'Pendente' | 'Cancelado' | 'Falta';
+  status: 'Confirmado' | 'Pendente' | 'Cancelado' | 'Falta' | 'Reagendado';
   phone: string;
   proposalTotal?: number;
 }
@@ -167,11 +169,22 @@ export default function DashboardView({
               const dt = new Date(startDateTime);
               timeStr = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             }
+            
+            // Clean up messy WhatsApp bot descriptions
+            let rawDesc = item.description || 'Consulta Clínica';
+            let cleanDesc = rawDesc;
+            if (rawDesc.includes('Notas:')) {
+              const parts = rawDesc.split('Notas:');
+              cleanDesc = parts[1].trim();
+            } else if (rawDesc.includes('Business name:')) {
+              cleanDesc = 'Agendamento via WhatsApp';
+            }
+
             return {
               id: item.id || `c-${idx}`,
               patientName: item.summary || 'Consulta Sem Nome',
               time: timeStr,
-              service: item.description || 'Consulta Clínica',
+              service: cleanDesc,
               status: 'Confirmado',
               phone: ''
             };
@@ -248,10 +261,21 @@ export default function DashboardView({
         'Confirmado': 'Falta',
         'Falta': 'Pendente',
         'Pendente': 'Confirmado',
-        'Cancelado': 'Pendente'
+        'Cancelado': 'Pendente',
+        'Reagendado': 'Pendente'
       };
       return { ...a, status: nextStatusMap[a.status] };
     }));
+  };
+
+  const handleRescheduleAppointment = (appt: Appointment) => {
+    // Muda o status para reagendado e abre o calendário para escolher a nova data
+    setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: 'Reagendado' } : a));
+    onOpenCalendar();
+  };
+
+  const handleCancelAppointmentStatus = (appt: Appointment) => {
+    setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: 'Cancelado' } : a));
   };
 
   const handleDeleteAppointment = async (id: string, name: string) => {
@@ -603,6 +627,10 @@ export default function DashboardView({
                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
                                 : appt.status === 'Falta'
                                 ? 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+                                : appt.status === 'Reagendado'
+                                ? 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
+                                : appt.status === 'Cancelado'
+                                ? 'bg-zinc-100 text-zinc-500 border-zinc-200 hover:bg-zinc-200'
                                 : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
                             }`}
                             title="Clique para alternar o status de comparecimento"
@@ -629,9 +657,23 @@ export default function DashboardView({
                               Atender
                             </button>
                             <button
+                              onClick={() => handleRescheduleAppointment(appt)}
+                              className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors ml-1 border border-transparent hover:border-blue-200"
+                              title="Reagendar Consulta (Muda status e abre agenda)"
+                            >
+                              <CalendarClock className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleCancelAppointmentStatus(appt)}
+                              className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors border border-transparent hover:border-zinc-200"
+                              title="Marcar como Cancelado"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                            </button>
+                            <button
                               onClick={() => handleDeleteAppointment(appt.id, appt.patientName)}
-                              className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-1"
-                              title="Apagar Agendamento"
+                              className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Apagar Agendamento do Calendário"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
