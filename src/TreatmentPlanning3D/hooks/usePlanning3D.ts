@@ -6,6 +6,7 @@ export function usePlanning3D() {
     activePlan,
     teeth,
     procedures,
+    globalProcedures,
     viewerState,
     setActivePlan,
     selectTooth,
@@ -21,6 +22,7 @@ export function usePlanning3D() {
     acceptPlan,
     setLayerVisibility,
     setLayerOpacity,
+    onOpenProcedureManager,
   } = usePlanning3DContext();
 
   // Helper selectors
@@ -48,6 +50,7 @@ export function usePlanning3D() {
     activePlan,
     teeth,
     procedures,
+    globalProcedures,
     viewerState,
     setActivePlan,
     selectTooth,
@@ -67,5 +70,6 @@ export function usePlanning3D() {
     getSurfaceCondition,
     getToothProcedures,
     getPlanTotal,
+    onOpenProcedureManager,
   };
 }

@@ -1,18 +1,20 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useMemo } from 'react';
 import { TreatmentPlan, TreatmentTooth, TreatmentProcedure, Viewer3DState, ToothCondition, ToothSurface, LayerKey, LayerConfig } from '../types';
+import { usePatientContext } from '../../context/PatientContext';
 
 interface Planning3DContextType {
   activePlan: TreatmentPlan | null;
   teeth: Record<number, TreatmentTooth>;
   procedures: TreatmentProcedure[];
+  globalProcedures: any[];
   viewerState: Viewer3DState;
   setActivePlan: (plan: TreatmentPlan | null) => void;
   selectTooth: (toothNumber: number | null) => void;
   selectSurface: (surface: ToothSurface) => void;
   updateToothCondition: (toothNumber: number, condition: ToothCondition, notes?: string) => void;
   updateToothSurfaceCondition: (toothNumber: number, surface: ToothSurface, condition: ToothCondition) => void;
-  addProcedure: (toothNumber: number, procedureName: string, price: number) => void;
-  removeProcedure: (procedureId: string) => void;
+  addProcedure: (toothNumber: number, procedureId: string, price: number, name: string) => void;
+  removeProcedure: (procedureInstanceId: string) => void;
   setTransparencyMode: (mode: boolean) => void;
   setLoading: (loading: boolean) => void;
   setPresentationMode: (mode: boolean) => void;
@@ -20,19 +22,15 @@ interface Planning3DContextType {
   acceptPlan: () => void;
   setLayerVisibility: (layerKey: LayerKey, visible: boolean) => void;
   setLayerOpacity: (layerKey: LayerKey, opacity: number) => void;
+  onOpenProcedureManager?: () => void;
 }
 
 const Planning3DContext = createContext<Planning3DContextType | undefined>(undefined);
 
-export function Planning3DProvider({ children }: { children: ReactNode }) {
-  const [activePlan, setActivePlan] = useState<TreatmentPlan | null>({
-    id: `plan-${Date.now()}`,
-    patient_id: 'default-patient',
-    created_at: new Date().toISOString(),
-    status: 'DRAFT',
-  });
-  const [teeth, setTeeth] = useState<Record<number, TreatmentTooth>>({});
-  const [procedures, setProcedures] = useState<TreatmentProcedure[]>([]);
+export function Planning3DProvider({ children, globalProcedures = [], onOpenProcedureManager }: { children: ReactNode, globalProcedures?: any[], onOpenProcedureManager?: () => void }) {
+  // Integração unificada com o CRM
+  const { activeSections, setActiveSections, activeProposal, setActiveProposal, selectedPatient } = usePatientContext();
+
   const [viewerState, setViewerState] = useState<Viewer3DState>({
     activeTooth: null,
     activeSurfaces: [],
@@ -52,10 +50,105 @@ export function Planning3DProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // 1. Derivar o estado local (teeth, procedures) a partir das activeSections globais
+  const { teeth, procedures } = useMemo(() => {
+    const t: Record<number, TreatmentTooth> = {};
+    const p: TreatmentProcedure[] = [];
+
+    activeSections.forEach(section => {
+      section.markers.forEach(marker => {
+        if (!t[marker.toothNumber]) {
+          t[marker.toothNumber] = {
+            id: marker.id,
+            plan_id: activeProposal?.patientName || 'plan',
+            tooth: marker.toothNumber,
+            condition: marker.condition || 'HEALTHY',
+            notes: marker.notes || '',
+            surfaces: marker.surfaces || {}
+          };
+        }
+        
+        if (marker.procedureInstances) {
+          marker.procedureInstances.forEach(inst => {
+            p.push({
+              id: inst.id,
+              tooth_id: marker.id,
+              procedure: inst.name,
+              price: inst.price
+            });
+          });
+        } else if (marker.procedures) {
+          // Compatibilidade antiga
+          marker.procedures.forEach(procId => {
+            const procInfo = globalProcedures.find(p => p.id === procId);
+            if (procInfo) {
+              p.push({
+                id: `${marker.id}-${procId}`,
+                tooth_id: marker.id,
+                procedure: procInfo.name,
+                price: procInfo.price
+              });
+            }
+          });
+        }
+      });
+    });
+
+    return { teeth: t, procedures: p };
+  }, [activeSections, activeProposal, globalProcedures]);
+
+  const activePlan: TreatmentPlan = {
+    id: 'unified-plan',
+    patient_id: selectedPatient?.id || 'unknown',
+    created_at: new Date().toISOString(),
+    status: 'DRAFT'
+  };
+
+  const setActivePlan = () => {};
+
+  const getSectionForTooth = (toothNumber: number) => {
+    return toothNumber < 30 ? 'upper' : 'lower';
+  };
+
+  const updateMarkerInSections = (toothNumber: number, updater: (marker: any) => any) => {
+    setActiveSections(prev => {
+      let found = false;
+      const newSections = prev.map(sec => {
+        const markerIndex = sec.markers.findIndex(m => m.toothNumber === toothNumber);
+        if (markerIndex !== -1) {
+          found = true;
+          const newMarkers = [...sec.markers];
+          newMarkers[markerIndex] = updater({ ...newMarkers[markerIndex] });
+          return { ...sec, markers: newMarkers };
+        }
+        return sec;
+      });
+
+      if (!found) {
+        // Create new marker if it doesn't exist
+        const targetSecId = getSectionForTooth(toothNumber);
+        const newMarker = updater({
+          id: `${targetSecId}-${toothNumber}-${Date.now()}`,
+          toothNumber,
+          x: 0,
+          y: 0,
+          procedures: [],
+          procedureInstances: [],
+          condition: 'HEALTHY',
+          surfaces: {}
+        });
+        
+        return newSections.map(sec => 
+          sec.id === targetSecId ? { ...sec, markers: [...sec.markers, newMarker] } : sec
+        );
+      }
+
+      return newSections;
+    });
+  };
+
   const selectTooth = (toothNumber: number | null) => {
-    // No modo de apresentação, desabilita a seleção detalhada individual por dente
     if (viewerState.presentationMode) return;
-    
     setViewerState((prev) => ({
       ...prev,
       activeTooth: toothNumber,
@@ -65,7 +158,6 @@ export function Planning3DProvider({ children }: { children: ReactNode }) {
 
   const selectSurface = (surface: ToothSurface) => {
     if (viewerState.presentationMode) return;
-
     setViewerState((prev) => {
       const exists = prev.activeSurfaces.includes(surface);
       const newSurfaces = exists
@@ -79,87 +171,60 @@ export function Planning3DProvider({ children }: { children: ReactNode }) {
   };
 
   const updateToothCondition = (toothNumber: number, condition: ToothCondition, notes?: string) => {
-    setTeeth((prev) => {
-      const existing = prev[toothNumber] || {
-        id: `tooth-${toothNumber}-${Date.now()}`,
-        plan_id: activePlan?.id || 'temp-plan-id',
-        tooth: toothNumber,
-        condition: 'HEALTHY',
-        notes: '',
-        surfaces: {},
-      };
+    updateMarkerInSections(toothNumber, (marker) => {
       return {
-        ...prev,
-        [toothNumber]: {
-          ...existing,
-          condition,
-          notes: notes !== undefined ? notes : existing.notes,
-        },
+        ...marker,
+        condition,
+        notes: notes !== undefined ? notes : marker.notes
       };
     });
   };
 
   const updateToothSurfaceCondition = (toothNumber: number, surface: ToothSurface, condition: ToothCondition) => {
-    setTeeth((prev) => {
-      const existing = prev[toothNumber] || {
-        id: `tooth-${toothNumber}-${Date.now()}`,
-        plan_id: activePlan?.id || 'temp-plan-id',
-        tooth: toothNumber,
-        condition: 'HEALTHY',
-        notes: '',
-        surfaces: {},
-      };
-
-      const existingSurfaces = existing.surfaces || {};
-      const updatedSurfaces = {
-        ...existingSurfaces,
-        [surface]: condition,
-      };
-
-      let toothCondition = existing.condition;
+    updateMarkerInSections(toothNumber, (marker) => {
+      const updatedSurfaces = { ...(marker.surfaces || {}), [surface]: condition };
+      let toothCond = marker.condition || 'HEALTHY';
       if (condition === 'CARIES' || condition === 'FRACTURE') {
-        toothCondition = condition;
+        toothCond = condition;
       }
-
       return {
-        ...prev,
-        [toothNumber]: {
-          ...existing,
-          condition: toothCondition,
-          surfaces: updatedSurfaces,
-        },
+        ...marker,
+        condition: toothCond,
+        surfaces: updatedSurfaces
       };
     });
   };
 
-  const addProcedure = (toothNumber: number, procedureName: string, price: number) => {
-    setTeeth((prev) => {
-      const toothId = prev[toothNumber]?.id || `tooth-${toothNumber}-${Date.now()}`;
-      if (!prev[toothNumber]) {
-        prev[toothNumber] = {
-          id: toothId,
-          plan_id: activePlan?.id || 'temp-plan-id',
-          tooth: toothNumber,
-          condition: 'HEALTHY',
-          surfaces: {},
-        };
-      }
-
-      const newProcedure: TreatmentProcedure = {
-        id: `proc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        tooth_id: toothId,
-        procedure: procedureName,
+  const addProcedure = (toothNumber: number, procedureId: string, price: number, name: string) => {
+    updateMarkerInSections(toothNumber, (marker) => {
+      const newInst = {
+        id: `inst-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        procedureId,
+        name,
         price,
+        includeFinancial: true,
+        status: 'A realizar',
+        date: new Date().toISOString(),
+        dentist: 'Sistema 3D'
       };
-
-      setProcedures((prevProcs) => [...prevProcs, newProcedure]);
-
-      return { ...prev };
+      
+      const instances = [...(marker.procedureInstances || []), newInst];
+      const procs = [...(marker.procedures || []), procedureId];
+      
+      return { ...marker, procedureInstances: instances, procedures: procs };
     });
   };
 
-  const removeProcedure = (procedureId: string) => {
-    setProcedures((prev) => prev.filter((p) => p.id !== procedureId));
+  const removeProcedure = (procedureInstanceId: string) => {
+    setActiveSections(prev => {
+      return prev.map(sec => ({
+        ...sec,
+        markers: sec.markers.map(m => ({
+          ...m,
+          procedureInstances: (m.procedureInstances || []).filter(inst => inst.id !== procedureInstanceId)
+        }))
+      }));
+    });
   };
 
   const setTransparencyMode = (mode: boolean) => {
@@ -192,22 +257,14 @@ export function Planning3DProvider({ children }: { children: ReactNode }) {
     setViewerState((prev) => ({ ...prev, simulationState: state }));
   };
 
-  const acceptPlan = () => {
-    setActivePlan((prev) => {
-      if (!prev) return null;
-      return { ...prev, status: 'ACCEPTED' };
-    });
-  };
+  const acceptPlan = () => {};
 
   const setLayerVisibility = (layerKey: LayerKey, visible: boolean) => {
     setViewerState((prev) => ({
       ...prev,
       layers: {
         ...prev.layers,
-        [layerKey]: {
-          ...prev.layers[layerKey],
-          visible,
-        },
+        [layerKey]: { ...prev.layers[layerKey], visible },
       },
     }));
   };
@@ -217,10 +274,7 @@ export function Planning3DProvider({ children }: { children: ReactNode }) {
       ...prev,
       layers: {
         ...prev.layers,
-        [layerKey]: {
-          ...prev.layers[layerKey],
-          opacity,
-        },
+        [layerKey]: { ...prev.layers[layerKey], opacity },
       },
     }));
   };
@@ -231,6 +285,7 @@ export function Planning3DProvider({ children }: { children: ReactNode }) {
         activePlan,
         teeth,
         procedures,
+        globalProcedures,
         viewerState,
         setActivePlan,
         selectTooth,
@@ -246,6 +301,7 @@ export function Planning3DProvider({ children }: { children: ReactNode }) {
         acceptPlan,
         setLayerVisibility,
         setLayerOpacity,
+        onOpenProcedureManager,
       }}
     >
       {children}
@@ -260,3 +316,4 @@ export function usePlanning3DContext() {
   }
   return context;
 }
+

@@ -172,9 +172,9 @@ function TreatmentPlanning3DContent() {
   );
 }
 
-export default function TreatmentPlanning3D() {
+export default function TreatmentPlanning3D({ procedures, onOpenProcedureManager }: { procedures: any[], onOpenProcedureManager?: () => void }) {
   return (
-    <Planning3DProvider>
+    <Planning3DProvider globalProcedures={procedures} onOpenProcedureManager={onOpenProcedureManager}>
       <TreatmentPlanning3DContent />
     </Planning3DProvider>
   );

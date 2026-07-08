@@ -335,6 +335,7 @@ export default function App() {
     const cached = localStorage.getItem('agnaldo_dent_procedures');
     return cached ? JSON.parse(cached) : DEFAULT_PROCEDURES;
   });
+  const [showProcedureManager, setShowProcedureManager] = useState(false);
 
   const [clinicSettings, setClinicSettings] = useState<ClinicSettings>(() => {
     const cached = localStorage.getItem('agnaldo_dent_clinic_settings');
@@ -559,7 +560,20 @@ export default function App() {
 
   // --- RENDER: Main Desktop App ---
   return (
-    <div className="app-shell">
+    <>
+      {showProcedureManager && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl h-[80vh] flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden">
+            <ProcedureManager
+              procedures={procedures}
+              setProcedures={setProcedures}
+              onResetProcedures={() => setProcedures(DEFAULT_PROCEDURES)}
+              onClose={() => setShowProcedureManager(false)}
+            />
+          </div>
+        </div>
+      )}
+      <div className="app-shell">
       <Sidebar
         currentView={currentAppView}
         onChangeView={setCurrentAppView}
@@ -656,7 +670,7 @@ export default function App() {
         {/* ── 3D Planning Module (Sprint 1) ────────────────────── */}
         {currentAppView === '3d-planning' && (
           <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 w-full animate-fade-in-up">
-            <TreatmentPlanning3D />
+            <TreatmentPlanning3D procedures={procedures} onOpenProcedureManager={() => setShowProcedureManager(true)} />
           </main>
         )}
 
@@ -695,5 +709,6 @@ export default function App() {
         />
       )}
     </div>
+    </>
   );
 }

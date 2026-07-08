@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { ToothCondition, ToothSurface } from './TreatmentPlanning3D/types';
+
 export interface Procedure {
   id: string;
   name: string;
@@ -29,6 +31,9 @@ export interface ToothMarker {
     faces?: string[];
     observation?: string;
   }[];
+  // --- Integração 3D ---
+  condition?: ToothCondition;
+  surfaces?: Partial<Record<ToothSurface, ToothCondition>>;
 }
 
 export interface PhotoSection {

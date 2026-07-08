@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, DollarSign, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, DollarSign, RotateCcw, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Procedure } from '../types';
 import { DEFAULT_PROCEDURES } from '../constants';
@@ -13,6 +13,7 @@ interface ProcedureManagerProps {
   procedures: Procedure[];
   setProcedures: React.Dispatch<React.SetStateAction<Procedure[]>>;
   onResetProcedures: () => void;
+  onClose: () => void;
 }
 
 // Beautiful clinical color choices for dental procedures
@@ -31,6 +32,7 @@ export default function ProcedureManager({
   procedures,
   setProcedures,
   onResetProcedures,
+  onClose,
 }: ProcedureManagerProps) {
   const [newNombre, setNewNombre] = useState('');
   const [newValor, setNewValor] = useState<number | string>('');
@@ -105,15 +107,25 @@ export default function ProcedureManager({
             Gerencie itens, cores e valores de tabela
           </p>
         </div>
-        <button
-          id="btn-reset-procedures"
-          onClick={onResetProcedures}
-          className="flex items-center gap-1 text-[11px] font-medium text-[#B48C4D] hover:text-[#8B0000] transition-colors"
-          title="Restaurar tabela padrão original"
-        >
-          <RotateCcw className="w-3 h-3" />
-          <span>Restaurar Padrão</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            id="btn-reset-procedures"
+            onClick={onResetProcedures}
+            className="flex items-center gap-1 text-[11px] font-medium text-[#B48C4D] hover:text-[#8B0000] transition-colors"
+            title="Restaurar tabela padrão original"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>Restaurar Padrão</span>
+          </button>
+          
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg bg-[#FAF8F5] border border-[#E6DEC9] text-[#B48C4D] hover:text-[#8B0000] hover:bg-[#F3EFE9] transition-colors"
+            title="Fechar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Main Body */}

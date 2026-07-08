@@ -24,7 +24,7 @@ const hitBoxGeo = new THREE.SphereGeometry(0.35, 16, 16);
 
 export function JawLoader({ getToothPosition }: JawLoaderProps) {
   const { scene } = useGLTF('/models/human_mouth_detailed.glb') as any;
-  const { procedures, selectTooth, viewerState } = usePlanning3D();
+  const { procedures, selectTooth, viewerState, teeth } = usePlanning3D();
 
   // O modelo do Sketchfab está em metros (~0.1 de largura), precisamos escalar para ~85 para bater com as hitboxes de 9 unidades
   const modelScale = 85.0; 
@@ -43,8 +43,8 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
           e criar os brilhos neon de orçamento. */}
       {ALL_TEETH.map((toothNum) => {
         const { position, rotation } = getToothPosition(toothNum);
-        
-        const toothProcedures = procedures.filter(p => p.tooth_id === toothNum);
+        const toothState = teeth[toothNum];
+        const toothProcedures = toothState ? procedures.filter(p => p.tooth_id === toothState.id) : [];
         const hasBudget = toothProcedures.length > 0;
         const isSelected = viewerState.activeTooth === toothNum;
 

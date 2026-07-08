@@ -53,7 +53,7 @@ export function AIAssistancePanel() {
           // 3. Adiciona os procedimentos sugeridos
           if (t.procedures && Array.isArray(t.procedures)) {
             t.procedures.forEach((p: any) => {
-              addProcedure(t.tooth, p.name, p.price);
+              addProcedure(t.tooth, 'ai-' + Math.random().toString(36).substr(2, 9), p.price || 0, p.name);
             });
           }
         });

@@ -13,6 +13,7 @@ export function ToothDetailPanel({ onClose }: ToothDetailPanelProps) {
     viewerState,
     teeth,
     procedures,
+    globalProcedures,
     selectTooth,
     selectSurface,
     updateToothCondition,
@@ -22,6 +23,7 @@ export function ToothDetailPanel({ onClose }: ToothDetailPanelProps) {
     getToothState,
     getSurfaceCondition,
     getToothProcedures,
+    onOpenProcedureManager,
   } = usePlanning3D();
 
   const activeTooth = viewerState.activeTooth;
@@ -47,15 +49,6 @@ export function ToothDetailPanel({ onClose }: ToothDetailPanelProps) {
   const toothProcedures = getToothProcedures(activeTooth);
   const anterior = isAnteriorTooth(activeTooth);
   const topSurface: ToothSurface = anterior ? 'I' : 'O';
-
-  // Procedimentos Disponíveis para Inserção Rápida
-  const AVAILABLE_PROCEDURES = [
-    { name: 'Restauração de Resina', price: 250.00 },
-    { name: 'Tratamento de Canal (Endodontia)', price: 800.00 },
-    { name: 'Implante de Titânio', price: 2500.00 },
-    { name: 'Faceta de Porcelana', price: 1800.00 },
-    { name: 'Coroa Provisória', price: 400.00 },
-  ];
 
   // Opções de condições clínicas
   const CONDITIONS: { id: ToothCondition; label: string; colorClass: string }[] = [
@@ -281,20 +274,32 @@ export function ToothDetailPanel({ onClose }: ToothDetailPanelProps) {
         
         {/* Adição Rápida */}
         <div className="bg-slate-900/40 p-2.5 border border-slate-800 rounded-lg mb-3">
-          <p className="text-[9px] text-slate-400 font-semibold mb-1.5 uppercase">Lançamento de Procedimentos:</p>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[9px] text-slate-400 font-semibold uppercase">Lançamento Rápido:</p>
+            <button
+              onClick={() => onOpenProcedureManager?.()}
+              className="text-[9px] text-sky-400 hover:text-sky-300 font-bold uppercase transition-colors"
+            >
+              Gerenciar Tabela
+            </button>
+          </div>
           <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
-            {AVAILABLE_PROCEDURES.map((proc) => (
-              <button
-                key={proc.name}
-                onClick={() => addProcedure(activeTooth, proc.name, proc.price)}
-                className="w-full flex items-center justify-between p-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-left text-[11px] rounded transition-colors"
-              >
-                <span className="truncate text-slate-200 pr-1">{proc.name}</span>
-                <span className="text-sky-400 font-bold flex items-center shrink-0">
-                  + R$ {proc.price.toFixed(0)}
-                </span>
-              </button>
-            ))}
+            {globalProcedures && globalProcedures.length > 0 ? (
+              globalProcedures.map((proc: any) => (
+                <button
+                  key={proc.id}
+                  onClick={() => addProcedure(activeTooth, proc.id, proc.price, proc.name)}
+                  className="w-full flex items-center justify-between p-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-left text-[11px] rounded transition-colors"
+                >
+                  <span className="truncate text-slate-200 pr-1">{proc.name}</span>
+                  <span className="text-sky-400 font-bold flex items-center shrink-0">
+                    + R$ {proc.price.toFixed(0)}
+                  </span>
+                </button>
+              ))
+            ) : (
+              <p className="text-[10px] text-slate-500 italic text-center py-2">Nenhum procedimento cadastrado.</p>
+            )}
           </div>
         </div>
 
