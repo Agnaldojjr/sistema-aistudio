@@ -212,10 +212,11 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
           <OrbitControls
             enableDamping
             dampingFactor={0.05}
-            maxPolarAngle={Math.PI / 1.6}
-            minPolarAngle={Math.PI / 4}
-            minDistance={4}
-            maxDistance={30}
+            maxPolarAngle={isDetailedView ? Math.PI : Math.PI / 1.6}
+            minPolarAngle={isDetailedView ? 0 : Math.PI / 4}
+            minDistance={isDetailedView ? 1 : 4}
+            maxDistance={isDetailedView ? 20 : 30}
+            enablePan={true}
           />
         </Canvas>
       </div>
