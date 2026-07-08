@@ -10,9 +10,9 @@ const ALL_TEETH = [...UPPER_TEETH, ...LOWER_TEETH];
 
 // Pré-carrega o modelo da arcada
 try {
-  useGLTF.preload('/models/human_mouth_detailed.glb');
+  useGLTF.preload('/models/boca_ortodoncia.glb');
 } catch (e) {
-  console.warn('Erro ao pré-carregar human_mouth_detailed.glb:', e);
+  console.warn('Erro ao pré-carregar boca_ortodoncia.glb:', e);
 }
 
 interface JawLoaderProps {
@@ -24,7 +24,7 @@ interface JawLoaderProps {
 const hitBoxGeo = new THREE.SphereGeometry(0.35, 16, 16);
 
 export function JawLoader({ getToothPosition, isCalibrating = false }: JawLoaderProps) {
-  const { scene } = useGLTF('/models/human_mouth_detailed.glb') as any;
+  const { scene } = useGLTF('/models/boca_ortodoncia.glb') as any;
   const { procedures, selectTooth, viewerState } = usePlanning3D();
   
   const groupRef = React.useRef<THREE.Group>(null);
