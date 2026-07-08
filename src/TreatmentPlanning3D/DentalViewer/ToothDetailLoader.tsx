@@ -1,5 +1,5 @@
 import React, { Component, Suspense } from 'react';
-import { useGLTF, Environment } from '@react-three/drei';
+import { useGLTF, Environment, Center } from '@react-three/drei';
 import { ToothMesh } from './ToothMesh';
 import * as THREE from 'three';
 
@@ -95,21 +95,13 @@ function DetailedToothGLB({ toothNumber, variant }: { toothNumber: number, varia
   // Clone to avoid mutating cached scene if same model is used
   const clonedScene = React.useMemo(() => scene.clone(), [scene]);
 
-  React.useLayoutEffect(() => {
-    if (clonedScene) {
-      const box = new THREE.Box3().setFromObject(clonedScene);
-      const center = box.getCenter(new THREE.Vector3());
-      clonedScene.position.x = -center.x;
-      clonedScene.position.y = -center.y;
-      clonedScene.position.z = -center.z;
-    }
-  }, [clonedScene]);
-
   // If variant === 'endodontic', we could maybe apply a material change or transparency to show root canals if we had them.
   // Since we only downloaded anatomic, we'll just show anatomic for both.
   
   return (
-    <primitive object={clonedScene} scale={[3 * scaleX, 3, 3]} />
+    <Center>
+      <primitive object={clonedScene} scale={[3 * scaleX, 3, 3]} />
+    </Center>
   );
 }
 
