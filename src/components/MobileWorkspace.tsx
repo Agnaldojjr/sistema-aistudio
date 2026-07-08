@@ -83,6 +83,12 @@ export default function MobileWorkspace({
     localStorage.setItem('ag_dent_quick_leads', JSON.stringify(quickLeads));
   }, [quickLeads]);
 
+  const handleDeleteQuickLead = (id: string, name: string) => {
+    if (window.confirm(`Deseja cancelar o cadastro provisório de ${name}?`)) {
+      setQuickLeads(prev => prev.filter(lead => lead.id !== id));
+    }
+  };
+
   const handleQuickLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!leadName.trim()) return;
@@ -763,6 +769,13 @@ export default function MobileWorkspace({
                               <MessageCircle className="w-3.5 h-3.5 fill-current text-emerald-600" />
                             </a>
                           )}
+                          <button
+                            onClick={() => handleDeleteQuickLead(item.id, item.name)}
+                            className="bg-[#FAF8F5] text-zinc-400 hover:text-red-600 border border-zinc-200 p-1.5 rounded-lg active:scale-95 transition-all cursor-pointer ml-1"
+                            title="Apagar este lead rápido"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                     );

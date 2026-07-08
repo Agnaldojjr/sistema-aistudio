@@ -1668,7 +1668,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
             <div>
               <h4 className="font-serif font-bold text-zinc-900 text-sm tracking-wide text-left">⚡ Automação e Integração Conectada (WhatsApp API)</h4>
               <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed text-left">
-                Gere o orçamento técnico em PDF de alta qualidade, hospede automaticamente no Google Drive do consultório e dispare via API.
+                Gere o orçamento técnico em PDF de alta qualidade, hospede automaticamente no Supabase do consultório e dispare via API.
               </p>
             </div>
           </div>
@@ -1715,7 +1715,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                 </button>
               </div>
               <p className="text-[10.5px] text-zinc-500 mt-1 leading-relaxed text-left">
-                Por padrão, o plano de tratamento é compilado em PDF, enviado ao Drive para privacidade garantida e despachado pela API corporativa.
+                Por padrão, o plano de tratamento é compilado em PDF, enviado ao Supabase para privacidade garantida e despachado pela API corporativa.
               </p>
             </div>
 
@@ -1817,7 +1817,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                 <div>
                   <h5 className="font-bold text-zinc-800 text-xs">🚀 Disparo Realizado com Sucesso Absoluto!</h5>
                   <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">
-                    O PDF do plano odontológico foi salvo no seu Google Drive corporativo e entregue ao paciente.
+                    O PDF do plano odontológico foi salvo no seu Supabase corporativo e entregue ao paciente.
                   </p>
                 </div>
               </div>

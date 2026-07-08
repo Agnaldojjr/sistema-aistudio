@@ -9,12 +9,13 @@ import { Loader2, Plus, Users, RefreshCcw } from 'lucide-react';
 import { addMonths, subMonths } from 'date-fns';
 
 interface CalendarViewProps {
-  onNewPatient: () => void;
+  onNewPatient?: () => void;
   initialPatientName?: string;
   onClearInitialPatient?: () => void;
+  isMobile?: boolean;
 }
 
-export default function CalendarView({ onNewPatient, initialPatientName, onClearInitialPatient }: CalendarViewProps) {
+export default function CalendarView({ onNewPatient, initialPatientName, onClearInitialPatient, isMobile }: CalendarViewProps) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -167,8 +168,8 @@ export default function CalendarView({ onNewPatient, initialPatientName, onClear
       <div className="flex-1 w-full flex flex-col bg-white border-2 border-[#E6DEC9] rounded-2xl overflow-hidden shadow-sm">
         <iframe 
           key={iframeKey}
-          src="https://calendar.google.com/calendar/embed?src=dragnaldof%40gmail.com&ctz=America%2FSao_Paulo" 
-          style={{ border: 0, width: '100%', height: '100%', minHeight: '800px' }} 
+          src={`https://calendar.google.com/calendar/embed?src=dragnaldof%40gmail.com&ctz=America%2FSao_Paulo${isMobile ? '&mode=AGENDA' : ''}`} 
+          style={{ border: 0, width: '100%', height: '100%', minHeight: isMobile ? '500px' : '800px' }} 
           frameBorder="0" 
           scrolling="no"
           className="flex-1 rounded-xl"

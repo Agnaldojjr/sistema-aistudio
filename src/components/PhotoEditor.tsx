@@ -764,7 +764,7 @@ export default function PhotoEditor({
               {isLoadingGallery ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
                   <Loader2 className="w-8 h-8 animate-spin text-[#C09553]" />
-                  <p className="text-xs text-zinc-500 font-medium font-sans">Carregando fotos do Google Drive...</p>
+                  <p className="text-xs text-zinc-500 font-medium font-sans">Carregando fotos do Supabase...</p>
                 </div>
               ) : galleryError ? (
                 <div className="text-center py-8 px-4 flex flex-col items-center">

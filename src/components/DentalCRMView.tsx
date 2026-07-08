@@ -208,6 +208,7 @@ export default function DentalCRMView({
   setProcedures,
   setClinicSettings,
   currentFileId,
+  isMobile,
   setCurrentFileId
 }: {
   onLoadPatientData?: (data: any) => void;
@@ -222,6 +223,7 @@ export default function DentalCRMView({
   setProcedures?: (p: any) => void;
   currentFileId?: string | null;
   setCurrentFileId?: (id: string | null) => void;
+  isMobile?: boolean;
 } = {}) {
   // Navigation
   const [activeSubTab, setActiveSubTab] = useState<'import' | 'crm'>('crm'); // Default directly to CRM for quick review!
@@ -3868,6 +3870,33 @@ export default function DentalCRMView({
                       </div>
 
                       {(() => {
+                        const handleDeleteHistoryEvent = async (e: React.MouseEvent, event: any) => {
+                          e.stopPropagation();
+                          if (!window.confirm('Deseja realmente apagar este registro?')) return;
+                          
+                          if (event.type === 'clinical') {
+                            const updated = (clinicalHistory || []).filter(i => i.id !== event.data.id && i.date !== event.data.date);
+                            setClinicalHistory(updated);
+                            setTimeout(() => saveContextToSupabase(), 100);
+                          } else if (event.type === 'odontograma') {
+                            const updated = (odontogramaList || []).filter(i => i.id !== event.data.id && i.date !== event.data.date);
+                            setOdontogramaList(updated);
+                            setTimeout(() => saveContextToSupabase(), 100);
+                          } else if (event.type === 'tratamento') {
+                            const updated = (tratamentosList || []).filter(i => i.id !== event.data.id && i.date !== event.data.date);
+                            setTratamentosList(updated);
+                            setTimeout(() => saveContextToSupabase(), 100);
+                          } else if (event.type === 'anamnese') {
+                            const updated = (anamneseList || []).filter(i => i.id !== event.data.id && i.date !== event.data.date);
+                            setAnamneseList(updated);
+                            setTimeout(() => saveContextToSupabase(), 100);
+                          } else if (event.type === 'galeria') {
+                            const updated = (galeriaList || []).filter(i => i.id !== event.data.id && i.date !== event.data.date);
+                            setGaleriaList(updated);
+                            setTimeout(() => saveContextToSupabase(), 100);
+                          }
+                        };
+
                         const safeClinicalHistory = clinicalHistory || [];
                         const safeOdontogramaList = odontogramaList || [];
                         const safeTratamentosList = tratamentosList || [];
@@ -3909,11 +3938,20 @@ export default function DentalCRMView({
                                     <Icon className="w-3 h-3" />
                                   </div>
 
-                                  <div className="bg-white border border-[#E6DEC9]/60 p-3 rounded-xl shadow-sm text-xs space-y-2">
-                                    <div className="flex justify-between items-center border-b border-zinc-100 pb-2 mb-2 text-[10px] font-bold font-mono">
-                                      <span className="text-[#8B0000]">{normalizeDateDisplay(event.date)}</span>
-                                      <span className="text-zinc-400 uppercase tracking-wider">{event.type}</span>
-                                    </div>
+                                    <div className="bg-white border border-[#E6DEC9]/60 p-3 rounded-xl shadow-sm text-xs space-y-2 group">
+                                      <div className="flex justify-between items-center border-b border-zinc-100 pb-2 mb-2 text-[10px] font-bold font-mono">
+                                        <div className="flex gap-2">
+                                          <span className="text-[#8B0000]">{normalizeDateDisplay(event.date)}</span>
+                                          <span className="text-zinc-400 uppercase tracking-wider">{event.type}</span>
+                                        </div>
+                                        <button
+                                          onClick={(e) => handleDeleteHistoryEvent(e, event)}
+                                          className="text-zinc-300 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-red-50"
+                                          title="Apagar Registro"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
 
                                     {/* Clinical Render */}
                                     {event.type === 'clinical' && (

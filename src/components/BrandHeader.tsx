@@ -132,7 +132,7 @@ export default function BrandHeader({
               {isAutosaving && (
                 <div className="flex items-center gap-2 text-xs font-medium text-emerald-600 animate-pulse bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></div>
-                  Salvando no Drive...
+                  Salvando no Supabase...
                 </div>
               )}
             </div>

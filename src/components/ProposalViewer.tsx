@@ -14,6 +14,7 @@ interface ProposalViewerProps {
   proposal: TreatmentProposal;
   setProposal: React.Dispatch<React.SetStateAction<TreatmentProposal>>;
   clinicSettings: ClinicSettings;
+  isMobile?: boolean;
 }
 
 export default function ProposalViewer({
@@ -22,6 +23,7 @@ export default function ProposalViewer({
   proposal,
   setProposal,
   clinicSettings,
+  isMobile,
 }: ProposalViewerProps) {
   const printAreaRef = useRef<HTMLDivElement>(null);
   const [showIframePrintHelp, setShowIframePrintHelp] = useState(false);

@@ -311,7 +311,7 @@ function LoginScreen({ onLogin, isLoggingIn }: { onLogin: () => void; isLoggingI
             </button>
 
             <p className="text-center text-[10px] text-zinc-400">
-              Seus dados são salvos no Google Drive de forma privada e segura.
+              Seus dados são salvos no Supabase de forma privada e segura.
             </p>
           </div>
         </div>

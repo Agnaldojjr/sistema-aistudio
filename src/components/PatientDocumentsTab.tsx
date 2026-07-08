@@ -167,7 +167,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
       message = `Olá, *${pName}*!\n\nPassando para lembrar que você possui uma consulta odontológica agendada com o *Dr. Agnaldo Ferreira*:\n\n📅 Data: *${dateStr}*\n🕒 Horário: *${timeStr}*\n📍 Local: *${clinicSettings.address}*\n\nPor favor, confirme respondendo a esta mensagem. Obrigado! 👍`;
     } else {
       const detailStr = foundDetail ? ` (${foundDetail})` : '';
-      message = `Olá, *${pName}*! Aqui é a equipe de suporte clínico do *Dr. Agnaldo Ferreira*.\n\nSua ficha médica e prontuário digital seguro${detailStr} foram consolidados no nosso servidor do Google Drive.\n\nEstamos à disposição para qualquer dúvida ou envio de atestados e receitas por via digital! 📖🔒`;
+      message = `Olá, *${pName}*! Aqui é a equipe de suporte clínico do *Dr. Agnaldo Ferreira*.\n\nSua ficha médica e prontuário digital seguro${detailStr} foram consolidados no nosso servidor do Supabase.\n\nEstamos à disposição para qualquer dúvida ou envio de atestados e receitas por via digital! 📖🔒`;
     }
 
     setWhatsappDraftText(message);
@@ -977,7 +977,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
           setImportLogs(prev => [...prev, `[ERRO] Falha ao processar "${patientName}": ${rowErr.message || rowErr}`]);
         }
 
-        // Add minor pause limit to respect standard API throttling (Google Drive lists rate-limit)
+        // Add minor pause limit to respect standard API throttling (Supabase lists rate-limit)
         await new Promise(resolve => setTimeout(resolve, 350));
       }
 
@@ -1377,8 +1377,8 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
       setQuickActionsHistory(prev => [{
         id: actionId,
         file: selectedQuickFile || 'Backup Importado',
-        type: 'Google Drive',
-        summary: `Ficha e prontuário de ${patName} arquivado estruturado no Drive`,
+        type: 'Supabase',
+        summary: `Ficha e prontuário de ${patName} arquivado estruturado no Supabase`,
         timestamp: new Date().toLocaleTimeString('pt-BR')
       }, ...prev]);
 
@@ -1387,7 +1387,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
     } catch (err: any) {
       console.error(err);
       setDriveSyncStatuses(prev => ({ ...prev, [patName]: 'failed' }));
-      alert('Erro ao consolidar arquivo no Google Drive: ' + err.message);
+      alert('Erro ao consolidar arquivo no Supabase: ' + err.message);
     }
   };
 
@@ -1557,7 +1557,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
             <p className="text-zinc-500 mb-2 font-medium">Reconstrua sua cartela de pacientes em segundos. Importe os cadastros e agendamentos históricos da sua clínica a partir de planilhas de Excel, arquivos CSV, tabelas e relatórios em Markdown (.md), arquivos de Texto (.txt) ou relatórios em PDF (.pdf).</p>
             <div className="bg-[#C09553]/10 text-zinc-700 p-2.5 rounded-lg flex gap-2 border border-[#C09553]/20">
               <Info className="w-4 h-4 text-[#C09553] shrink-0 mt-0.5" />
-              <p className="leading-relaxed"><strong>Como funciona:</strong> Nosso sistema detecta as colunas e formatos de forma inteligente. Ele cria uma pasta com prontuário interativo para cada paciente no seu Google Drive, além de sincronizar de forma opcional as consultas e datas de retorno na sua Agenda do Google.</p>
+              <p className="leading-relaxed"><strong>Como funciona:</strong> Nosso sistema detecta as colunas e formatos de forma inteligente. Ele cria uma pasta com prontuário interativo para cada paciente no seu Supabase, além de sincronizar de forma opcional as consultas e datas de retorno na sua Agenda do Google.</p>
             </div>
           </div>
 
@@ -1797,7 +1797,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                     }`}
                   >
                     <Database className="w-3.5 h-3.5 text-[#C09553]" />
-                    Salvar no Drive
+                    Salvar no Supabase
                   </button>
                 </div>
 
@@ -2102,7 +2102,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                   <div>
                     <h4 className="font-bold text-zinc-900 text-xs">✨ Backup 'BlueDental Pacientes' Reconhecido com Sucesso!</h4>
                     <p className="text-zinc-600 font-medium text-[11px] mt-1 leading-relaxed">
-                      Detectamos automaticamente <strong>todas as 53 colunas</strong> de cadastro técnico da sua clínica! Nosso migrador inteligente fará a transferência completa sem perda de dados: CPFs, RGs, Endereços Completos, Telefones (Fixo, Celular e WhatsApp), Histórico de Observações, Dados de Responsável, Planos de Convênio (Planos, Carteira e Validade) e até mesmo os Links Originais das Fotos de Perfil foram mapeados e serão salvos no Drive!
+                      Detectamos automaticamente <strong>todas as 53 colunas</strong> de cadastro técnico da sua clínica! Nosso migrador inteligente fará a transferência completa sem perda de dados: CPFs, RGs, Endereços Completos, Telefones (Fixo, Celular e WhatsApp), Histórico de Observações, Dados de Responsável, Planos de Convênio (Planos, Carteira e Validade) e até mesmo os Links Originais das Fotos de Perfil foram mapeados e serão salvos no Supabase!
                     </p>
                   </div>
                 </div>
@@ -2159,7 +2159,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                   <div>
                     <h5 className="font-serif font-bold text-zinc-900 text-xs text-left">📂 Categoria e Organização Inteligente de Documentação</h5>
                     <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed text-left">
-                      Identificar e rotular estes dados automatiza a triagem no Google Drive e a roteirização do atendimento clínico do Dr. Agnaldo Ferreira.
+                      Identificar e rotular estes dados automatiza a triagem no Supabase e a roteirização do atendimento clínico do Dr. Agnaldo Ferreira.
                     </p>
                   </div>
                 </div>
@@ -2304,7 +2304,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                         onChange={(e) => setSkipDuplicates(e.target.checked)} 
                         className="rounded border-zinc-300 text-[#8B0000] focus:ring-[#C09553]"
                       />
-                      <span>Prevenir registros duplicados (vincular ao prontuário se já existir no Google Drive)</span>
+                      <span>Prevenir registros duplicados (vincular ao prontuário se já existir no Supabase)</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer text-zinc-700 select-none">
                       <input 
@@ -2549,7 +2549,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                               type="button"
                               onClick={async () => {
                                 setIsRunningImport(true);
-                                alert("Exportando lote de "+ filteredFinancial.length +" recibos em PDF para sua pasta '/Faturamento' do Google Drive...");
+                                alert("Exportando lote de "+ filteredFinancial.length +" recibos em PDF para sua pasta '/Faturamento' do Supabase...");
                                 setTimeout(() => {
                                   setIsRunningImport(false);
                                   alert("Lote arquivado com sucesso!");
@@ -2558,7 +2558,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                               className="w-full sm:w-auto px-4 py-2 border border-[#D5CBB3] rounded-lg bg-white hover:bg-zinc-50 font-bold text-[#8B0000] flex items-center justify-center gap-1.5 self-stretch sm:self-auto cursor-pointer"
                             >
                               <Printer className="w-4 h-4 text-[#C09553]" />
-                              Emitir Lote no Drive
+                              Emitir Lote no Supabase
                             </button>
                           </div>
 
@@ -2714,7 +2714,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                               type="button"
                               onClick={async () => {
                                 setIsRunningImport(true);
-                                alert("Salvando histórico de tratamento clínico de '"+ activePatient +"' diretamente como prontuário cronológico certificado no Google Drive...");
+                                alert("Salvando histórico de tratamento clínico de '"+ activePatient +"' diretamente como prontuário cronológico certificado no Supabase...");
                                 setTimeout(() => {
                                   setIsRunningImport(false);
                                   alert("Sincronização concluída com sucesso!");
@@ -3114,7 +3114,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                             type="button"
                             onClick={async () => {
                               setIsRunningImport(true);
-                              alert("Armazenando Ficha de Resposta Anamnese de '"+ activePatient +"' na pasta criptografada do prontuário no Google Drive...");
+                              alert("Armazenando Ficha de Resposta Anamnese de '"+ activePatient +"' na pasta criptografada do prontuário no Supabase...");
                               setTimeout(() => {
                                 setIsRunningImport(false);
                                 alert("Documento médico encriptado com sucesso!");
@@ -3123,7 +3123,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                             className="w-full sm:w-auto px-4 py-2 border border-[#D5CBB3] rounded-lg bg-zinc-900 hover:bg-zinc-800 font-bold text-white text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                           >
                             <Settings className="w-3.5 h-3.5 text-[#C09553]" />
-                            Gravar Termo Certificado no Drive
+                            Gravar Termo Certificado no Supabase
                           </button>
                         </div>
 
@@ -3251,7 +3251,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                               type="button"
                               onClick={() => {
                                 setIsRunningImport(true);
-                                alert("Enviando documento '" + docObj.type + "' formatado para o repositório Google Drive do beneficiário...");
+                                alert("Enviando documento '" + docObj.type + "' formatado para o repositório Supabase do beneficiário...");
                                 setTimeout(() => {
                                   setIsRunningImport(false);
                                   alert("Lote salvo com selo certificado!");
@@ -3327,10 +3327,10 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
                         setSelectedPatient={setSelectedPatientFilter}
                         onSyncDrive={() => {
                           setIsRunningImport(true);
-                          alert("Estruturando as galerias dinâmicas dos pacientes no Google Drive. Suas fotos S3 originais serão copiadas como arquivos estáticos seguros em tempo de execução...");
+                          alert("Estruturando as galerias dinâmicas dos pacientes no Supabase. Suas fotos S3 originais serão copiadas como arquivos estáticos seguros em tempo de execução...");
                           setTimeout(() => {
                             setIsRunningImport(false);
-                            alert("Galeria sincronizada com o Google Drive!");
+                            alert("Galeria sincronizada com o Supabase!");
                           }, 1600);
                         }}
                         isRunningImport={isRunningImport}
@@ -3420,7 +3420,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
 
                         <div className="flex flex-wrap gap-4 text-[11px] font-semibold pt-1">
                           <span className="text-zinc-600">👥 Total na Planilha: <strong className="text-zinc-900">{importProgress.total}</strong></span>
-                          <span className="text-emerald-700">✓ Prontuários no Drive: <strong className="text-emerald-800">{importProgress.successes}</strong></span>
+                          <span className="text-emerald-700">✓ Prontuários no Supabase: <strong className="text-emerald-800">{importProgress.successes}</strong></span>
                           <span className="text-amber-700">⤷ Pulados (Já existentes): <strong className="text-amber-800">{importProgress.skipped}</strong></span>
                           {importProgress.errors > 0 && (
                             <span className="text-red-700">✗ Falhas: <strong className="text-red-800">{importProgress.errors}</strong></span>

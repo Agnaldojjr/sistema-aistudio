@@ -24,11 +24,12 @@ import {
   Loader2,
   Monitor,
   Smartphone,
-  Search
+  Search,
+  Trash2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ClinicSettings, TreatmentProposal } from '../types';
-import { listCalendarEvents } from '../lib/calendar';
+import { listCalendarEvents, deleteCalendarEvent } from '../lib/calendar';
 import { getSupabaseCRMDatabase } from '../lib/supabaseCrm';
 import { addDays, subDays, format, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -251,6 +252,21 @@ export default function DashboardView({
       };
       return { ...a, status: nextStatusMap[a.status] };
     }));
+  };
+
+  const handleDeleteAppointment = async (id: string, name: string) => {
+    if (window.confirm(`Deseja realmente cancelar e apagar definitivamente o agendamento de ${name}?`)) {
+      try {
+        if (!id.startsWith('c-')) {
+          // If it's a real Google Calendar ID, call the API
+          await deleteCalendarEvent(id);
+        }
+        setAppointments(prev => prev.filter(a => a.id !== id));
+      } catch (err) {
+        console.error("Erro ao deletar agendamento:", err);
+        alert("Falha ao apagar o agendamento. Verifique sua conexão ou se você tem permissão.");
+      }
+    }
   };
 
   return (
@@ -611,6 +627,13 @@ export default function DashboardView({
                               title="Abrir Planejamento de Tratamento"
                             >
                               Atender
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAppointment(appt.id, appt.patientName)}
+                              className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-1"
+                              title="Apagar Agendamento"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </td>

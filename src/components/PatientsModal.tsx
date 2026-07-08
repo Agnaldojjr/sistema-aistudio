@@ -260,7 +260,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
             const allFiles = await listPatientFilesFromSupabase(selectedPatient.name);
             setPatientImages(allFiles.filter(f => f.mimeType.startsWith('image/')));
           } catch (err: any) {
-            alert('Erro ao enviar foto para o Google Drive: ' + err.message);
+            alert('Erro ao enviar foto para o Supabase: ' + err.message);
           } finally {
             setIsUploading(false);
           }
@@ -297,7 +297,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
       const allFiles = await listPatientFilesFromSupabase(selectedPatient.name);
       setPatientImages(allFiles.filter(f => f.mimeType.startsWith('image/')));
     } catch (err: any) {
-      alert('Erro ao enviar imagem editada para o Google Drive: ' + err.message);
+      alert('Erro ao enviar imagem editada para o Supabase: ' + err.message);
     } finally {
       setIsUploading(false);
     }
@@ -549,7 +549,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
       setPatientToDelete(null);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Falha ao excluir paciente do Google Drive');
+      setError(err.message || 'Falha ao excluir paciente do Supabase');
     } finally {
       setDeletingId(null);
     }
@@ -727,7 +727,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                       </div>
                       <div>
                         <h3 className="font-bold text-zinc-800 text-sm">Pasta na Nuvem (Drive)</h3>
-                        <p className="text-xs text-zinc-500 mt-1 leading-relaxed">Abrir o diretório exclusivo do paciente no Google Drive.</p>
+                        <p className="text-xs text-zinc-500 mt-1 leading-relaxed">Abrir o diretório exclusivo do paciente no Supabase.</p>
                       </div>
                     </a>
 
@@ -740,7 +740,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                       </div>
                       <div>
                         <h3 className="font-bold text-red-800 text-sm">Excluir Cadastro</h3>
-                        <p className="text-xs text-zinc-500 mt-1 leading-relaxed">Remover permanentemente a pasta do paciente no Google Drive.</p>
+                        <p className="text-xs text-zinc-500 mt-1 leading-relaxed">Remover permanentemente a pasta do paciente no Supabase.</p>
                       </div>
                     </button>
                   </div>
@@ -1275,7 +1275,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                   {isUploading && (
                     <div className="bg-zinc-100 border border-zinc-200/60 p-4 rounded-xl flex items-center justify-center gap-3 animate-pulse">
                       <Loader2 className="w-5 h-5 animate-spin text-[#C09553]" />
-                      <span className="text-xs text-zinc-700 font-medium">Sincronizando imagem com o Google Drive, por favor aguarde...</span>
+                      <span className="text-xs text-zinc-700 font-medium">Sincronizando imagem com o Supabase, por favor aguarde...</span>
                     </div>
                   )}
 
@@ -1286,7 +1286,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                     </div>
                   ) : patientImages.length === 0 ? (
                     <p className="text-sm text-zinc-500 text-center p-8 bg-zinc-100/50 rounded-xl border border-dashed border-zinc-200">
-                      Nenhuma imagem foi sincronizada no Google Drive deste paciente ainda.
+                      Nenhuma imagem foi sincronizada no Supabase deste paciente ainda.
                     </p>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -1396,7 +1396,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                   onClick={handleCleanDummies}
                   disabled={isCleaningDummies}
                   className="px-4 py-2 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 flex-shrink-0 disabled:opacity-50"
-                  title="Remove do Drive todos os pacientes de teste"
+                  title="Remove do Supabase todos os pacientes de teste"
                 >
                   {isCleaningDummies ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
                   Limpar Fictícios
@@ -1431,7 +1431,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-12 text-zinc-500 space-y-4">
                   <Loader2 className="w-8 h-8 animate-spin text-[#C09553]" />
-                  <p className="text-sm">Buscando pastas no Drive...</p>
+                  <p className="text-sm">Buscando pastas no Supabase...</p>
                 </div>
               ) : filteredPatients.length === 0 ? (
                 <div className="text-center py-12 text-zinc-500">
@@ -1494,7 +1494,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                   Deseja mesmo excluir o cadastro de <strong className="text-zinc-800">{patientToDelete.name}</strong>?
                 </p>
                 <p className="text-[11px] text-red-600 font-semibold bg-red-50 p-2.5 rounded-lg mt-2">
-                  Atenção: Isso deletará permanentemente a pasta do paciente no Google Drive, incluindo todas as fotos, documentos e orçamentos associados!
+                  Atenção: Isso deletará permanentemente a pasta do paciente no Supabase, incluindo todas as fotos, documentos e orçamentos associados!
                 </p>
               </div>
               <div className="flex gap-3 pt-2">

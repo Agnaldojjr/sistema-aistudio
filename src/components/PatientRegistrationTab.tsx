@@ -108,7 +108,7 @@ export default function PatientRegistrationTab({ proposal, setProposal }: Patien
               className="flex items-center gap-1.5 px-3 py-1 bg-[#C09553] hover:bg-[#A88248] text-white rounded-lg text-[11px] font-bold shadow-sm transition-colors disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
-              {isSavingToSupabase ? 'Salvando...' : 'Salvar no Drive'}
+              {isSavingToSupabase ? 'Salvando...' : 'Salvar no Supabase'}
             </button>
           )}
         </div>

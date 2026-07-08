@@ -207,7 +207,7 @@ export default function PatientGallery({
             className="flex-1 md:flex-none px-4 py-2 border border-[#D5CBB3] rounded-lg bg-zinc-900 hover:bg-zinc-800 font-bold text-white text-xs flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
             <ImageIcon className="w-3.5 h-3.5 text-[#C09553]" />
-            Salvar no Drive
+            Salvar no Supabase
           </button>
         </div>
       </div>
