@@ -106,7 +106,7 @@ export default function CalendarView({ onNewPatient, initialPatientName, onClear
   };
 
   return (
-    <div className="h-full w-full flex flex-col bg-white overflow-hidden p-6 relative">
+    <div className="h-full w-full flex flex-col bg-white overflow-y-auto p-6 relative" style={{ WebkitOverflowScrolling: 'touch' }}>
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <button
           onClick={() => setIframeKey(Date.now())}
@@ -165,11 +165,11 @@ export default function CalendarView({ onNewPatient, initialPatientName, onClear
         </div>
       )}
 
-      <div className="flex-1 w-full flex flex-col bg-white border-2 border-[#E6DEC9] rounded-2xl overflow-hidden shadow-sm">
+      <div className="flex-1 w-full flex flex-col bg-white border-2 border-[#E6DEC9] rounded-2xl overflow-y-auto shadow-sm" style={{ WebkitOverflowScrolling: 'touch', minHeight: isMobile ? '650px' : '800px' }}>
         <iframe 
           key={iframeKey}
           src={`https://calendar.google.com/calendar/embed?src=dragnaldof%40gmail.com&ctz=America%2FSao_Paulo${isMobile ? '&mode=AGENDA' : ''}`} 
-          style={{ border: 0, width: '100%', height: '100%', minHeight: isMobile ? '600px' : '800px' }} 
+          style={{ border: 0, width: '100%', height: '100%', minHeight: isMobile ? '650px' : '800px' }} 
           frameBorder="0" 
           scrolling="yes"
           className="flex-1 rounded-xl"
