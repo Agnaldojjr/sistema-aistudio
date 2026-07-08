@@ -33,7 +33,7 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
   const clonedScene = React.useMemo(() => {
     const clone = scene.clone();
     clone.traverse((child: any) => {
-      if (child.isMesh && child.name.includes('teeth')) {
+      if (child.isMesh) {
         child.material = child.material.clone();
         
         // Ativa customDepthMaterial para garantir que a sombra respeite o discard
@@ -45,7 +45,8 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
         const patchShader = (shader: any) => {
           child.material.userData.shader = shader;
           shader.uniforms.uMissingCount = { value: 0 };
-          shader.uniforms.uMissingCenters = { value: Array(32).fill(new THREE.Vector3()) };
+          // FIX: Do not use .fill(new Vector3()), as it uses the exact same reference for all elements!
+          shader.uniforms.uMissingCenters = { value: Array.from({ length: 32 }, () => new THREE.Vector3()) };
           
           shader.vertexShader = `
             varying vec3 vWorldPos;
@@ -54,7 +55,8 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
             `#include <worldpos_vertex>`,
             `
             #include <worldpos_vertex>
-            vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+            // Use the internally computed worldPosition to be safe
+            vWorldPos = worldPosition.xyz;
             `
           );
 
@@ -69,7 +71,8 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
             #include <clipping_planes_fragment>
             for(int i = 0; i < 32; i++) {
               if(i >= uMissingCount) break;
-              if(distance(vWorldPos, uMissingCenters[i]) < 0.6) {
+              // Radius 0.4 world units covers exactly one tooth
+              if(distance(vWorldPos, uMissingCenters[i]) < 0.4) {
                 discard;
               }
             }

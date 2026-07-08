@@ -1,10 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePlanning3D } from '../hooks/usePlanning3D';
 import { Eye, EyeOff, PlusCircle, Activity, X, ChevronLeft, Settings } from 'lucide-react';
 
 export function ToothActionMenu() {
   const { viewerState, setViewingAnatomy, toggleMissingTooth, selectTooth, onOpenProcedureManager, globalProcedures, addProcedure } = usePlanning3D();
   const [view, setView] = useState<'MENU' | 'PROCEDURES'>('MENU');
+  
+  // Dragging state
+  const [position, setPosition] = useState<{ x: number, y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef<{ startX: number, startY: number, initialX: number, initialY: number } | null>(null);
+
+  // Sync initial position when activeToothPos changes
+  useEffect(() => {
+    if (viewerState.activeToothPos) {
+      setPosition({ x: viewerState.activeToothPos.x, y: viewerState.activeToothPos.y - 120 });
+    } else {
+      setPosition(null);
+    }
+  }, [viewerState.activeToothPos]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const dx = e.clientX - dragRef.current.startX;
+      const dy = e.clientY - dragRef.current.startY;
+      setPosition({
+        x: dragRef.current.initialX + dx,
+        y: dragRef.current.initialY + dy
+      });
+    };
+    const handleMouseUp = () => setIsDragging(false);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
 
   if (viewerState.activeTooth === null || viewerState.viewingAnatomy) {
     return null;
@@ -13,19 +48,33 @@ export function ToothActionMenu() {
   const toothNumber = viewerState.activeTooth;
   const isMissing = viewerState.missingTeeth?.includes(toothNumber);
 
-  // Use the stored coordinates or fallback to center
-  const style = viewerState.activeToothPos 
-    ? { top: viewerState.activeToothPos.y - 120, left: viewerState.activeToothPos.x }
+  const style = position 
+    ? { top: position.y, left: position.x }
     : { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!position) return;
+    setIsDragging(true);
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialX: position.x,
+      initialY: position.y
+    };
+  };
 
   return (
     <div 
-      className={`fixed z-[60] flex flex-col items-center animate-in zoom-in-95 fade-in duration-200 ${viewerState.activeToothPos ? '-translate-x-1/2' : ''}`}
+      className={`fixed z-[60] flex flex-col items-center animate-in zoom-in-95 fade-in duration-200 ${viewerState.activeToothPos && !position ? '-translate-x-1/2' : ''}`}
       style={style}
     >
       <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700 p-5 rounded-2xl shadow-2xl flex flex-col gap-3 min-w-[280px] max-w-[320px]">
         
-        <div className="flex justify-between items-center mb-1">
+        {/* Header acts as drag handle */}
+        <div 
+          className="flex justify-between items-center mb-1 cursor-move active:cursor-grabbing"
+          onMouseDown={handleMouseDown}
+        >
           <div className="flex items-center gap-2">
             {view === 'PROCEDURES' && (
               <button onClick={() => setView('MENU')} className="p-1 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-300">
