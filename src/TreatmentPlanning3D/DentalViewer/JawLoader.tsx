@@ -68,7 +68,7 @@ export function JawLoader({ getToothPosition, isCalibrating = false, archConfig 
               const { position } = getToothPosition(toothNum);
               const dx = localPoint.x - position[0];
               const dy = localPoint.y - position[1];
-              const dz = localPoint.z - position[2];
+              const dz = localPoint.z - (position[2] + 1.5); // Compensa a translação de +1.5 Z do modelo
               const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
               
               if (distance < minDistance) {
@@ -91,43 +91,46 @@ export function JawLoader({ getToothPosition, isCalibrating = false, archConfig 
       </group>
 
       {/* 2. HIGHLIGHTS E ESFERAS DE CALIBRAÇÃO (Apenas visíveis se selecionados, com orçamento ou em calibração) */}
-      {ALL_TEETH.map((toothNum) => {
-        const toothProcedures = procedures.filter(p => p.tooth_id === String(toothNum));
-        const hasBudget = toothProcedures.length > 0;
-        const isSelected = viewerState.activeTooth === toothNum;
+      {/* Grupo com translação de +1.5 Z para alinhar perfeitamente com a malha do modelo realista */}
+      <group position={[0, 0, 1.5]}>
+        {ALL_TEETH.map((toothNum) => {
+          const toothProcedures = procedures.filter(p => p.tooth_id === String(toothNum));
+          const hasBudget = toothProcedures.length > 0;
+          const isSelected = viewerState.activeTooth === toothNum;
 
-        if (!isSelected && !hasBudget && !isCalibrating) return null;
+          if (!isSelected && !hasBudget && !isCalibrating) return null;
 
-        const { position } = getToothPosition(toothNum);
-        
-        let color = '#0ea5e9';
-        let emissive = '#0284c7';
-        let opacity = 0.5;
+          const { position } = getToothPosition(toothNum);
+          
+          let color = '#0ea5e9';
+          let emissive = '#0284c7';
+          let opacity = 0.5;
 
-        if (isCalibrating) {
-          color = '#ef4444'; // Vermelho para calibração
-          emissive = '#dc2626';
-          opacity = 0.6;
-        } else if (isSelected) {
-          color = '#3B82F6'; // Azul para selecionado
-          emissive = '#3B82F6';
-          opacity = 0.6;
-        }
+          if (isCalibrating) {
+            color = '#ef4444'; // Vermelho para calibração
+            emissive = '#dc2626';
+            opacity = 0.6;
+          } else if (isSelected) {
+            color = '#3B82F6'; // Azul para selecionado
+            emissive = '#3B82F6';
+            opacity = 0.6;
+          }
 
-        return (
-          <mesh key={toothNum} position={position} geometry={hitBoxGeo}>
-            <meshStandardMaterial 
-              color={color} 
-              emissive={emissive} 
-              emissiveIntensity={0.5} 
-              transparent 
-              opacity={opacity} 
-              depthWrite={false}
-              depthTest={!isCalibrating} // Se calibrando, renderiza por cima para visualizarmos melhor
-            />
-          </mesh>
-        );
-      })}
+          return (
+            <mesh key={toothNum} position={position} geometry={hitBoxGeo}>
+              <meshStandardMaterial 
+                color={color} 
+                emissive={emissive} 
+                emissiveIntensity={0.5} 
+                transparent 
+                opacity={opacity} 
+                depthWrite={false}
+                depthTest={!isCalibrating} // Se calibrando, renderiza por cima para visualizarmos melhor
+              />
+            </mesh>
+          );
+        })}
+      </group>
     </group>
   );
 }

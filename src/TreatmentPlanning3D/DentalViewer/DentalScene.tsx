@@ -180,7 +180,7 @@ function CalibrationPanel({
           </label>
           <input 
             onPointerDown={(e) => e.stopPropagation()} 
-            type="range" min="3.0" max="6.0" step="0.05" value={config.a}
+            type="range" min="2.0" max="8.0" step="0.05" value={config.a}
             onChange={(e) => setConfig({ ...config, a: parseFloat(e.target.value) })}
             className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
           />
@@ -192,7 +192,7 @@ function CalibrationPanel({
           </label>
           <input 
             onPointerDown={(e) => e.stopPropagation()} 
-            type="range" min="3.0" max="6.0" step="0.05" value={config.b}
+            type="range" min="2.0" max="8.0" step="0.05" value={config.b}
             onChange={(e) => setConfig({ ...config, b: parseFloat(e.target.value) })}
             className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
           />
@@ -204,7 +204,7 @@ function CalibrationPanel({
           </label>
           <input 
             onPointerDown={(e) => e.stopPropagation()} 
-            type="range" min="-3.0" max="1.0" step="0.05" value={config.zOffset}
+            type="range" min="-4.0" max="4.0" step="0.05" value={config.zOffset}
             onChange={(e) => setConfig({ ...config, zOffset: parseFloat(e.target.value) })}
             className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
           />
@@ -216,7 +216,7 @@ function CalibrationPanel({
           </label>
           <input 
             onPointerDown={(e) => e.stopPropagation()} 
-            type="range" min="0.5" max="1.5" step="0.02" value={config.hitboxScale}
+            type="range" min="0.2" max="2.0" step="0.02" value={config.hitboxScale}
             onChange={(e) => setConfig({ ...config, hitboxScale: parseFloat(e.target.value) })}
             className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
           />
