@@ -7,6 +7,7 @@ import { JawLoader } from './JawLoader';
 import { ToothDetailLoader } from './ToothDetailLoader';
 import { usePlanning3D } from '../hooks/usePlanning3D';
 import { ArrowLeft, Dna, Activity } from 'lucide-react';
+import { motion, useDragControls } from 'motion/react';
 
 // Lista de dentes permanentes por quadrantes
 const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -138,20 +139,38 @@ function CalibrationPanel({
   isCalibrating: boolean; 
   setIsCalibrating: (c: boolean) => void; 
 }) {
+  const dragControls = useDragControls();
+
   if (!isCalibrating) return (
     <button 
       onClick={() => setIsCalibrating(true)} 
-      className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-red-600/80 hover:bg-red-600 text-white px-3 py-1.5 text-xs font-bold rounded-lg z-50 backdrop-blur"
+      className="absolute top-16 left-4 bg-red-600/80 hover:bg-red-600 text-white px-3 py-1.5 text-xs font-bold rounded-lg z-50 backdrop-blur cursor-pointer transition-all shadow-md hover:scale-105"
     >
       🛠️ Calibrar Hitboxes
     </button>
   );
 
   return (
-    <div className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-slate-900/90 border border-slate-700 rounded-xl p-4 w-72 z-50 shadow-2xl backdrop-blur-sm text-white">
-      <div className="flex justify-between items-center mb-3">
+    <motion.div 
+      drag 
+      dragControls={dragControls}
+      dragListener={false}
+      dragMomentum={false}
+      className="absolute top-16 left-4 bg-slate-900/90 border border-slate-700 rounded-xl p-4 w-72 z-50 shadow-2xl backdrop-blur-sm text-white select-none"
+    >
+      {/* Cabeçalho como alça de arrasto */}
+      <div 
+        onPointerDown={(e) => dragControls.start(e)}
+        className="flex justify-between items-center mb-3 cursor-move active:cursor-grabbing pb-2 border-b border-slate-800"
+      >
         <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wide">Calibração da Arcada</h4>
-        <button onClick={() => setIsCalibrating(false)} className="text-slate-400 hover:text-white text-xs">Fechar</button>
+        <button 
+          onPointerDown={(e) => e.stopPropagation()} 
+          onClick={() => setIsCalibrating(false)} 
+          className="text-slate-400 hover:text-white text-xs cursor-pointer"
+        >
+          Fechar
+        </button>
       </div>
       <div className="space-y-3 text-xs">
         <div>
@@ -160,6 +179,7 @@ function CalibrationPanel({
             <span className="font-mono">{config.a.toFixed(2)}</span>
           </label>
           <input 
+            onPointerDown={(e) => e.stopPropagation()} 
             type="range" min="3.0" max="6.0" step="0.05" value={config.a}
             onChange={(e) => setConfig({ ...config, a: parseFloat(e.target.value) })}
             className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -171,6 +191,7 @@ function CalibrationPanel({
             <span className="font-mono">{config.b.toFixed(2)}</span>
           </label>
           <input 
+            onPointerDown={(e) => e.stopPropagation()} 
             type="range" min="3.0" max="6.0" step="0.05" value={config.b}
             onChange={(e) => setConfig({ ...config, b: parseFloat(e.target.value) })}
             className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -182,6 +203,7 @@ function CalibrationPanel({
             <span className="font-mono">{config.zOffset.toFixed(2)}</span>
           </label>
           <input 
+            onPointerDown={(e) => e.stopPropagation()} 
             type="range" min="-3.0" max="1.0" step="0.05" value={config.zOffset}
             onChange={(e) => setConfig({ ...config, zOffset: parseFloat(e.target.value) })}
             className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -193,19 +215,21 @@ function CalibrationPanel({
             <span className="font-mono">{config.hitboxScale.toFixed(2)}</span>
           </label>
           <input 
+            onPointerDown={(e) => e.stopPropagation()} 
             type="range" min="0.5" max="1.5" step="0.02" value={config.hitboxScale}
             onChange={(e) => setConfig({ ...config, hitboxScale: parseFloat(e.target.value) })}
             className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
           />
         </div>
         <button 
+          onPointerDown={(e) => e.stopPropagation()} 
           onClick={() => console.log('CONFIG ATUAL:', JSON.stringify(config))} 
-          className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-1.5 rounded-lg border border-slate-700 transition-colors"
+          className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-1.5 rounded-lg border border-slate-700 transition-colors cursor-pointer"
         >
           Print no Console
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -238,30 +262,35 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
         {/* Modal de Ações sobre a Arcada */}
         {showActionMenu && <ToothActionMenu />}
 
-        {/* Painel de Calibração (Apenas visível se nenhum dente estiver selecionado) */}
-        {viewerState.activeTooth === null && (
-          <CalibrationPanel 
-            config={archConfig} 
-            setConfig={setArchConfig} 
-            isCalibrating={isCalibrating} 
-            setIsCalibrating={setIsCalibrating} 
-          />
-        )}
+        {/* Painel de Calibração */}
+        <CalibrationPanel 
+          config={archConfig} 
+          setConfig={setArchConfig} 
+          isCalibrating={isCalibrating} 
+          setIsCalibrating={setIsCalibrating} 
+        />
 
         {/* Controles do Modo Detalhado (Dente Individual) */}
         {isDetailedView && (
           <>
-            <button
+            <motion.button
+              drag
+              dragMomentum={false}
               onClick={handleBack}
-              className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3 py-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg backdrop-blur-sm transition-all border border-slate-700 shadow-lg"
+              className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3 py-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg backdrop-blur-sm transition-all border border-slate-700 shadow-lg cursor-move active:cursor-grabbing select-none"
             >
               <ArrowLeft size={16} />
               <span className="text-sm font-medium">Voltar para Arcada</span>
-            </button>
+            </motion.button>
 
             {/* Toggle Anatômico vs Endodôntico */}
-            <div className="absolute top-4 right-4 z-10 flex items-center bg-slate-800/80 rounded-lg p-1 backdrop-blur-sm border border-slate-700 shadow-lg">
+            <motion.div 
+              drag
+              dragMomentum={false}
+              className="absolute top-4 right-4 z-10 flex items-center bg-slate-800/80 rounded-lg p-1 backdrop-blur-sm border border-slate-700 shadow-lg cursor-move active:cursor-grabbing select-none"
+            >
               <button
+                onPointerDown={(e) => e.stopPropagation()} 
                 onClick={() => setVariant('anatomic')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   variant === 'anatomic'
@@ -273,6 +302,7 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
                 Anatômico
               </button>
               <button
+                onPointerDown={(e) => e.stopPropagation()} 
                 onClick={() => setVariant('endodontic')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   variant === 'endodontic'
@@ -283,7 +313,7 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
                 <Activity size={16} />
                 Endodôntico
               </button>
-            </div>
+            </motion.div>
           </>
         )}
 
