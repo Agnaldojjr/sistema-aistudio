@@ -4,10 +4,12 @@ import { OrbitControls } from '@react-three/drei';
 import { ToothMesh } from './ToothMesh';
 import { StructureMesh } from './StructureMesh';
 import { JawLoader } from './JawLoader';
+import { ToothDetailLoader } from './ToothDetailLoader';
 import { usePlanning3D } from '../hooks/usePlanning3D';
 import { LayersPanel } from './LayersPanel';
 import { TransparencyPanel } from './TransparencyPanel';
 import { AnatomyLegend } from './AnatomyLegend';
+import { ArrowLeft } from 'lucide-react';
 
 // Lista de dentes permanentes por quadrantes
 const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -115,12 +117,26 @@ class SceneErrorBoundary extends Component<{ children: React.ReactNode }, { hasE
 }
 
 export function DentalScene() {
-  const { viewerState } = usePlanning3D();
+  const { viewerState, selectTooth } = usePlanning3D();
+
+  const isDetailedView = viewerState.activeTooth !== null;
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 w-full min-h-[550px]">
       {/* 3D Canvas Container */}
       <div className="flex-1 relative h-[550px] bg-slate-950 rounded-2xl overflow-hidden border border-slate-900 shadow-2xl">
+        
+        {/* Botão Flutuante Voltar */}
+        {isDetailedView && (
+          <button
+            onClick={() => selectTooth(null)}
+            className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3 py-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg backdrop-blur-sm transition-all border border-slate-700 shadow-lg"
+          >
+            <ArrowLeft size={16} />
+            <span className="text-sm font-medium">Voltar para Arcada</span>
+          </button>
+        )}
+
         <div className="absolute bottom-4 left-4 z-10 bg-slate-900/80 backdrop-blur border border-slate-800 text-slate-400 text-[10px] px-3 py-1.5 rounded-lg pointer-events-none">
           Clique para selecionar dente • Arraste para rotacionar
         </div>
@@ -144,7 +160,11 @@ export function DentalScene() {
 
           <Suspense fallback={null}>
             <SceneErrorBoundary>
-              <JawLoader getToothPosition={getToothPosition} />
+              {isDetailedView ? (
+                <ToothDetailLoader toothNumber={viewerState.activeTooth!} />
+              ) : (
+                <JawLoader getToothPosition={getToothPosition} />
+              )}
             </SceneErrorBoundary>
           </Suspense>
 

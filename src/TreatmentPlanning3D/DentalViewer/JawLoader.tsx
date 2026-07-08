@@ -1,93 +1,93 @@
 import React from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
-import { ToothMesh } from './ToothMesh';
-import { StructureMesh } from './StructureMesh';
+import { usePlanning3D } from '../hooks/usePlanning3D';
 
 // Lista de dentes permanentes por quadrantes
 const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 const LOWER_TEETH = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 const ALL_TEETH = [...UPPER_TEETH, ...LOWER_TEETH];
 
-// Pré-carrega o modelo anatômico padrão e o decodificador Draco
+// Pré-carrega o modelo da arcada
 try {
-  useGLTF.preload('/models/dental_jaw.glb', '/models/draco/');
+  useGLTF.preload('/models/human_mouth_detailed.glb');
 } catch (e) {
-  console.warn('Erro ao pré-carregar useGLTF:', e);
+  console.warn('Erro ao pré-carregar human_mouth_detailed.glb:', e);
 }
 
 interface JawLoaderProps {
   getToothPosition: (fdiCode: number) => { position: [number, number, number]; rotation: [number, number, number] };
 }
 
+// Geometria procedural leve para o highlight e hitbox
+const hitBoxGeo = new THREE.SphereGeometry(0.35, 16, 16);
+
 export function JawLoader({ getToothPosition }: JawLoaderProps) {
-  // Carrega o GLTF/GLB usando Drei.
-  // Se o arquivo não existir, o Suspense/ErrorBoundary acima capturará o erro e renderizará o FallbackProcedural.
-  const { nodes } = useGLTF('/models/dental_jaw.glb', '/models/draco/') as any;
+  const { nodes, materials } = useGLTF('/models/human_mouth_detailed.glb') as any;
+  const { procedures, selectTooth, viewerState } = usePlanning3D();
 
-  // Extrair as geometrias de cada dente mapeado pelo padrão FDI
-  const teethGeometries: Record<number, any> = {};
-
-  ALL_TEETH.forEach((num) => {
-    teethGeometries[num] = {
-      enamel: nodes[`Enamel_${num}`]?.geometry || nodes[`${num}`]?.geometry,
-      dentin: nodes[`Dentin_${num}`]?.geometry,
-      pulp: nodes[`Pulp_${num}`]?.geometry,
-      root: nodes[`Root_${num}`]?.geometry || nodes[`Root_${num}_Mesial`]?.geometry,
-      canal: nodes[`Canal_${num}`]?.geometry,
-    };
-  });
+  // Escala para ajustar o modelo realista com as nossas posições procedurais
+  const modelScale = 0.8; 
 
   return (
     <group position={[0, -0.2, 0]}>
-      {/* 1. RENDERIZAÇÃO DOS DENTES COM GEOMETRIAS ANATÔMICAS GLB */}
+      
+      {/* 1. MODELO REALISTA (FUNDO) */}
+      <group scale={[modelScale, modelScale, modelScale]} position={[0, 0, 0]}>
+        {nodes.Object_0 && (
+          <mesh castShadow receiveShadow geometry={nodes.Object_0.geometry} material={materials.mouth} />
+        )}
+        {nodes.Object_1 && (
+          <mesh castShadow receiveShadow geometry={nodes.Object_1.geometry} material={materials.teeth} />
+        )}
+        {nodes.Object_2 && (
+          <mesh castShadow receiveShadow geometry={nodes.Object_2.geometry} material={materials.material} />
+        )}
+      </group>
+
+      {/* 2. HITBOXES E HIGHLIGHTS DE ORÇAMENTO */}
+      {/* Como o modelo realista tem dentes fundidos (1 única mesh "Object_1"),
+          nós sobrepomos hitboxes invisíveis nas posições calculadas para detectar os cliques 
+          e criar os brilhos neon de orçamento. */}
       {ALL_TEETH.map((toothNum) => {
         const { position, rotation } = getToothPosition(toothNum);
+        
+        const toothProcedures = procedures.filter(p => p.tooth_id === toothNum);
+        const hasBudget = toothProcedures.length > 0;
+        const isSelected = viewerState.activeTooth === toothNum;
+
+        // Mostrar highlight visível se estiver com orçamento ou selecionado
+        const showHighlight = hasBudget || isSelected;
+
         return (
-          <ToothMesh
+          <mesh
             key={toothNum}
-            toothNumber={toothNum}
             position={position}
-            rotation={rotation}
-            geometries={teethGeometries[toothNum]}
-          />
+            geometry={hitBoxGeo}
+            onClick={(e) => {
+              e.stopPropagation();
+              selectTooth(toothNum);
+            }}
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              document.body.style.cursor = 'pointer';
+            }}
+            onPointerOut={() => {
+              document.body.style.cursor = 'default';
+            }}
+            visible={true}
+          >
+            <meshStandardMaterial
+              color={isSelected ? '#3B82F6' : '#0ea5e9'}
+              emissive={isSelected ? '#3B82F6' : '#0284c7'}
+              emissiveIntensity={0.6}
+              transparent={true}
+              opacity={showHighlight ? 0.7 : 0.0} // Invisível (0) para clique, visível (0.7) para highlight
+              depthWrite={false}
+            />
+          </mesh>
         );
       })}
-
-      {/* 2. RENDERIZAÇÃO DAS ESTRUTURAS ADICIONAIS DO GLB */}
-      <StructureMesh
-        layerKey="gums"
-        color="#C77373"
-        geometry={nodes.Gingiva_Upper?.geometry || nodes.Gingiva?.geometry}
-      />
-      <StructureMesh
-        layerKey="gums"
-        color="#C77373"
-        geometry={nodes.Gingiva_Lower?.geometry}
-      />
-
-      <StructureMesh
-        layerKey="bone"
-        color="#E5E7EB"
-        geometry={nodes.Bone_Upper?.geometry || nodes.Bone?.geometry}
-      />
-      <StructureMesh
-        layerKey="bone"
-        color="#E5E7EB"
-        geometry={nodes.Bone_Lower?.geometry}
-      />
-
-      <StructureMesh
-        layerKey="nerves"
-        color="#FBBF24"
-        geometry={nodes.Nerve_Mandibular?.geometry || nodes.Nerve?.geometry}
-      />
-
-      <StructureMesh
-        layerKey="sinus"
-        color="#A7F3D0"
-        geometry={nodes.Sinus_Maxillar?.geometry || nodes.Sinus?.geometry}
-      />
     </group>
   );
 }
