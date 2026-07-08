@@ -92,6 +92,11 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
     const size = box.getSize(new THREE.Vector3());
 
     return (viewerState.missingTeeth || []).map(num => {
+      // 100% pixel-perfect hit point from the user's click!
+      if (viewerState.missingTeethCoords?.[num]) {
+        return viewerState.missingTeethCoords[num];
+      }
+
       const isUpper = num < 30;
       const quadrant = Math.floor(num / 10);
       const index = num % 10;
@@ -117,9 +122,6 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
       const localY = center.y + (isUpper ? (size.y * 0.25) : -(size.y * 0.25));
 
       // The group wrapper applies scale=85 and position=[0, -0.2, 0] + [0, 0, 1.5]
-      // W.x = P.x * 85
-      // W.y = P.y * 85 - 0.2
-      // W.z = P.z * 85 + 1.5
       const worldX = localX * modelScale;
       const worldY = localY * modelScale - 0.2;
       const worldZ = localZ * modelScale + 1.5;
@@ -127,7 +129,7 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
       // The returned Vector3 is in world space, perfect for the shader
       return new THREE.Vector3(worldX, worldY, worldZ);
     });
-  }, [viewerState.missingTeeth, clonedScene]);
+  }, [viewerState.missingTeeth, viewerState.missingTeethCoords, clonedScene]);
 
   // Atualizar os uniforms quando missingTeeth mudar
   React.useEffect(() => {
@@ -202,7 +204,8 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
             const selectedTooth = (quadrant * 10) + toothIndex;
             
             // Pass the 2D coordinates of the click so the menu can float there
-            selectTooth(selectedTooth, { x: e.clientX, y: e.clientY });
+            // Also pass the 3D e.point so the "Hide Tooth" shader can perfectly match the click coordinate
+            selectTooth(selectedTooth, { x: e.clientX, y: e.clientY }, e.point);
           }}
           onPointerOver={(e: any) => {
             e.stopPropagation();
