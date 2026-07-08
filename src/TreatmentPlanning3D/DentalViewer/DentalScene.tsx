@@ -238,13 +238,15 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
         {/* Modal de Ações sobre a Arcada */}
         {showActionMenu && <ToothActionMenu />}
 
-        {/* Painel de Calibração */}
-        <CalibrationPanel 
-          config={archConfig} 
-          setConfig={setArchConfig} 
-          isCalibrating={isCalibrating} 
-          setIsCalibrating={setIsCalibrating} 
-        />
+        {/* Painel de Calibração (Apenas visível se nenhum dente estiver selecionado) */}
+        {viewerState.activeTooth === null && (
+          <CalibrationPanel 
+            config={archConfig} 
+            setConfig={setArchConfig} 
+            isCalibrating={isCalibrating} 
+            setIsCalibrating={setIsCalibrating} 
+          />
+        )}
 
         {/* Controles do Modo Detalhado (Dente Individual) */}
         {isDetailedView && (
