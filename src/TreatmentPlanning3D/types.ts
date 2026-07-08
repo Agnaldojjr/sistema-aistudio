@@ -38,11 +38,12 @@ export type LayerConfig = Record<LayerKey, LayerState>;
 
 export interface Viewer3DState {
   activeTooth: number | null;
+  viewingAnatomy?: boolean;
   activeSurfaces: ToothSurface[];
-  transparencyMode: boolean; // Transparência da gengiva (retrocompatibilidade)
+  transparencyMode: boolean;
+  presentationMode: boolean;
+  simulationState: 'BEFORE' | 'AFTER';
   loading: boolean;
-  presentationMode: boolean; // Se o modo de apresentação está ativo
-  simulationState: 'BEFORE' | 'AFTER'; // Simulação antes/depois
-  layers: LayerConfig; // Configuração do sistema de camadas anatômicas
+  missingTeeth?: number[];
+  layers: LayerConfig;
 }
-

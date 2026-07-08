@@ -22,6 +22,8 @@ export function usePlanning3D() {
     acceptPlan,
     setLayerVisibility,
     setLayerOpacity,
+    setViewingAnatomy,
+    toggleMissingTooth,
     onOpenProcedureManager,
   } = usePlanning3DContext();
 
@@ -66,6 +68,8 @@ export function usePlanning3D() {
     removeProcedure,
     setLayerVisibility,
     setLayerOpacity,
+    setViewingAnatomy,
+    toggleMissingTooth,
     getToothState,
     getSurfaceCondition,
     getToothProcedures,

@@ -22,6 +22,8 @@ interface Planning3DContextType {
   acceptPlan: () => void;
   setLayerVisibility: (layerKey: LayerKey, visible: boolean) => void;
   setLayerOpacity: (layerKey: LayerKey, opacity: number) => void;
+  toggleMissingTooth: (toothNumber: number) => void;
+  setViewingAnatomy: (state: boolean) => void;
   onOpenProcedureManager?: () => void;
 }
 
@@ -33,11 +35,13 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
 
   const [viewerState, setViewerState] = useState<Viewer3DState>({
     activeTooth: null,
+    viewingAnatomy: false,
     activeSurfaces: [],
     transparencyMode: false,
     loading: false,
     presentationMode: false,
     simulationState: 'BEFORE',
+    missingTeeth: [],
     layers: {
       gums: { visible: true, opacity: 0.95 },
       bone: { visible: true, opacity: 0.8 },
@@ -49,6 +53,22 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
       sinus: { visible: true, opacity: 1.0 },
     },
   });
+
+  const setViewingAnatomy = (state: boolean) => {
+    setViewerState(prev => ({ ...prev, viewingAnatomy: state }));
+  };
+
+  const toggleMissingTooth = (toothNumber: number) => {
+    setViewerState(prev => {
+      const isMissing = prev.missingTeeth.includes(toothNumber);
+      return {
+        ...prev,
+        missingTeeth: isMissing 
+          ? prev.missingTeeth.filter(t => t !== toothNumber) 
+          : [...prev.missingTeeth, toothNumber]
+      };
+    });
+  };
 
   // 1. Derivar o estado local (teeth, procedures) a partir das activeSections globais
   const { teeth, procedures } = useMemo(() => {
@@ -299,6 +319,8 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
         setPresentationMode,
         setSimulationState,
         acceptPlan,
+        toggleMissingTooth,
+        setViewingAnatomy,
         setLayerVisibility,
         setLayerOpacity,
         onOpenProcedureManager,

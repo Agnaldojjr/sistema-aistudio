@@ -29,12 +29,95 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
   // O modelo do Sketchfab está em metros (~0.1 de largura), precisamos escalar para ~85 para bater com as hitboxes de 9 unidades
   const modelScale = 85.0; 
 
+  const missingCenters = React.useMemo(() => {
+    return (viewerState.missingTeeth || []).map(num => {
+      const pos = getToothPosition(num).position;
+      // As the hitboxes are within a group with position={[0, -0.2, 0]},
+      // their world position would be y - 0.2.
+      return new THREE.Vector3(pos[0], pos[1] - 0.2, pos[2]);
+    });
+  }, [viewerState.missingTeeth, getToothPosition]);
+
+  // Clonamos a cena para não afetar outras instâncias e injetamos o shader
+  const clonedScene = React.useMemo(() => {
+    const clone = scene.clone();
+    clone.traverse((child: any) => {
+      if (child.isMesh && child.name.includes('teeth')) {
+        child.material = child.material.clone();
+        
+        // Ativa customDepthMaterial para garantir que a sombra respeite o discard
+        child.customDepthMaterial = new THREE.MeshDepthMaterial({
+          depthPacking: THREE.RGBADepthPacking,
+          alphaTest: 0.5
+        });
+
+        const patchShader = (shader: any) => {
+          child.material.userData.shader = shader;
+          shader.uniforms.uMissingCount = { value: 0 };
+          shader.uniforms.uMissingCenters = { value: Array(32).fill(new THREE.Vector3()) };
+          
+          shader.vertexShader = `
+            varying vec3 vWorldPos;
+            ${shader.vertexShader}
+          `.replace(
+            `#include <worldpos_vertex>`,
+            `
+            #include <worldpos_vertex>
+            vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+            `
+          );
+
+          shader.fragmentShader = `
+            uniform int uMissingCount;
+            uniform vec3 uMissingCenters[32];
+            varying vec3 vWorldPos;
+            ${shader.fragmentShader}
+          `.replace(
+            `#include <clipping_planes_fragment>`,
+            `
+            #include <clipping_planes_fragment>
+            for(int i = 0; i < 32; i++) {
+              if(i >= uMissingCount) break;
+              if(distance(vWorldPos, uMissingCenters[i]) < 0.6) {
+                discard;
+              }
+            }
+            `
+          );
+        };
+
+        child.material.onBeforeCompile = patchShader;
+        child.customDepthMaterial.onBeforeCompile = patchShader;
+      }
+    });
+    return clone;
+  }, [scene]);
+
+  // Atualizar os uniforms quando missingTeeth mudar
+  React.useEffect(() => {
+    clonedScene.traverse((child: any) => {
+      if (child.isMesh && child.material.userData.shader) {
+        child.material.userData.shader.uniforms.uMissingCount.value = missingCenters.length;
+        // Atualizar o array (Three.js aceita array de Vector3)
+        const padded = [...missingCenters];
+        while(padded.length < 32) padded.push(new THREE.Vector3());
+        child.material.userData.shader.uniforms.uMissingCenters.value = padded;
+      }
+      if (child.isMesh && child.customDepthMaterial && child.customDepthMaterial.userData.shader) {
+        child.customDepthMaterial.userData.shader.uniforms.uMissingCount.value = missingCenters.length;
+        const padded = [...missingCenters];
+        while(padded.length < 32) padded.push(new THREE.Vector3());
+        child.customDepthMaterial.userData.shader.uniforms.uMissingCenters.value = padded;
+      }
+    });
+  }, [missingCenters, clonedScene]);
+
   return (
     <group position={[0, -0.2, 0]}>
       
       {/* 1. MODELO REALISTA (FUNDO) */}
       <group scale={[modelScale, modelScale, modelScale]} position={[0, 0, 1.5]}>
-        <primitive object={scene} />
+        <primitive object={clonedScene} />
       </group>
 
       {/* 2. HITBOXES E HIGHLIGHTS DE ORÇAMENTO */}

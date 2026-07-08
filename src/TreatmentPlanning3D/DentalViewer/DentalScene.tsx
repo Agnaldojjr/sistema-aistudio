@@ -6,9 +6,6 @@ import { StructureMesh } from './StructureMesh';
 import { JawLoader } from './JawLoader';
 import { ToothDetailLoader } from './ToothDetailLoader';
 import { usePlanning3D } from '../hooks/usePlanning3D';
-import { LayersPanel } from './LayersPanel';
-import { TransparencyPanel } from './TransparencyPanel';
-import { AnatomyLegend } from './AnatomyLegend';
 import { ArrowLeft, Dna, Activity } from 'lucide-react';
 
 // Lista de dentes permanentes por quadrantes
@@ -116,23 +113,33 @@ class SceneErrorBoundary extends Component<{ children: React.ReactNode }, { hasE
   }
 }
 
-export function DentalScene() {
-  const { viewerState, selectTooth } = usePlanning3D();
+import { ToothActionMenu } from '../components/ToothActionMenu';
+
+interface DentalSceneProps {
+  isPresentationMode?: boolean;
+}
+
+export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
+  const { viewerState, selectTooth, setViewingAnatomy } = usePlanning3D();
   const [variant, setVariant] = useState<'anatomic' | 'endodontic'>('anatomic');
 
-  const isDetailedView = viewerState.activeTooth !== null;
+  const isDetailedView = viewerState.activeTooth !== null && viewerState.viewingAnatomy;
+  const showActionMenu = viewerState.activeTooth !== null && !viewerState.viewingAnatomy;
 
   const handleBack = () => {
-    selectTooth(null);
-    setVariant('anatomic'); // reseta a visualização ao voltar
+    setViewingAnatomy(false);
+    setVariant('anatomic'); 
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 w-full min-h-[550px]">
+    <div className="flex flex-col lg:flex-row gap-6 w-full min-h-[550px] relative">
       {/* 3D Canvas Container */}
       <div className="flex-1 relative h-[550px] bg-slate-950 rounded-2xl overflow-hidden border border-slate-900 shadow-2xl">
         
-        {/* Controles do Modo Detalhado */}
+        {/* Modal de Ações sobre a Arcada */}
+        {showActionMenu && <ToothActionMenu />}
+
+        {/* Controles do Modo Detalhado (Dente Individual) */}
         {isDetailedView && (
           <>
             <button
@@ -213,12 +220,6 @@ export function DentalScene() {
         </Canvas>
       </div>
 
-      {/* Controles de Interação Lateral */}
-      <div className="w-full lg:w-[280px] flex flex-col gap-4">
-        <LayersPanel />
-        <TransparencyPanel />
-        <AnatomyLegend />
-      </div>
     </div>
   );
 }
