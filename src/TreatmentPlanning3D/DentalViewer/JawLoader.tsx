@@ -18,13 +18,12 @@ try {
 interface JawLoaderProps {
   getToothPosition: (fdiCode: number) => { position: [number, number, number]; rotation: [number, number, number] };
   isCalibrating?: boolean;
-  archConfig?: any;
 }
 
 // Geometria procedural leve para o highlight e hitbox
 const hitBoxGeo = new THREE.SphereGeometry(0.35, 16, 16);
 
-export function JawLoader({ getToothPosition, isCalibrating = false, archConfig }: JawLoaderProps) {
+export function JawLoader({ getToothPosition, isCalibrating = false }: JawLoaderProps) {
   const { scene } = useGLTF('/models/human_mouth_detailed.glb') as any;
   const { procedures, selectTooth, viewerState } = usePlanning3D();
   

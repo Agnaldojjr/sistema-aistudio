@@ -27,8 +27,13 @@ export const DEFAULT_ARCH_CONFIG = {
 export type ArchConfig = typeof DEFAULT_ARCH_CONFIG;
 
 // Função auxiliar para calcular posições na arcada dentária (arco elíptico)
-export function getToothPosition(fdiCode: number, config: ArchConfig = DEFAULT_ARCH_CONFIG): { position: [number, number, number]; rotation: [number, number, number] } {
+export function getToothPosition(
+  fdiCode: number, 
+  upperConfig: ArchConfig = DEFAULT_ARCH_CONFIG,
+  lowerConfig: ArchConfig = DEFAULT_ARCH_CONFIG
+): { position: [number, number, number]; rotation: [number, number, number] } {
   const isUpper = fdiCode < 30; // Quadrantes 10 e 20 são superiores
+  const config = isUpper ? upperConfig : lowerConfig;
   const quadrant = Math.floor(fdiCode / 10);
   const positionIndex = fdiCode % 10; // 1 (incisivo) a 8 (terceiro molar)
 
@@ -132,12 +137,16 @@ function CalibrationPanel({
   config, 
   setConfig, 
   isCalibrating, 
-  setIsCalibrating 
+  setIsCalibrating,
+  activeArch,
+  setActiveArch
 }: { 
   config: ArchConfig; 
   setConfig: (c: ArchConfig) => void; 
   isCalibrating: boolean; 
   setIsCalibrating: (c: boolean) => void; 
+  activeArch: 'upper' | 'lower';
+  setActiveArch: (a: 'upper' | 'lower') => void;
 }) {
   const dragControls = useDragControls();
 
@@ -172,6 +181,33 @@ function CalibrationPanel({
           Fechar
         </button>
       </div>
+
+      {/* Seleção de Arcada */}
+      <div className="flex gap-2 mb-3 bg-slate-850 p-1 rounded-lg border border-slate-800">
+        <button
+          onPointerDown={(e) => e.stopPropagation()} 
+          onClick={() => setActiveArch('upper')}
+          className={`flex-1 text-center py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+            activeArch === 'upper' 
+              ? 'bg-blue-600 text-white shadow-md' 
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          Arcada Superior
+        </button>
+        <button
+          onPointerDown={(e) => e.stopPropagation()} 
+          onClick={() => setActiveArch('lower')}
+          className={`flex-1 text-center py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+            activeArch === 'lower' 
+              ? 'bg-rose-600 text-white shadow-md' 
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          Arcada Inferior
+        </button>
+      </div>
+
       <div className="space-y-3 text-xs">
         <div>
           <label className="flex justify-between mb-1">
@@ -223,7 +259,7 @@ function CalibrationPanel({
         </div>
         <button 
           onPointerDown={(e) => e.stopPropagation()} 
-          onClick={() => console.log('CONFIG ATUAL:', JSON.stringify(config))} 
+          onClick={() => console.log(`CONFIG ${activeArch.toUpperCase()}:`, JSON.stringify(config))} 
           className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-1.5 rounded-lg border border-slate-700 transition-colors cursor-pointer"
         >
           Print no Console
@@ -241,7 +277,11 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
   const { viewerState, selectTooth, setViewingAnatomy } = usePlanning3D();
   const [variant, setVariant] = useState<'anatomic' | 'endodontic'>('anatomic');
   const [isCalibrating, setIsCalibrating] = useState(false);
-  const [archConfig, setArchConfig] = useState<ArchConfig>(DEFAULT_ARCH_CONFIG);
+  
+  // Arcadas independentes
+  const [upperArchConfig, setUpperArchConfig] = useState<ArchConfig>(DEFAULT_ARCH_CONFIG);
+  const [lowerArchConfig, setLowerArchConfig] = useState<ArchConfig>(DEFAULT_ARCH_CONFIG);
+  const [activeCalibratingArch, setActiveCalibratingArch] = useState<'upper' | 'lower'>('upper');
 
   const isDetailedView = viewerState.activeTooth !== null && viewerState.viewingAnatomy;
   const showActionMenu = viewerState.activeTooth !== null && !viewerState.viewingAnatomy;
@@ -251,8 +291,9 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
     setVariant('anatomic'); 
   };
 
-  // getToothPosition adaptada para usar o config dinâmico
-  const getDynamicToothPosition = (fdiCode: number) => getToothPosition(fdiCode, archConfig);
+  // getToothPosition adaptada para usar as arcadas independentes
+  const getDynamicToothPosition = (fdiCode: number) => 
+    getToothPosition(fdiCode, upperArchConfig, lowerArchConfig);
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 w-full min-h-[550px] relative">
@@ -264,10 +305,12 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
 
         {/* Painel de Calibração */}
         <CalibrationPanel 
-          config={archConfig} 
-          setConfig={setArchConfig} 
+          config={activeCalibratingArch === 'upper' ? upperArchConfig : lowerArchConfig} 
+          setConfig={activeCalibratingArch === 'upper' ? setUpperArchConfig : setLowerArchConfig} 
           isCalibrating={isCalibrating} 
           setIsCalibrating={setIsCalibrating} 
+          activeArch={activeCalibratingArch}
+          setActiveArch={setActiveCalibratingArch}
         />
 
         {/* Controles do Modo Detalhado (Dente Individual) */}
@@ -346,7 +389,6 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
                 <JawLoader 
                   getToothPosition={getDynamicToothPosition} 
                   isCalibrating={isCalibrating} 
-                  archConfig={archConfig} 
                 />
               )}
             </SceneErrorBoundary>
