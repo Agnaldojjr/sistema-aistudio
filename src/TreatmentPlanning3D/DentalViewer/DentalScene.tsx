@@ -208,7 +208,7 @@ export function DentalScene() {
             maxPolarAngle={Math.PI / 1.6}
             minPolarAngle={Math.PI / 4}
             minDistance={4}
-            maxDistance={12}
+            maxDistance={30}
           />
         </Canvas>
       </div>
