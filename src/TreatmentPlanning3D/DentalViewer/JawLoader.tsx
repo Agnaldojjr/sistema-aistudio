@@ -26,14 +26,14 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
   const { scene } = useGLTF('/models/human_mouth_detailed.glb') as any;
   const { procedures, selectTooth, viewerState } = usePlanning3D();
 
-  // Escala para ajustar o modelo realista com as nossas posições procedurais
-  const modelScale = 0.8; 
+  // O modelo do Sketchfab está em metros (~0.1 de largura), precisamos escalar para ~85 para bater com as hitboxes de 9 unidades
+  const modelScale = 85.0; 
 
   return (
     <group position={[0, -0.2, 0]}>
       
       {/* 1. MODELO REALISTA (FUNDO) */}
-      <group scale={[modelScale, modelScale, modelScale]} position={[0, 0, 0]}>
+      <group scale={[modelScale, modelScale, modelScale]} position={[0, 0, 1.5]}>
         <primitive object={scene} />
       </group>
 
