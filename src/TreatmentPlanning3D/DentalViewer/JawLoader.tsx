@@ -115,54 +115,69 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
   return (
     <group position={[0, -0.2, 0]}>
       
-      {/* 1. MODELO REALISTA (FUNDO) */}
+      {/* 1. MODELO REALISTA (FUNDO COM RAYCAST DENTÁRIO) */}
       <group scale={[modelScale, modelScale, modelScale]} position={[0, 0, 1.5]}>
-        <primitive object={clonedScene} />
+        <primitive 
+          object={clonedScene} 
+          onClick={(e: any) => {
+            e.stopPropagation();
+            
+            // Descobre o ponto clicado no espaço local do modelo
+            const point = e.point;
+            
+            // Calcula o centro e limites do modelo (pode ser cacheado, mas faremos aqui para simplificar)
+            const box = new THREE.Box3().setFromObject(clonedScene);
+            const center = box.getCenter(new THREE.Vector3());
+            
+            // Upper ou Lower (Y)
+            const isUpper = point.y > center.y;
+            
+            // X (Esquerda/Direita) e Z (Frente/Trás)
+            // atan2(x, z) dá o ângulo no plano horizontal
+            // z positivo é a frente da boca (incisivos)
+            const dx = point.x - center.x;
+            const dz = point.z - center.z;
+            
+            const angle = Math.atan2(dx, dz); // radianos
+            
+            // Convert angle to degrees for easier slicing
+            let deg = (angle * 180) / Math.PI;
+            
+            // O quadrante depende do Y (isUpper) e do X (deg positivo = direita da tela = esquerda do paciente)
+            let quadrant = 0;
+            if (isUpper) {
+              quadrant = deg > 0 ? 2 : 1; // 2: Sup Esquerdo (Paciente), 1: Sup Direito (Paciente)
+            } else {
+              quadrant = deg > 0 ? 3 : 4; // 3: Inf Esquerdo (Paciente), 4: Inf Direito (Paciente)
+            }
+            
+            // O índice do dente (1 a 8) depende do valor absoluto do ângulo
+            // 0 = centro da frente. 90 = fundo.
+            const absDeg = Math.abs(deg);
+            
+            // Mapeamento aproximado do arco dentário
+            let toothIndex = 1;
+            if (absDeg < 15) toothIndex = 1;      // Incisivo Central
+            else if (absDeg < 30) toothIndex = 2; // Incisivo Lateral
+            else if (absDeg < 45) toothIndex = 3; // Canino
+            else if (absDeg < 65) toothIndex = 4; // 1º Pré-molar
+            else if (absDeg < 85) toothIndex = 5; // 2º Pré-molar
+            else if (absDeg < 110) toothIndex = 6;// 1º Molar
+            else if (absDeg < 135) toothIndex = 7;// 2º Molar
+            else toothIndex = 8;                  // 3º Molar
+            
+            const selectedTooth = (quadrant * 10) + toothIndex;
+            selectTooth(selectedTooth);
+          }}
+          onPointerOver={(e: any) => {
+            e.stopPropagation();
+            document.body.style.cursor = 'pointer';
+          }}
+          onPointerOut={() => {
+            document.body.style.cursor = 'default';
+          }}
+        />
       </group>
-
-      {/* 2. HITBOXES E HIGHLIGHTS DE ORÇAMENTO */}
-      {/* Como o modelo realista tem dentes fundidos (1 única mesh "Object_1"),
-          nós sobrepomos hitboxes invisíveis nas posições calculadas para detectar os cliques 
-          e criar os brilhos neon de orçamento. */}
-      {ALL_TEETH.map((toothNum) => {
-        const { position, rotation } = getToothPosition(toothNum);
-        const toothState = teeth[toothNum];
-        const toothProcedures = toothState ? procedures.filter(p => p.tooth_id === toothState.id) : [];
-        const hasBudget = toothProcedures.length > 0;
-        const isSelected = viewerState.activeTooth === toothNum;
-
-        // Mostrar highlight visível se estiver com orçamento ou selecionado
-        const showHighlight = hasBudget || isSelected;
-
-        return (
-          <mesh
-            key={toothNum}
-            position={position}
-            geometry={hitBoxGeo}
-            onClick={(e) => {
-              e.stopPropagation();
-              selectTooth(toothNum);
-            }}
-            onPointerOver={(e) => {
-              e.stopPropagation();
-              document.body.style.cursor = 'pointer';
-            }}
-            onPointerOut={() => {
-              document.body.style.cursor = 'default';
-            }}
-            visible={true}
-          >
-            <meshStandardMaterial
-              color={isSelected ? '#3B82F6' : '#0ea5e9'}
-              emissive={isSelected ? '#3B82F6' : '#0284c7'}
-              emissiveIntensity={0.6}
-              transparent={true}
-              opacity={showHighlight ? 0.7 : 0.0} // Invisível (0) para clique, visível (0.7) para highlight
-              depthWrite={false}
-            />
-          </mesh>
-        );
-      })}
     </group>
   );
 }
