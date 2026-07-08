@@ -23,7 +23,7 @@ interface JawLoaderProps {
 const hitBoxGeo = new THREE.SphereGeometry(0.35, 16, 16);
 
 export function JawLoader({ getToothPosition }: JawLoaderProps) {
-  const { nodes, materials } = useGLTF('/models/human_mouth_detailed.glb') as any;
+  const { scene } = useGLTF('/models/human_mouth_detailed.glb') as any;
   const { procedures, selectTooth, viewerState } = usePlanning3D();
 
   // Escala para ajustar o modelo realista com as nossas posições procedurais
@@ -34,15 +34,7 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
       
       {/* 1. MODELO REALISTA (FUNDO) */}
       <group scale={[modelScale, modelScale, modelScale]} position={[0, 0, 0]}>
-        {nodes.Object_0 && (
-          <mesh castShadow receiveShadow geometry={nodes.Object_0.geometry} material={materials.mouth} />
-        )}
-        {nodes.Object_1 && (
-          <mesh castShadow receiveShadow geometry={nodes.Object_1.geometry} material={materials.teeth} />
-        )}
-        {nodes.Object_2 && (
-          <mesh castShadow receiveShadow geometry={nodes.Object_2.geometry} material={materials.material} />
-        )}
+        <primitive object={scene} />
       </group>
 
       {/* 2. HITBOXES E HIGHLIGHTS DE ORÇAMENTO */}
