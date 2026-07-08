@@ -5,6 +5,7 @@ import * as THREE from 'three';
 
 interface ToothDetailLoaderProps {
   toothNumber: number;
+  variant: 'anatomic' | 'endodontic';
 }
 
 // Fallback caso o usuário não tenha feito o download do dente individual ainda
@@ -42,9 +43,13 @@ class SingleToothErrorBoundary extends Component<{ children: React.ReactNode, to
   }
 }
 
-function DetailedToothGLB({ toothNumber }: { toothNumber: number }) {
-  // Tenta carregar o dente individual. Ex: /models/dente_22.glb
-  const { scene } = useGLTF(`/models/dente_${toothNumber}.glb`) as any;
+function DetailedToothGLB({ toothNumber, variant }: { toothNumber: number, variant: 'anatomic' | 'endodontic' }) {
+  // Carrega a versão baseada na variante escolhida
+  const filename = variant === 'endodontic' 
+    ? `/models/dente_${toothNumber}_endodontic.glb` 
+    : `/models/dente_${toothNumber}_anatomic.glb`;
+    
+  const { scene } = useGLTF(filename) as any;
 
   // Centraliza o dente no pivot (útil se o modelo veio com a origem fora do centro)
   React.useLayoutEffect(() => {
@@ -55,16 +60,17 @@ function DetailedToothGLB({ toothNumber }: { toothNumber: number }) {
       scene.position.y = -center.y;
       scene.position.z = -center.z;
     }
-  }, [scene]);
+  }, [scene, variant]);
 
   return (
     <primitive object={scene} scale={[2, 2, 2]} />
   );
 }
 
-export function ToothDetailLoader({ toothNumber }: ToothDetailLoaderProps) {
+export function ToothDetailLoader({ toothNumber, variant }: ToothDetailLoaderProps) {
+  // Chave baseada na variante para forçar o re-render e re-capturar erros de arquivos inexistentes
   return (
-    <group>
+    <group key={variant}>
       <ambientLight intensity={0.6} />
       <directionalLight position={[10, 10, 10]} intensity={1.5} castShadow />
       <directionalLight position={[-10, 5, -10]} intensity={0.8} />
@@ -72,7 +78,7 @@ export function ToothDetailLoader({ toothNumber }: ToothDetailLoaderProps) {
 
       <Suspense fallback={null}>
         <SingleToothErrorBoundary toothNumber={toothNumber}>
-          <DetailedToothGLB toothNumber={toothNumber} />
+          <DetailedToothGLB toothNumber={toothNumber} variant={variant} />
         </SingleToothErrorBoundary>
       </Suspense>
     </group>
