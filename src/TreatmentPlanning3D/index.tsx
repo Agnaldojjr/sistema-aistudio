@@ -153,13 +153,7 @@ function TreatmentPlanning3DContent() {
         </div>
       </div>
 
-      {/* Gaveta Lateral Deslizante (Drawer) */}
-      {viewerState.activeTooth !== null && (
-        <div
-          onClick={() => selectTooth(null)}
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-300"
-        />
-      )}
+      {/* A Gaveta Lateral Deslizante (Drawer) continua abrindo sem bloquear a tela toda */}
 
       <div
         className={`fixed top-[60px] right-0 bottom-0 z-50 w-85 bg-slate-950 border-l border-slate-800 p-5 shadow-2xl transition-transform duration-300 ease-out transform ${
