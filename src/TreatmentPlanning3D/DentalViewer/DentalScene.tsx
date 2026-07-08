@@ -176,11 +176,11 @@ function CalibrationPanel({
         <div>
           <label className="flex justify-between mb-1">
             <span>Largura (a):</span>
-            <span className="font-mono">{config.a.toFixed(2)}</span>
+            <span className="font-mono">{config.a.toFixed(1)}</span>
           </label>
           <input 
             onPointerDown={(e) => e.stopPropagation()} 
-            type="range" min="2.0" max="8.0" step="0.05" value={config.a}
+            type="range" min="0" max="50" step="0.1" value={config.a}
             onChange={(e) => setConfig({ ...config, a: parseFloat(e.target.value) })}
             className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
           />
@@ -188,11 +188,11 @@ function CalibrationPanel({
         <div>
           <label className="flex justify-between mb-1">
             <span>Profundidade (b):</span>
-            <span className="font-mono">{config.b.toFixed(2)}</span>
+            <span className="font-mono">{config.b.toFixed(1)}</span>
           </label>
           <input 
             onPointerDown={(e) => e.stopPropagation()} 
-            type="range" min="2.0" max="8.0" step="0.05" value={config.b}
+            type="range" min="0" max="50" step="0.1" value={config.b}
             onChange={(e) => setConfig({ ...config, b: parseFloat(e.target.value) })}
             className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
           />
@@ -200,11 +200,11 @@ function CalibrationPanel({
         <div>
           <label className="flex justify-between mb-1">
             <span>Deslocamento Z:</span>
-            <span className="font-mono">{config.zOffset.toFixed(2)}</span>
+            <span className="font-mono">{config.zOffset.toFixed(1)}</span>
           </label>
           <input 
             onPointerDown={(e) => e.stopPropagation()} 
-            type="range" min="-4.0" max="4.0" step="0.05" value={config.zOffset}
+            type="range" min="-50" max="50" step="0.1" value={config.zOffset}
             onChange={(e) => setConfig({ ...config, zOffset: parseFloat(e.target.value) })}
             className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
           />
@@ -212,11 +212,11 @@ function CalibrationPanel({
         <div>
           <label className="flex justify-between mb-1">
             <span>Escala Hitbox:</span>
-            <span className="font-mono">{config.hitboxScale.toFixed(2)}</span>
+            <span className="font-mono">{config.hitboxScale.toFixed(1)}</span>
           </label>
           <input 
             onPointerDown={(e) => e.stopPropagation()} 
-            type="range" min="0.2" max="2.0" step="0.02" value={config.hitboxScale}
+            type="range" min="0" max="50" step="0.1" value={config.hitboxScale}
             onChange={(e) => setConfig({ ...config, hitboxScale: parseFloat(e.target.value) })}
             className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
           />
