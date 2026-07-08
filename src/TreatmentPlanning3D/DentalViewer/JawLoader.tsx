@@ -71,8 +71,10 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
             #include <clipping_planes_fragment>
             for(int i = 0; i < 32; i++) {
               if(i >= uMissingCount) break;
-              // Radius 0.4 world units covers exactly one tooth
-              if(distance(vWorldPos, uMissingCenters[i]) < 0.4) {
+              // Cria uma borracha oval (mais alta no eixo Y) para apagar o dente inteiro
+              vec3 diff = vWorldPos - uMissingCenters[i];
+              diff.y *= 0.5; // Faz o buraco ser 2x mais alto (raio Y = 2.0)
+              if(length(diff) < 1.2) { // Raio X e Z = 1.2
                 discard;
               }
             }
