@@ -169,9 +169,9 @@ export default function CalendarView({ onNewPatient, initialPatientName, onClear
         <iframe 
           key={iframeKey}
           src={`https://calendar.google.com/calendar/embed?src=dragnaldof%40gmail.com&ctz=America%2FSao_Paulo${isMobile ? '&mode=AGENDA' : ''}`} 
-          style={{ border: 0, width: '100%', height: '100%', minHeight: isMobile ? '500px' : '800px' }} 
+          style={{ border: 0, width: '100%', height: '100%', minHeight: isMobile ? '600px' : '800px' }} 
           frameBorder="0" 
-          scrolling="no"
+          scrolling="yes"
           className="flex-1 rounded-xl"
         ></iframe>
       </div>

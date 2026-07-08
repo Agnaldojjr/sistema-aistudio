@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { usePlanning3D } from '../hooks/usePlanning3D';
 import { SignatureCanvas } from './SignatureCanvas';
-import { DentalCanvas3D } from './DentalCanvas3D';
+import { DentalScene } from '../DentalViewer/DentalScene';
 import { usePatientContext } from '../../context/PatientContext';
 import { Monitor, Smartphone, ShieldCheck, CheckCircle2, ChevronRight, X, Heart } from 'lucide-react';
 
@@ -88,7 +88,7 @@ export function PresentationPanel3D() {
           </div>
 
           <div className="flex-1 flex flex-col">
-            <DentalCanvas3D />
+            <DentalScene />
           </div>
 
           {/* Legenda de Cores para o Paciente */}

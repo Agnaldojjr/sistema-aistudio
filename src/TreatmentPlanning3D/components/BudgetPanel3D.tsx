@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePlanning3D } from '../hooks/usePlanning3D';
-import { BudgetEngine } from '../services/budgetEngine';
+import { calculateBudget } from '../services/budgetEngine';
 import { usePatientContext } from '../../context/PatientContext';
 import { jsPDF } from 'jspdf';
 import { Coins, FileText, CheckCircle, Percent, DollarSign, Calendar, Printer } from 'lucide-react';
@@ -17,7 +17,7 @@ export function BudgetPanel3D() {
 
   const prices = procedures.map((p) => p.price);
   
-  const budget = BudgetEngine.calculate(
+  const budget = calculateBudget(
     prices,
     discountType,
     discountValue,
