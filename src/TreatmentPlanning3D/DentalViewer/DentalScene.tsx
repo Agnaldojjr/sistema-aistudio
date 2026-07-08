@@ -13,8 +13,20 @@ const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27,
 const LOWER_TEETH = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 const ALL_TEETH = [...UPPER_TEETH, ...LOWER_TEETH];
 
+// Configuração da arcada dentária geométrica (pode ser ajustada no painel de calibração)
+export const DEFAULT_ARCH_CONFIG = {
+  a: 4.5,
+  b: 4.0,
+  zOffset: -1.5,
+  yOffset: 1.0,
+  maxAngleDivider: 2.3,
+  hitboxScale: 0.8,
+};
+
+export type ArchConfig = typeof DEFAULT_ARCH_CONFIG;
+
 // Função auxiliar para calcular posições na arcada dentária (arco elíptico)
-function getToothPosition(fdiCode: number): { position: [number, number, number]; rotation: [number, number, number] } {
+export function getToothPosition(fdiCode: number, config: ArchConfig = DEFAULT_ARCH_CONFIG): { position: [number, number, number]; rotation: [number, number, number] } {
   const isUpper = fdiCode < 30; // Quadrantes 10 e 20 são superiores
   const quadrant = Math.floor(fdiCode / 10);
   const positionIndex = fdiCode % 10; // 1 (incisivo) a 8 (terceiro molar)
@@ -26,15 +38,15 @@ function getToothPosition(fdiCode: number): { position: [number, number, number]
     index = -positionIndex;
   }
 
-  const maxAngle = Math.PI / 2.3;
+  const maxAngle = Math.PI / config.maxAngleDivider;
   const angle = (index / 8) * maxAngle;
 
-  const a = 4.5; // Largura do arco
-  const b = 4.0; // Comprimento/profundidade do arco
+  const a = config.a; // Largura do arco
+  const b = config.b; // Comprimento/profundidade do arco
 
   const x = a * Math.sin(angle);
-  const z = b * Math.cos(angle) - 1.5; // Deslocamento para centralizar a rotação
-  const y = isUpper ? 1.0 : -1.0; // Distância vertical entre arcada superior e inferior
+  const z = b * Math.cos(angle) + config.zOffset; // Deslocamento para centralizar a rotação
+  const y = isUpper ? config.yOffset : -config.yOffset; // Distância vertical entre arcada superior e inferior
 
   const rotY = angle;
   const rotX = isUpper ? 0 : Math.PI; // Dentes inferiores ficam invertidos verticalmente
@@ -115,6 +127,88 @@ class SceneErrorBoundary extends Component<{ children: React.ReactNode }, { hasE
 
 import { ToothActionMenu } from '../components/ToothActionMenu';
 
+function CalibrationPanel({ 
+  config, 
+  setConfig, 
+  isCalibrating, 
+  setIsCalibrating 
+}: { 
+  config: ArchConfig; 
+  setConfig: (c: ArchConfig) => void; 
+  isCalibrating: boolean; 
+  setIsCalibrating: (c: boolean) => void; 
+}) {
+  if (!isCalibrating) return (
+    <button 
+      onClick={() => setIsCalibrating(true)} 
+      className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-red-600/80 hover:bg-red-600 text-white px-3 py-1.5 text-xs font-bold rounded-lg z-50 backdrop-blur"
+    >
+      🛠️ Calibrar Hitboxes
+    </button>
+  );
+
+  return (
+    <div className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-slate-900/90 border border-slate-700 rounded-xl p-4 w-72 z-50 shadow-2xl backdrop-blur-sm text-white">
+      <div className="flex justify-between items-center mb-3">
+        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wide">Calibração da Arcada</h4>
+        <button onClick={() => setIsCalibrating(false)} className="text-slate-400 hover:text-white text-xs">Fechar</button>
+      </div>
+      <div className="space-y-3 text-xs">
+        <div>
+          <label className="flex justify-between mb-1">
+            <span>Largura (a):</span>
+            <span className="font-mono">{config.a.toFixed(2)}</span>
+          </label>
+          <input 
+            type="range" min="3.0" max="6.0" step="0.05" value={config.a}
+            onChange={(e) => setConfig({ ...config, a: parseFloat(e.target.value) })}
+            className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+          />
+        </div>
+        <div>
+          <label className="flex justify-between mb-1">
+            <span>Profundidade (b):</span>
+            <span className="font-mono">{config.b.toFixed(2)}</span>
+          </label>
+          <input 
+            type="range" min="3.0" max="6.0" step="0.05" value={config.b}
+            onChange={(e) => setConfig({ ...config, b: parseFloat(e.target.value) })}
+            className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+          />
+        </div>
+        <div>
+          <label className="flex justify-between mb-1">
+            <span>Deslocamento Z:</span>
+            <span className="font-mono">{config.zOffset.toFixed(2)}</span>
+          </label>
+          <input 
+            type="range" min="-3.0" max="1.0" step="0.05" value={config.zOffset}
+            onChange={(e) => setConfig({ ...config, zOffset: parseFloat(e.target.value) })}
+            className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+          />
+        </div>
+        <div>
+          <label className="flex justify-between mb-1">
+            <span>Escala Hitbox:</span>
+            <span className="font-mono">{config.hitboxScale.toFixed(2)}</span>
+          </label>
+          <input 
+            type="range" min="0.5" max="1.5" step="0.02" value={config.hitboxScale}
+            onChange={(e) => setConfig({ ...config, hitboxScale: parseFloat(e.target.value) })}
+            className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+          />
+        </div>
+        <button 
+          onClick={() => console.log('CONFIG ATUAL:', JSON.stringify(config))} 
+          className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-1.5 rounded-lg border border-slate-700 transition-colors"
+        >
+          Print no Console
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface DentalSceneProps {
   isPresentationMode?: boolean;
 }
@@ -122,6 +216,8 @@ interface DentalSceneProps {
 export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
   const { viewerState, selectTooth, setViewingAnatomy } = usePlanning3D();
   const [variant, setVariant] = useState<'anatomic' | 'endodontic'>('anatomic');
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [archConfig, setArchConfig] = useState<ArchConfig>(DEFAULT_ARCH_CONFIG);
 
   const isDetailedView = viewerState.activeTooth !== null && viewerState.viewingAnatomy;
   const showActionMenu = viewerState.activeTooth !== null && !viewerState.viewingAnatomy;
@@ -131,6 +227,9 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
     setVariant('anatomic'); 
   };
 
+  // getToothPosition adaptada para usar o config dinâmico
+  const getDynamicToothPosition = (fdiCode: number) => getToothPosition(fdiCode, archConfig);
+
   return (
     <div className="flex flex-col lg:flex-row gap-6 w-full min-h-[550px] relative">
       {/* 3D Canvas Container */}
@@ -138,6 +237,14 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
         
         {/* Modal de Ações sobre a Arcada */}
         {showActionMenu && <ToothActionMenu />}
+
+        {/* Painel de Calibração */}
+        <CalibrationPanel 
+          config={archConfig} 
+          setConfig={setArchConfig} 
+          isCalibrating={isCalibrating} 
+          setIsCalibrating={setIsCalibrating} 
+        />
 
         {/* Controles do Modo Detalhado (Dente Individual) */}
         {isDetailedView && (
@@ -204,7 +311,11 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
               {isDetailedView ? (
                 <ToothDetailLoader toothNumber={viewerState.activeTooth!} variant={variant} />
               ) : (
-                <JawLoader getToothPosition={getToothPosition} />
+                <JawLoader 
+                  getToothPosition={getDynamicToothPosition} 
+                  isCalibrating={isCalibrating} 
+                  archConfig={archConfig} 
+                />
               )}
             </SceneErrorBoundary>
           </Suspense>

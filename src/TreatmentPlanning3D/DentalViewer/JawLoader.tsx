@@ -17,14 +17,18 @@ try {
 
 interface JawLoaderProps {
   getToothPosition: (fdiCode: number) => { position: [number, number, number]; rotation: [number, number, number] };
+  isCalibrating?: boolean;
+  archConfig?: any;
 }
 
 // Geometria procedural leve para o highlight e hitbox
 const hitBoxGeo = new THREE.SphereGeometry(0.35, 16, 16);
 
-export function JawLoader({ getToothPosition }: JawLoaderProps) {
+export function JawLoader({ getToothPosition, isCalibrating = false, archConfig }: JawLoaderProps) {
   const { scene } = useGLTF('/models/human_mouth_detailed.glb') as any;
-  const { procedures, selectTooth, viewerState, teeth } = usePlanning3D();
+  const { procedures, selectTooth, viewerState } = usePlanning3D();
+  
+  const groupRef = React.useRef<THREE.Group>(null);
 
   // O modelo do Sketchfab está em metros (~0.1 de largura), precisamos escalar para ~85 para bater com as hitboxes de 9 unidades
   const modelScale = 85.0; 
@@ -40,10 +44,8 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
     return clone;
   }, [scene]);
 
-
-
   return (
-    <group position={[0, -0.2, 0]}>
+    <group ref={groupRef} position={[0, -0.2, 0]}>
       
       {/* 1. MODELO REALISTA (FUNDO COM RAYCAST DENTÁRIO) */}
       <group scale={[modelScale, modelScale, modelScale]} position={[0, 0, 1.5]}>
@@ -52,52 +54,31 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
           onClick={(e: any) => {
             e.stopPropagation();
             
-            // Descobre o ponto clicado no espaço local do modelo
-            const point = e.point;
+            if (!groupRef.current) return;
             
-            // Calcula o centro e limites do modelo (pode ser cacheado, mas faremos aqui para simplificar)
-            const box = new THREE.Box3().setFromObject(clonedScene);
-            const center = box.getCenter(new THREE.Vector3());
+            // Converte o ponto clicado (world space) para o espaço local do grupo principal (onde escala é 1.0)
+            groupRef.current.updateMatrixWorld(true);
+            const localPoint = groupRef.current.worldToLocal(e.point.clone());
             
-            // Upper ou Lower (Y)
-            const isUpper = point.y > center.y;
+            // Encontra o dente mais próximo usando as posições matemáticas calculadas
+            let closestTooth = 11;
+            let minDistance = Infinity;
             
-            // Calcula o ângulo a partir do centro (no plano XZ)
-            const dx = point.x - center.x;
-            const dz = point.z - center.z;
-            const angle = Math.atan2(dx, dz);
+            ALL_TEETH.forEach((toothNum) => {
+              const { position } = getToothPosition(toothNum);
+              const dx = localPoint.x - position[0];
+              const dy = localPoint.y - position[1];
+              const dz = localPoint.z - position[2];
+              const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+              
+              if (distance < minDistance) {
+                minDistance = distance;
+                closestTooth = toothNum;
+              }
+            });
             
-            // Converte ângulo para graus
-            let deg = (angle * 180) / Math.PI;
-            
-            // Ajusta o mapeamento de dentes baseado na geometria real do arco
-            const absDeg = Math.abs(deg);
-            
-            // 0 = centro da frente. 90 = fundo.
-            let toothIndex = 1;
-            if (absDeg < 15) toothIndex = 1;      // Incisivo Central
-            else if (absDeg < 30) toothIndex = 2; // Incisivo Lateral
-            else if (absDeg < 45) toothIndex = 3; // Canino
-            else if (absDeg < 65) toothIndex = 4; // 1º Pré-molar
-            else if (absDeg < 85) toothIndex = 5; // 2º Pré-molar
-            else if (absDeg < 110) toothIndex = 6; // 1º Molar
-            else if (absDeg < 135) toothIndex = 7; // 2º Molar
-            else toothIndex = 8;                  // 3º Molar (Siso)
-            
-            // Determina o quadrante (1 a 4)
-            // deg negativo é o lado direito do paciente (nossa esquerda na tela)
-            let quadrant;
-            if (isUpper) {
-              quadrant = deg < 0 ? 1 : 2;
-            } else {
-              quadrant = deg < 0 ? 4 : 3;
-            }
-            
-            const selectedTooth = (quadrant * 10) + toothIndex;
-            
-            // Pass the 2D coordinates of the click so the menu can float there
-            // Also pass the 3D e.point so the "Hide Tooth" shader can perfectly match the click coordinate
-            selectTooth(selectedTooth, { x: e.clientX, y: e.clientY }, e.point);
+            // Passa as coordenadas 2D do clique para o menu flutuar na tela
+            selectTooth(closestTooth, { x: e.clientX, y: e.clientY });
           }}
           onPointerOver={(e: any) => {
             e.stopPropagation();
@@ -108,6 +89,45 @@ export function JawLoader({ getToothPosition }: JawLoaderProps) {
           }}
         />
       </group>
+
+      {/* 2. HIGHLIGHTS E ESFERAS DE CALIBRAÇÃO (Apenas visíveis se selecionados, com orçamento ou em calibração) */}
+      {ALL_TEETH.map((toothNum) => {
+        const toothProcedures = procedures.filter(p => p.tooth_id === String(toothNum));
+        const hasBudget = toothProcedures.length > 0;
+        const isSelected = viewerState.activeTooth === toothNum;
+
+        if (!isSelected && !hasBudget && !isCalibrating) return null;
+
+        const { position } = getToothPosition(toothNum);
+        
+        let color = '#0ea5e9';
+        let emissive = '#0284c7';
+        let opacity = 0.5;
+
+        if (isCalibrating) {
+          color = '#ef4444'; // Vermelho para calibração
+          emissive = '#dc2626';
+          opacity = 0.6;
+        } else if (isSelected) {
+          color = '#3B82F6'; // Azul para selecionado
+          emissive = '#3B82F6';
+          opacity = 0.6;
+        }
+
+        return (
+          <mesh key={toothNum} position={position} geometry={hitBoxGeo}>
+            <meshStandardMaterial 
+              color={color} 
+              emissive={emissive} 
+              emissiveIntensity={0.5} 
+              transparent 
+              opacity={opacity} 
+              depthWrite={false}
+              depthTest={!isCalibrating} // Se calibrando, renderiza por cima para visualizarmos melhor
+            />
+          </mesh>
+        );
+      })}
     </group>
   );
 }
