@@ -12,10 +12,8 @@ const ALL_TEETH = [...UPPER_TEETH, ...LOWER_TEETH];
 // Pré-carrega o novo modelo rotulado
 try {
   useGLTF.preload('/models/boca_ortodoncia_labeled.glb');
-  useGLTF.preload('/models/boca_ortodoncia.glb');
-  useGLTF.preload('/models/_deprecated/human_mouth_detailed.glb');
 } catch (e) {
-  console.warn('Erro ao pré-carregar modelos:', e);
+  console.warn('Erro ao pré-carregar modelo:', e);
 }
 
 interface JawLoaderProps {
@@ -314,40 +312,11 @@ function JawModelRenderer({
   );
 }
 
-// Componente exportado principal com detecção inteligente de arquivo
+// Componente exportado principal que carrega o modelo segmentado rotulado diretamente
 export function JawLoader({ getToothPosition, onUpdateToothPosition, setControlsEnabled, onLoadPositions }: JawLoaderProps) {
-  const [modelPath, setModelPath] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    // Tenta carregar o modelo segmentado rotulado, caso contrário faz fallback para o modelo depreciado
-    fetch('/models/boca_ortodoncia_labeled.glb', { method: 'HEAD' })
-      .then((res) => {
-        if (res.ok) {
-          setModelPath('/models/boca_ortodoncia_labeled.glb');
-        } else {
-          fetch('/models/boca_ortodoncia.glb', { method: 'HEAD' })
-            .then((r) => {
-              if (r.ok) {
-                setModelPath('/models/boca_ortodoncia.glb');
-              } else {
-                setModelPath('/models/_deprecated/human_mouth_detailed.glb');
-              }
-            })
-            .catch(() => {
-              setModelPath('/models/_deprecated/human_mouth_detailed.glb');
-            });
-        }
-      })
-      .catch(() => {
-        setModelPath('/models/_deprecated/human_mouth_detailed.glb');
-      });
-  }, []);
-
-  if (!modelPath) return null;
-
   return (
     <JawModelRenderer
-      modelPath={modelPath}
+      modelPath="/models/boca_ortodoncia_labeled.glb"
       getToothPosition={getToothPosition}
       onUpdateToothPosition={onUpdateToothPosition}
       setControlsEnabled={setControlsEnabled}
