@@ -4,7 +4,6 @@ import { SignatureCanvas } from './SignatureCanvas';
 import { DentalScene } from '../DentalViewer/DentalScene';
 import { usePatientContext } from '../../context/PatientContext';
 import { Monitor, ShieldCheck, CheckCircle2, X, Eye, EyeOff } from 'lucide-react';
-import { WindowPortal } from '../../components/WindowPortal';
 
 // Helper inlined
 const getToothNumberForProcedure = (id: string) => {
@@ -13,30 +12,21 @@ const getToothNumberForProcedure = (id: string) => {
 };
 
 export function PresentationPanel3D() {
-  const { viewerState, teeth, procedures, getPlanTotal, setSimulationState, setPresentationMode, acceptPlan, activePlan } = usePlanning3D();
-  const { activeProposal, saveContextToSupabase } = usePatientContext();
+  const { viewerState, teeth, procedures, getPlanTotal, setSimulationState, setPresentationMode, acceptPlan, planStatus, signatureData } = usePlanning3D();
+  const { activeProposal } = usePatientContext();
 
   const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const [signatureData, setSignatureData] = useState<string | null>(null);
   const [showBudgetPanel, setShowBudgetPanel] = useState(false);
 
-  const handleSaveSignature = async (base64: string) => {
-    setSignatureData(base64);
-    acceptPlan();
-    // Salva o odontograma e o orçamento integrado diretamente no banco CRM global
-    try {
-      await saveContextToSupabase();
-    } catch (e) {
-      console.error('Falha ao salvar no CRM:', e);
-    }
+  const handleSaveSignature = (base64: string) => {
+    acceptPlan(base64);
     setShowSignatureModal(false);
   };
 
-  const isAccepted = activePlan?.status === 'ACCEPTED';
+  const isAccepted = planStatus === 'ACCEPTED';
 
   return (
-    <WindowPortal onClose={() => setPresentationMode(false)} title="Modo Paciente - Apresentação">
-      <div className="w-full h-full bg-slate-950 text-slate-200 flex flex-col p-6 animate-in slide-in-from-bottom-10 fade-in duration-500 overflow-hidden">
+    <div className="fixed inset-0 z-[120] bg-slate-950 text-slate-200 flex flex-col p-6 animate-in slide-in-from-bottom-10 fade-in duration-500 overflow-hidden">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between pb-6 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
@@ -58,7 +48,7 @@ export function PresentationPanel3D() {
               {showBudgetPanel ? 'Ocultar Orçamento' : 'Mostrar Orçamento'}
             </button>
             <button
-              onClick={() => setPresentationMode(false)}
+              onClick={() => window.close()}
               className="px-4 py-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-bold rounded-xl transition-all"
             >
               Sair da Apresentação
@@ -214,7 +204,6 @@ export function PresentationPanel3D() {
             </div>
           </div>
         )}
-      </div>
-    </WindowPortal>
+    </div>
   );
 }

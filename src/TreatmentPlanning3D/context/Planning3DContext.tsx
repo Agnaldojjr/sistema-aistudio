@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useMemo, useRef, useEffect } from 'react';
 import { TreatmentPlan, TreatmentTooth, TreatmentProcedure, Viewer3DState, ToothCondition, ToothSurface, LayerKey, LayerConfig } from '../types';
 import { usePatientContext } from '../../context/PatientContext';
 
@@ -20,19 +20,25 @@ interface Planning3DContextType {
   setLoading: (loading: boolean) => void;
   setPresentationMode: (mode: boolean) => void;
   setSimulationState: (state: 'BEFORE' | 'AFTER') => void;
-  acceptPlan: () => void;
+  acceptPlan: (signature?: string) => void;
   setLayerVisibility: (layerKey: LayerKey, visible: boolean) => void;
   setLayerOpacity: (layerKey: LayerKey, opacity: number) => void;
   toggleMissingTooth: (toothNumber: number) => void;
   setViewingAnatomy: (state: boolean) => void;
   onOpenProcedureManager?: () => void;
+  planStatus: 'DRAFT' | 'ACCEPTED';
+  signatureData: string | null;
+  setPlanStatus: (status: 'DRAFT' | 'ACCEPTED') => void;
+  setSignatureData: (sig: string | null) => void;
 }
 
 const Planning3DContext = createContext<Planning3DContextType | undefined>(undefined);
 
+const isPresentation = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'presentation';
+
 export function Planning3DProvider({ children, globalProcedures = [], onOpenProcedureManager }: { children: ReactNode, globalProcedures?: any[], onOpenProcedureManager?: () => void }) {
   // Integração unificada com o CRM
-  const { activeSections, setActiveSections, activeProposal, setActiveProposal, selectedPatient } = usePatientContext();
+  const { activeSections, setActiveSections, activeProposal, setActiveProposal, selectedPatient, saveContextToSupabase } = usePatientContext();
 
   const [viewerState, setViewerState] = useState<Viewer3DState>({
     activeTooth: null,
@@ -40,7 +46,7 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
     activeSurfaces: [],
     transparencyMode: false,
     loading: false,
-    presentationMode: false,
+    presentationMode: isPresentation,
     simulationState: 'BEFORE',
     missingTeeth: [],
     layers: {
@@ -298,7 +304,104 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
     setViewerState((prev) => ({ ...prev, simulationState: state }));
   };
 
-  const acceptPlan = () => {};
+  const [planStatus, setPlanStatus] = useState<'DRAFT' | 'ACCEPTED'>('DRAFT');
+  const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [pendingSave, setPendingSave] = useState(false);
+
+  const acceptPlan = (signature?: string) => {
+    setPlanStatus('ACCEPTED');
+    if (signature) {
+      setSignatureData(signature);
+    }
+    
+    if (isPresentation) {
+      const channel = new BroadcastChannel('planning_3d_channel');
+      channel.postMessage({
+        type: 'accept_plan_viewer',
+        payload: { signatureData: signature || null }
+      });
+      channel.close();
+    } else {
+      setActiveProposal(prev => ({
+        ...prev,
+        status: 'Aprovado (paciente pagou)'
+      }));
+      setPendingSave(true);
+    }
+  };
+
+  useEffect(() => {
+    if (pendingSave && activeProposal.status === 'Aprovado (paciente pagou)') {
+      setPendingSave(false);
+      saveContextToSupabase().catch(err => {
+        console.error("Erro ao salvar aceite do plano no Supabase:", err);
+      });
+    }
+  }, [pendingSave, activeProposal, saveContextToSupabase]);
+
+  // Sync state via BroadcastChannel
+  const latestViewerStateRef = useRef({ viewerState, planStatus, signatureData });
+  useEffect(() => {
+    latestViewerStateRef.current = { viewerState, planStatus, signatureData };
+  }, [viewerState, planStatus, signatureData]);
+
+  useEffect(() => {
+    const channel = new BroadcastChannel('planning_3d_channel');
+
+    if (!isPresentation) {
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'request_initial_viewer_state') {
+          const current = latestViewerStateRef.current;
+          channel.postMessage({
+            type: 'viewer_sync',
+            payload: {
+              viewerState: current.viewerState,
+              planStatus: current.planStatus,
+              signatureData: current.signatureData
+            }
+          });
+        } else if (event.data?.type === 'accept_plan_viewer') {
+          acceptPlan(event.data.payload?.signatureData);
+        }
+      };
+      channel.addEventListener('message', handleMessage);
+      return () => {
+        channel.removeEventListener('message', handleMessage);
+        channel.close();
+      };
+    } else {
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'viewer_sync' && event.data.payload) {
+          const { viewerState: syncViewerState, planStatus: syncPlanStatus, signatureData: syncSignatureData } = event.data.payload;
+          setViewerState({
+            ...syncViewerState,
+            presentationMode: true
+          });
+          setPlanStatus(syncPlanStatus);
+          setSignatureData(syncSignatureData);
+        }
+      };
+      channel.addEventListener('message', handleMessage);
+      channel.postMessage({ type: 'request_initial_viewer_state' });
+      return () => {
+        channel.removeEventListener('message', handleMessage);
+        channel.close();
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isPresentation) {
+      const channel = new BroadcastChannel('planning_3d_channel');
+      channel.postMessage({
+        type: 'viewer_sync',
+        payload: { viewerState, planStatus, signatureData }
+      });
+      return () => {
+        channel.close();
+      };
+    }
+  }, [viewerState, planStatus, signatureData]);
 
   const setLayerVisibility = (layerKey: LayerKey, visible: boolean) => {
     setViewerState((prev) => ({
@@ -346,6 +449,10 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
         setLayerVisibility,
         setLayerOpacity,
         onOpenProcedureManager,
+        planStatus,
+        signatureData,
+        setPlanStatus,
+        setSignatureData,
       }}
     >
       {children}

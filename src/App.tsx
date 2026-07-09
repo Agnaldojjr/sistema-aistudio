@@ -44,7 +44,7 @@ import { initAuth, googleSignIn, logout } from './firebase';
 import TreatmentPlanning3D from './TreatmentPlanning3D';
 
 import type { User } from '@supabase/supabase-js';
-import { usePatientContext } from './context/PatientContext';
+import { usePatientContext, PatientProvider } from './context/PatientContext';
 
 // ─── Logo SVG (AF Monogram matching the brand identity) ─────────────────────
 const AFLogoSVG = ({ className = '', light = false }: { className?: string; light?: boolean }) => (
@@ -322,6 +322,20 @@ function LoginScreen({ onLogin, isLoggingIn }: { onLogin: () => void; isLoggingI
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
+  const isPresentationWindow = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'presentation';
+
+  if (isPresentationWindow) {
+    const cachedProcedures = typeof window !== 'undefined' ? localStorage.getItem('agnaldo_dent_procedures') : null;
+    const initialProcedures = cachedProcedures ? JSON.parse(cachedProcedures) : [];
+    return (
+      <div className="w-screen h-screen overflow-hidden bg-slate-950 text-slate-200">
+        <PatientProvider>
+          <TreatmentPlanning3D procedures={initialProcedures} />
+        </PatientProvider>
+      </div>
+    );
+  }
+
   // --- AUTH STATE ---
   const [needsAuth, setNeedsAuth] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);

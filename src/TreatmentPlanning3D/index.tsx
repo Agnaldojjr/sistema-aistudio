@@ -224,7 +224,13 @@ function TreatmentPlanning3DContent() {
 
           {/* Acionador do Modo Apresentação */}
           <button
-            onClick={() => setPresentationMode(true)}
+            onClick={() => {
+              window.open(
+                window.location.pathname + '?view=presentation',
+                'patient_presentation',
+                'width=1200,height=800,menubar=no,status=no,toolbar=no'
+              );
+            }}
             className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg transition-all"
           >
             <Monitor className="w-4 h-4" />

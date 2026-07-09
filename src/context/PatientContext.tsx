@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
 import { CRMPatient, CRMAppointment, CRMClinicalHistory, CRMCommunication, PhotoSection, TreatmentProposal } from '../types';
 
@@ -73,6 +73,8 @@ const INITIAL_PROPOSAL: TreatmentProposal = {
   markerSize: 26,
 };
 
+const isPresentation = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'presentation';
+
 export function PatientProvider({ children }: { children: ReactNode }) {
   const [selectedPatient, setSelectedPatient] = useState<CRMPatient | null>(null);
   const [appointments, setAppointments] = useState<CRMAppointment[]>([]);
@@ -88,6 +90,65 @@ export function PatientProvider({ children }: { children: ReactNode }) {
   const [activeSections, setActiveSections] = useState<PhotoSection[]>(INITIAL_SECTIONS);
   const [activeProposal, setActiveProposal] = useState<TreatmentProposal>(INITIAL_PROPOSAL);
   const [isSavingToSupabase, setIsSavingToSupabase] = useState(false);
+
+  // Sync state via BroadcastChannel
+  const latestStateRef = useRef({ selectedPatient, activeSections, activeProposal });
+  useEffect(() => {
+    latestStateRef.current = { selectedPatient, activeSections, activeProposal };
+  }, [selectedPatient, activeSections, activeProposal]);
+
+  useEffect(() => {
+    const channel = new BroadcastChannel('patient_presentation_channel');
+
+    if (!isPresentation) {
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'request_initial_state') {
+          channel.postMessage({
+            type: 'state_sync',
+            payload: latestStateRef.current
+          });
+        } else if (event.data?.type === 'accept_plan') {
+          setActiveProposal(prev => ({
+            ...prev,
+            status: 'Aprovado (paciente pagou)'
+          }));
+        }
+      };
+      channel.addEventListener('message', handleMessage);
+      return () => {
+        channel.removeEventListener('message', handleMessage);
+        channel.close();
+      };
+    } else {
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'state_sync' && event.data.payload) {
+          const { selectedPatient: syncPatient, activeSections: syncSections, activeProposal: syncProposal } = event.data.payload;
+          setSelectedPatient(syncPatient);
+          setActiveSections(syncSections);
+          setActiveProposal(syncProposal);
+        }
+      };
+      channel.addEventListener('message', handleMessage);
+      channel.postMessage({ type: 'request_initial_state' });
+      return () => {
+        channel.removeEventListener('message', handleMessage);
+        channel.close();
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isPresentation) {
+      const channel = new BroadcastChannel('patient_presentation_channel');
+      channel.postMessage({
+        type: 'state_sync',
+        payload: { selectedPatient, activeSections, activeProposal }
+      });
+      return () => {
+        channel.close();
+      };
+    }
+  }, [selectedPatient, activeSections, activeProposal]);
 
   const refreshPatientSubModules = useCallback(async (patientId: string) => {
     if (!patientId) return;
@@ -126,6 +187,7 @@ export function PatientProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (isPresentation) return;
     if (selectedPatient) {
       refreshPatientSubModules(selectedPatient.id);
     } else {
@@ -145,10 +207,12 @@ export function PatientProvider({ children }: { children: ReactNode }) {
   }, [selectedPatient, refreshPatientSubModules]);
 
   useEffect(() => {
+    if (isPresentation) return;
     localStorage.setItem('agnaldo_dent_sections', JSON.stringify(activeSections));
   }, [activeSections]);
 
   useEffect(() => {
+    if (isPresentation) return;
     localStorage.setItem('agnaldo_dent_proposal', JSON.stringify(activeProposal));
   }, [activeProposal]);
 

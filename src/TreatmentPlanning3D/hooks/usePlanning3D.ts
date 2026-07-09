@@ -26,6 +26,8 @@ export function usePlanning3D() {
     setViewingAnatomy,
     toggleMissingTooth,
     onOpenProcedureManager,
+    planStatus,
+    signatureData,
   } = usePlanning3DContext();
 
   // Helper selectors
@@ -77,5 +79,7 @@ export function usePlanning3D() {
     getToothProcedures,
     getPlanTotal,
     onOpenProcedureManager,
+    planStatus,
+    signatureData,
   };
 }

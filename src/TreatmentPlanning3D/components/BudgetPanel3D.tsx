@@ -9,11 +9,26 @@ export function BudgetPanel3D() {
   const { procedures, teeth, getPlanTotal, removeProcedure, updateProcedure, addProcedure, globalProcedures } = usePlanning3D();
   const { activeProposal, selectedPatient } = usePatientContext();
 
-  const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD'>('PIX');
+  const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD' | 'CASH'>('PIX');
   const [discountType, setDiscountType] = useState<'PERCENT' | 'FIXED'>('PERCENT');
   const [discountValue, setDiscountValue] = useState<number>(5);
   const [installmentsCount, setInstallmentsCount] = useState<number>(1);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  // Helper para determinar limite de parcelas
+  const getMaxInstallments = (method: 'PIX' | 'CREDIT_CARD' | 'CASH') => {
+    if (method === 'CREDIT_CARD') return 12;
+    return 1;
+  };
+
+  // Handler para troca de meio de pagamento
+  const handlePaymentMethodChange = (method: 'PIX' | 'CREDIT_CARD' | 'CASH') => {
+    setPaymentMethod(method);
+    const max = getMaxInstallments(method);
+    if (installmentsCount > max || method === 'PIX' || method === 'CASH') {
+      setInstallmentsCount(max);
+    }
+  };
 
   // State para edição inline de procedimentos
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -30,7 +45,7 @@ export function BudgetPanel3D() {
     prices,
     discountType,
     discountValue,
-    paymentMethod === 'PIX' ? 1 : installmentsCount,
+    paymentMethod === 'CREDIT_CARD' ? installmentsCount : 1,
     paymentMethod
   );
 
@@ -187,7 +202,17 @@ export function BudgetPanel3D() {
       doc.setFont('Helvetica', 'normal');
       doc.setTextColor(50, 50, 50);
       doc.setFontSize(8.5);
-      doc.text(`Condição de Pagamento: ${paymentMethod === 'PIX' ? 'PIX (À Vista com Desconto)' : `${installmentsCount}x no Cartão`}`, 15, summaryY + 28);
+      
+      let paymentMethodLabel = '';
+      if (paymentMethod === 'PIX') {
+        paymentMethodLabel = 'PIX (À Vista)';
+      } else if (paymentMethod === 'CASH') {
+        paymentMethodLabel = 'Dinheiro/Espécie (À Vista)';
+      } else if (paymentMethod === 'CREDIT_CARD') {
+        paymentMethodLabel = `${installmentsCount}x no Cartão de Crédito`;
+      }
+      
+      doc.text(`Condição de Pagamento: ${paymentMethodLabel}`, 15, summaryY + 28);
       
       if (paymentMethod === 'CREDIT_CARD' && installmentsCount > 1) {
         doc.setFontSize(7.5);
@@ -364,19 +389,19 @@ export function BudgetPanel3D() {
         {/* Forma de Pagamento */}
         <div>
           <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1.5">Forma de Pagamento</label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
-              onClick={() => { setPaymentMethod('PIX'); setInstallmentsCount(1); }}
+              onClick={() => handlePaymentMethodChange('PIX')}
               className={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all ${
                 paymentMethod === 'PIX'
                   ? 'bg-sky-600 border-sky-500 text-white'
                   : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
               }`}
             >
-              PIX (5% desc.)
+              PIX
             </button>
             <button
-              onClick={() => setPaymentMethod('CREDIT_CARD')}
+              onClick={() => handlePaymentMethodChange('CREDIT_CARD')}
               className={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all ${
                 paymentMethod === 'CREDIT_CARD'
                   ? 'bg-sky-600 border-sky-500 text-white'
@@ -384,6 +409,16 @@ export function BudgetPanel3D() {
               }`}
             >
               Cartão de Crédito
+            </button>
+            <button
+              onClick={() => handlePaymentMethodChange('CASH')}
+              className={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                paymentMethod === 'CASH'
+                  ? 'bg-sky-600 border-sky-500 text-white'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              Dinheiro/Espécie
             </button>
           </div>
         </div>
@@ -419,7 +454,7 @@ export function BudgetPanel3D() {
               onChange={(e) => setInstallmentsCount(parseInt(e.target.value))}
               className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-sky-500"
             >
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+              {Array.from({ length: getMaxInstallments(paymentMethod) }, (_, i) => i + 1).map((n) => (
                 <option key={n} value={n}>{n}x sem juros</option>
               ))}
             </select>

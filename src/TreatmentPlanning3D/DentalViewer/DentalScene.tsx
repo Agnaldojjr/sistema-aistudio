@@ -1,13 +1,47 @@
 import React, { Suspense, Component, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
+import * as THREE from 'three';
 import { ToothMesh } from './ToothMesh';
 import { StructureMesh } from './StructureMesh';
 import { JawLoader } from './JawLoader';
 import { ToothDetailLoader } from './ToothDetailLoader';
 import { usePlanning3D } from '../hooks/usePlanning3D';
-import { ArrowLeft, Dna, Activity } from 'lucide-react';
+import { ArrowLeft, Dna, Activity, Settings, Eye } from 'lucide-react';
 import { motion } from 'motion/react';
+
+const presetViews: Record<string, { position: [number, number, number], target: [number, number, number] }> = {
+  frontal: { position: [0, 0, 10], target: [0, 0, 0] },
+  oclusalSup: { position: [0, -10, 1], target: [0, 0, 0] },
+  oclusalInf: { position: [0, 10, 1], target: [0, 0, 0] },
+  lateralDir: { position: [10, 0, 0], target: [0, 0, 0] },
+  lateralEsq: { position: [-10, 0, 0], target: [0, 0, 0] },
+};
+
+function CameraController({ targetView, onAnimationComplete }: { targetView: string | null, onAnimationComplete: () => void }) {
+  const { camera } = useThree();
+  const controls = useThree((state) => state.controls) as any;
+  const targetPos = React.useMemo(() => new THREE.Vector3(), []);
+  const targetLook = React.useMemo(() => new THREE.Vector3(), []);
+
+  useFrame((state, delta) => {
+    if (targetView && controls) {
+      targetPos.set(...presetViews[targetView].position);
+      targetLook.set(...presetViews[targetView].target);
+      
+      const dist = camera.position.distanceTo(targetPos);
+      if (dist < 0.1) {
+        onAnimationComplete();
+        return;
+      }
+      
+      camera.position.lerp(targetPos, 5 * delta);
+      controls.target.lerp(targetLook, 5 * delta);
+      controls.update();
+    }
+  });
+  return null;
+}
 
 // Lista de dentes permanentes por quadrantes
 const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -136,6 +170,10 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
 
   // Controla se a rotação geral do cenário está ativa ou pausada
   const [controlsEnabled, setControlsEnabled] = useState(true);
+  
+  // Estado para o controle de câmera animada
+  const [activeView, setActiveView] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const isDetailedView = viewerState.activeTooth !== null && viewerState.viewingAnatomy;
   const showActionMenu = viewerState.activeTooth !== null && !viewerState.viewingAnatomy;
@@ -211,8 +249,51 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
           </>
         )}
 
+        {/* Menu de Visualização 3D */}
+        {!isDetailedView && (
+          <div className="absolute top-4 right-4 z-20">
+            <div className="relative">
+              <button 
+                onClick={() => setMenuOpen(!menuOpen)}
+                className={`p-2 rounded-lg backdrop-blur-sm border shadow-lg transition-all flex items-center gap-2 ${
+                  menuOpen 
+                    ? 'bg-sky-600/90 border-sky-500 text-white' 
+                    : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+                title="Modos de Visualização"
+              >
+                <Settings size={18} />
+              </button>
+              
+              {menuOpen && (
+                <div className="absolute top-12 right-0 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-2 w-48 z-30">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase px-3 py-2 border-b border-slate-800 mb-2">
+                    Vistas Rápidas
+                  </div>
+                  {[
+                    { id: 'frontal', label: 'Frontal' },
+                    { id: 'oclusalSup', label: 'Oclusal Superior' },
+                    { id: 'oclusalInf', label: 'Oclusal Inferior' },
+                    { id: 'lateralDir', label: 'Lateral Direita' },
+                    { id: 'lateralEsq', label: 'Lateral Esquerda' },
+                  ].map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => { setActiveView(v.id); setMenuOpen(false); }}
+                      className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-sky-600/20 hover:border-sky-500/50 rounded-lg transition-colors border border-transparent flex items-center gap-2"
+                    >
+                      <Eye size={14} className="text-sky-400" />
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="absolute bottom-4 left-4 z-10 bg-slate-900/80 backdrop-blur border border-slate-800 text-slate-400 text-[10px] px-3 py-1.5 rounded-lg pointer-events-none">
-          Clique no dente para selecionar • Arraste bolinhas para mover • Dois cliques para ocultar bolinha
+          Gire livremente (360º) • Clique no dente para detalhes • Dois cliques para ocultar
         </div>
 
         <Canvas
@@ -263,15 +344,18 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
             </SceneErrorBoundary>
           </Suspense>
 
+          <CameraController targetView={activeView} onAnimationComplete={() => setActiveView(null)} />
+
           <OrbitControls
-            enabled={controlsEnabled}
+            makeDefault
+            enabled={controlsEnabled && !activeView}
             enableDamping
             dampingFactor={0.05}
-            maxPolarAngle={isDetailedView ? Math.PI : Math.PI / 1.6}
-            minPolarAngle={isDetailedView ? 0 : Math.PI / 4}
+            maxPolarAngle={Math.PI}
+            minPolarAngle={0}
             minDistance={isDetailedView ? 1 : 4}
             maxDistance={isDetailedView ? 20 : 30}
-            enablePan={true}
+            enablePan={false}
           />
         </Canvas>
       </div>

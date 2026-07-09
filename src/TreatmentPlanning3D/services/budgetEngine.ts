@@ -24,7 +24,7 @@ export function calculateBudget(
   discountType: 'PERCENT' | 'FIXED',
   discountValue: number,
   installmentsCount: number,
-  paymentMethod: 'PIX' | 'CREDIT_CARD'
+  paymentMethod: 'PIX' | 'CREDIT_CARD' | 'CASH'
 ): BudgetCalculationResult {
   const rawSubtotal = itemPrices.reduce((sum, p) => sum + p, 0);
   const subtotal = roundToCents(rawSubtotal);
@@ -37,13 +37,7 @@ export function calculateBudget(
     discountAmount = Math.min(discountValue, subtotal);
   }
 
-  // Se for Pix, aplica um desconto adicional automático de 5% sobre o valor pós-desconto
-  let total = roundToCents(subtotal - discountAmount);
-  if (paymentMethod === 'PIX') {
-    const pixDiscount = roundToCents(total * 0.05);
-    discountAmount = roundToCents(discountAmount + pixDiscount);
-    total = roundToCents(subtotal - discountAmount);
-  }
+  const total = roundToCents(subtotal - discountAmount);
 
   // Simulação das parcelas
   const installmentsList = [];

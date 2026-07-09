@@ -21,6 +21,19 @@ interface JawLoaderProps {
   onLoadPositions?: (positions: Record<number, [number, number, number]>) => void;
 }
 
+// Corrige os números dos dentes que vieram invertidos no modelo 3D
+function fixFdiNumber(originalFdi: number): number {
+  const quadrant = Math.floor(originalFdi / 10);
+  const tooth = originalFdi % 10;
+  
+  if (quadrant === 1) return 40 + tooth;
+  if (quadrant === 2) return 30 + tooth;
+  if (quadrant === 3) return 20 + tooth;
+  if (quadrant === 4) return 10 + tooth;
+  
+  return originalFdi;
+}
+
 // Renderizador interno do modelo
 function JawModelRenderer({
   modelPath,
@@ -60,7 +73,8 @@ function JawModelRenderer({
     
     clonedScene.traverse((child: any) => {
       if (child.isMesh && /^\d{2}$/.test(child.name)) {
-        const fdi = parseInt(child.name);
+        const rawFdi = parseInt(child.name);
+        const fdi = fixFdiNumber(rawFdi);
         child.geometry.computeBoundingBox();
         const bbox = child.geometry.boundingBox;
         if (bbox) {
@@ -87,7 +101,8 @@ function JawModelRenderer({
   React.useEffect(() => {
     clonedScene.traverse((child: any) => {
       if (child.isMesh && /^\d{2}$/.test(child.name)) {
-        const fdi = parseInt(child.name);
+        const rawFdi = parseInt(child.name);
+        const fdi = fixFdiNumber(rawFdi);
         const isSelected = viewerState.activeTooth === fdi;
         const isMissing = viewerState.missingTeeth?.includes(fdi);
         
@@ -111,7 +126,7 @@ function JawModelRenderer({
   return (
     <group ref={groupRef} position={[0, -0.2, 0]}>
       {/* 1. MODELO REALISTA COM SELEÇÃO DIRECTA POR CLIQUE */}
-      <group scale={[modelScale, modelScale, modelScale]} position={[0, -1.0, 0]}>
+      <group scale={[modelScale, modelScale, modelScale]} position={[0, -1.0, 0]} rotation={[Math.PI, Math.PI, 0]}>
         <primitive 
           object={clonedScene} 
           onClick={(e: any) => {
@@ -122,7 +137,8 @@ function JawModelRenderer({
             let clickedFdi: number | null = null;
             while (current) {
               if (current.name && /^\d{2}$/.test(current.name)) {
-                clickedFdi = parseInt(current.name);
+                const rawFdi = parseInt(current.name);
+                clickedFdi = fixFdiNumber(rawFdi);
                 break;
               }
               current = current.parent;
