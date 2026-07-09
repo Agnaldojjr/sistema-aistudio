@@ -7,6 +7,8 @@ import React, { useRef, useState, useMemo } from 'react';
 import { FileDown, Printer, Receipt, Percent, CreditCard, ChevronRight, MessageSquareCode, X, ExternalLink, AlertCircle } from 'lucide-react';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from '../types';
 import PrintableLetterhead from './PrintableLetterhead';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface ProposalViewerProps {
   sections: PhotoSection[];
@@ -76,6 +78,62 @@ export default function ProposalViewer({
   // Custom discount if they override
   const finalTotalCard = Math.max(0, grossTotal - proposal.customDiscountAmount);
 
+  const threeDScreenshot = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('agnaldo_dent_3d_screenshot');
+  }, []);
+
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const exportProposalPdf = async () => {
+    const element = document.getElementById('printable-document-root');
+    if (!element) return;
+    
+    setExportingPdf(true);
+    try {
+      // Small delay to ensure any rendering/layouts settle
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      
+      const canvas = await html2canvas(element, {
+        scale: 2, // High resolution
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#FAF8F5'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+      
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 295; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      pdf.save(`Orcamento_${proposal.patientName || 'Paciente'}.pdf`);
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar PDF. Utilizando o assistente de impressão do sistema como fallback.');
+      handlePrint();
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   const handlePrint = () => {
     if (isInsideIframe) {
       setShowIframePrintHelp(true);
@@ -109,11 +167,12 @@ export default function ProposalViewer({
         <button
           id="btn-export-plan-top"
           type="button"
-          onClick={handlePrint}
-          className="flex items-center justify-center gap-2.5 bg-[#C09553] hover:bg-[#A97E3B] text-[#FAF8F5] font-bold text-sm px-6 py-3 rounded-xl transition-all duration-200 shadow-lg cursor-pointer select-none group flex-shrink-0 active:scale-[0.98]"
+          onClick={exportProposalPdf}
+          disabled={exportingPdf}
+          className="flex items-center justify-center gap-2.5 bg-[#C09553] hover:bg-[#A97E3B] text-[#FAF8F5] font-bold text-sm px-6 py-3 rounded-xl transition-all duration-200 shadow-lg cursor-pointer select-none group flex-shrink-0 active:scale-[0.98] disabled:opacity-50"
         >
           <FileDown className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
-          <span>Exportar Plano em PDF</span>
+          <span>{exportingPdf ? 'Exportando...' : 'Exportar Plano em PDF'}</span>
         </button>
       </div>
 
@@ -214,11 +273,12 @@ export default function ProposalViewer({
           <button
             id="btn-print-prop"
             type="button"
-            onClick={handlePrint}
-            className="flex items-center gap-2 bg-[#4E1119] hover:bg-[#6c1b26] text-[#FAF8F5] font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors shadow-md cursor-pointer select-none"
+            onClick={exportProposalPdf}
+            disabled={exportingPdf}
+            className="flex items-center gap-2 bg-[#4E1119] hover:bg-[#6c1b26] text-[#FAF8F5] font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors shadow-md cursor-pointer select-none disabled:opacity-50"
           >
             <Printer className="w-4 h-4" />
-            <span>Gerar PDF / Imprimir Orçamento</span>
+            <span>{exportingPdf ? 'Exportando...' : 'Gerar PDF / Imprimir Orçamento'}</span>
           </button>
         </div>
       </div>
@@ -244,6 +304,22 @@ export default function ProposalViewer({
               </p>
             )}
           </div>
+
+          {/* 3D Arcada Screenshot (if available) */}
+          {threeDScreenshot && (
+            <div className="mb-10 p-4 bg-white border border-[#E6DEC9] rounded-2xl shadow-sm max-w-xl mx-auto print:shadow-none">
+              <span className="text-[10px] font-bold text-[#B48C4D] uppercase tracking-wider block mb-2 font-sans text-center">
+                Mapa Anatômico Digital da Arcada (3D)
+              </span>
+              <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-950 border border-[#E6DEC9]">
+                <img
+                  src={threeDScreenshot}
+                  alt="Planejamento da Arcada Dentária 3D"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            </div>
+          )}
 
         {/* Empty layout prompt if no quadrants are active at all */}
         {activeSections.length === 0 && (

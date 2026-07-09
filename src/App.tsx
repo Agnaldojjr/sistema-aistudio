@@ -393,6 +393,22 @@ export default function App() {
     document.body.className = currentTheme === 'padrao' ? '' : `theme-${currentTheme}`;
   }, [currentTheme]);
 
+  useEffect(() => {
+    return () => {
+      if (currentAppView === '3d-planning') {
+        try {
+          const canvas = document.querySelector('canvas');
+          if (canvas) {
+            const imgData = canvas.toDataURL('image/png');
+            localStorage.setItem('agnaldo_dent_3d_screenshot', imgData);
+          }
+        } catch (e) {
+          console.error('Erro ao capturar screenshot da arcada 3D:', e);
+        }
+      }
+    };
+  }, [currentAppView]);
+
   // --- ACTIONS ---
   const handleLogin = async () => {
     setIsLoggingIn(true);

@@ -21,3 +21,7 @@ consolidate_bluedental.cjs
 # Local Netlify folder
 .netlify
 .vercel
+
+# Local development scratch folder and files
+scratch/
+test3d.cjs
