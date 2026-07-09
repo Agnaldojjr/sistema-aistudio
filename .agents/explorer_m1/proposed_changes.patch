@@ -1,0 +1,109 @@
+diff --git a/src/types.ts b/src/types.ts
+index abcdefg..hijklmn 100645
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -142,3 +142,6 @@ export interface TreatmentProposal {
+   showTotalBySection: boolean; // if we want to show totals for Upper/Lower/Smile separately
+   markerSize?: number; // customizable circle marker size in pixels
++  paymentMethod?: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito';
++  totalValue?: number;
++  selectedPlanIndex?: number;
+ }
+diff --git a/src/components/NegotiationTab.tsx b/src/components/NegotiationTab.tsx
+index 1234567..8901234 100645
+--- a/src/components/NegotiationTab.tsx
++++ b/src/components/NegotiationTab.tsx
+@@ -192,2 +192,15 @@ export default function NegotiationTab({
+   }, [salesVolume, cardBrand, installments, percentSim1, percentSim2, patientOfferInput, selectedPlanIndex, customNetDesired, showInPatientScreen, firstOptionMethod]);
+ 
++  // Sync calculations back to the proposal context state
++  useEffect(() => {
++    const computedTotal = chosenSim.custoTotal;
++    if (
++      proposal.totalValue !== computedTotal ||
++      proposal.selectedPlanIndex !== selectedPlanIndex
++    ) {
++      setProposal(prev => ({
++        ...prev,
++        totalValue: computedTotal,
++        selectedPlanIndex: selectedPlanIndex
++      }));
++    }
++  }, [chosenSim.custoTotal, selectedPlanIndex, setProposal, proposal.totalValue, proposal.selectedPlanIndex]);
++
+@@ -961,2 +974,18 @@ export default function NegotiationTab({
+             </div>
+ 
++            {/* Forma de Pagamento */}
++            <div className="space-y-1.5 border-b border-zinc-100 pb-4">
++              <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wide">
++                Forma de Pagamento
++              </label>
++              <select
++                value={proposal.paymentMethod || 'PIX'}
++                onChange={(e) => setProposal({ ...proposal, paymentMethod: e.target.value as any })}
++                className="w-full bg-[#FAF8F5] border border-[#D5CBB3] rounded-lg p-2.5 text-xs text-zinc-700 font-semibold focus:outline-none focus:border-[#8B0000]"
++              >
++                <option value="Dinheiro">Dinheiro</option>
++                <option value="PIX">PIX</option>
++                <option value="Cartão de Crédito">Cartão de Crédito</option>
++                <option value="Cartão de Débito">Cartão de Débito</option>
++              </select>
++            </div>
++
+diff --git a/src/context/PatientContext.tsx b/src/context/PatientContext.tsx
+index qwertyu..asdfghj 100645
+--- a/src/context/PatientContext.tsx
++++ b/src/context/PatientContext.tsx
+@@ -249,3 +249,24 @@ export function PatientProvider({ children }: { children: ReactNode }) {
+-      crmData.pagamentos = mergeLists(crmData.pagamentos, pagamentosList);
++      let updatedPagamentosList = [...pagamentosList];
++      if (activeProposal.status === 'Aprovado (paciente pagou)') {
++        const paymentValue = activeProposal.totalValue || 0;
++        const paymentMethod = activeProposal.paymentMethod || 'PIX';
++        const paymentDate = new Date().toISOString();
++        
++        const hasPayment = pagamentosList.some((p: any) => p.description === `Orçamento Aprovado (tr-${pId})`);
++        if (!hasPayment && paymentValue > 0) {
++          const newPayment = {
++            id: `pay-${pId}-${Date.now()}`,
++            patientId: pId,
++            date: paymentDate,
++            data_pagamento: paymentDate,
++            method: paymentMethod,
++            description: `Orçamento Aprovado (tr-${pId})`,
++            value: paymentValue
++          };
++          updatedPagamentosList.push(newPayment);
++          setPagamentosList(updatedPagamentosList);
++        }
++      }
++      crmData.pagamentos = mergeLists(crmData.pagamentos, updatedPagamentosList);
+diff --git a/src/App.tsx b/src/App.tsx
+index zxcvbnm..poiuytre 100645
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -44,2 +44,3 @@ import TreatmentPlanning3D from './TreatmentPlanning3D';
++import FinancialView from './components/FinancialView';
+ 
+@@ -70,3 +71,3 @@ import type { User } from '@supabase/supabase-js';
+-type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings' | '3d-planning';
++type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings' | '3d-planning' | 'financial';
+ 
+@@ -76,2 +77,3 @@ const NAV_ITEMS = [
+   { id: '3d-planning' as AppView, label: 'Arcada 3D', icon: Layers,        section: 'principal' },
++  { id: 'financial' as AppView, label: 'Financeiro', icon: Coins,          section: 'principal' },
+   { id: 'settings'  as AppView, label: 'Ajustes',   icon: Settings,        section: 'principal' },
+@@ -206,3 +208,4 @@ function TopBar({ currentView, proposal, onChangeView, onOpenMobileMenu, isMobil
+     '3d-planning': 'Planejamento 3D',
++    financial: 'Controle Financeiro',
+   };
+@@ -705,2 +708,8 @@ function Sidebar({
+         )}
++
++        {/* ── Financeiro ────────────────────────────────────────── */}
++        {currentAppView === 'financial' && (
++          <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 w-full animate-fade-in-up">
++            <FinancialView />
++          </main>
++        )}
