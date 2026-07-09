@@ -4585,6 +4585,17 @@ export default function DentalCRMView({
                                 <ExternalLink className="w-3.5 h-3.5" />
                                 Tela do Paciente
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (onNewProposal) onNewProposal(selectedPatient.name);
+                                }}
+                                className="px-3 py-1 bg-[#8B0000] text-[#FAF8F5] text-xs font-bold rounded-lg transition-colors border-2 border-[#8B0000] hover:bg-[#a32c3d] flex items-center gap-1.5 shadow-sm cursor-pointer select-none"
+                                title="Criar orçamento avulso sem fotos"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                Procedimento Avulso
+                              </button>
                             </div>
                             <span className="text-[10px] text-zinc-400">{activeSections.filter(s => s.image).length} de {activeSections.length} fotos carregadas</span>
                           </div>
