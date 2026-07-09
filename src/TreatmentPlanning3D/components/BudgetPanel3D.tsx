@@ -7,7 +7,7 @@ import { Coins, FileText, CheckCircle, Percent, DollarSign, Calendar, Printer } 
 
 export function BudgetPanel3D() {
   const { procedures, teeth, getPlanTotal } = usePlanning3D();
-  const { activeProposal } = usePatientContext();
+  const { activeProposal, selectedPatient } = usePatientContext();
 
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD'>('PIX');
   const [discountType, setDiscountType] = useState<'PERCENT' | 'FIXED'>('PERCENT');
@@ -57,7 +57,7 @@ export function BudgetPanel3D() {
 
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(9);
-      doc.text(`Paciente: ${activeProposal.patientName || 'Paciente de Teste'}`, 15, 49);
+      doc.text(`Paciente: ${selectedPatient?.name || activeProposal.patientName || 'Paciente de Teste'}`, 15, 49);
       doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 15, 54);
       doc.text(`Status do Plano: ${activeProposal.status || 'Em Planejamento'}`, 15, 59);
 
@@ -157,7 +157,7 @@ export function BudgetPanel3D() {
       doc.setTextColor(150, 150, 150);
       doc.text('Este documento é uma estimativa comercial sujeita a alterações conforme diagnóstico de exames complementares.', 15, 287);
 
-      doc.save(`Proposta_3D_${activeProposal.patientName || 'Paciente'}.pdf`);
+      doc.save(`Proposta_3D_${selectedPatient?.name || activeProposal.patientName || 'Paciente'}.pdf`);
     } catch (err) {
       console.error('[BudgetPanel3D:Pdf] Erro na exportação do PDF:', err);
       alert('Ocorreu um erro ao gerar o PDF. Verifique se o navegador suporta exportação.');

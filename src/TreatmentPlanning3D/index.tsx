@@ -6,11 +6,29 @@ import { BudgetPanel3D } from './components/BudgetPanel3D';
 import { PresentationPanel3D } from './components/PresentationPanel3D';
 import { AIAssistancePanel } from './components/AIAssistancePanel';
 import { usePlanning3D } from './hooks/usePlanning3D';
-import { Layers, FileText, Coins, CheckCircle, ChevronRight, Monitor } from 'lucide-react';
+import { usePatientContext } from '../context/PatientContext';
+import { Layers, FileText, Coins, CheckCircle, ChevronRight, Monitor, UserX } from 'lucide-react';
 
 function TreatmentPlanning3DContent() {
   const { viewerState, selectTooth, teeth, procedures, getPlanTotal, setPresentationMode } = usePlanning3D();
+  const { selectedPatient } = usePatientContext();
   const [activeTab, setActiveTab] = useState<'clinical' | 'financial' | 'ai'>('clinical');
+
+  if (!selectedPatient) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 bg-slate-950 text-white min-h-[calc(100vh-140px)] rounded-3xl border border-slate-800 text-center gap-4">
+        <div className="p-4 bg-slate-900 border border-slate-800 rounded-full text-slate-500">
+          <UserX size={40} />
+        </div>
+        <div className="max-w-md">
+          <h2 className="text-lg font-bold text-white mb-2">Nenhum Paciente Selecionado</h2>
+          <p className="text-sm text-slate-400">
+            Selecione um paciente no painel de pacientes do CRM para iniciar o planejamento clínico e financeiro 3D.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Filtra dentes que possuem alguma patologia/condição não saudável ou procedimentos
   const diagnosedTeeth = Object.values(teeth).filter(
@@ -88,6 +106,17 @@ function TreatmentPlanning3DContent() {
 
           {activeTab === 'clinical' && (
             <>
+               {/* Cabeçalho do Paciente Ativo */}
+              <div className="flex items-center gap-3 p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                <div className="w-8 h-8 rounded-full bg-sky-950 flex items-center justify-center text-xs font-bold text-sky-400 border border-sky-800">
+                  {selectedPatient.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-white leading-tight">{selectedPatient.name}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-none">CPF: {selectedPatient.cpf || 'Não informado'}</p>
+                </div>
+              </div>
+
               {/* Totalizador Financeiro */}
               <div className="flex items-center justify-between p-3.5 bg-slate-950 border border-slate-800 rounded-xl">
                 <div>
