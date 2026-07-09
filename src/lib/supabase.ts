@@ -44,12 +44,16 @@ export const supabase = !isDemoMode
         select: (columns: string) => ({
           eq: (column: string, value: any) => ({
             single: async () => {
-              // Retorna dados vazios simulando sucesso do banco
-              return { data: { crm_data: null }, error: null };
+              const cached = localStorage.getItem('supabase_mock_clinic_data');
+              const crm_data = cached ? JSON.parse(cached) : null;
+              return { data: { crm_data }, error: null };
             }
           })
         }),
         upsert: async (data: any, options: any) => {
+          if (data && data.crm_data) {
+            localStorage.setItem('supabase_mock_clinic_data', JSON.stringify(data.crm_data));
+          }
           return { error: null };
         }
       }),

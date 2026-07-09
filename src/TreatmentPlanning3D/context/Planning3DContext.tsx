@@ -15,6 +15,7 @@ interface Planning3DContextType {
   updateToothSurfaceCondition: (toothNumber: number, surface: ToothSurface, condition: ToothCondition) => void;
   addProcedure: (toothNumber: number, procedureId: string, price: number, name: string) => void;
   removeProcedure: (procedureInstanceId: string) => void;
+  updateProcedure: (instanceId: string, updates: { name?: string; price?: number }) => void;
   setTransparencyMode: (mode: boolean) => void;
   setLoading: (loading: boolean) => void;
   setPresentationMode: (mode: boolean) => void;
@@ -248,6 +249,25 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
     });
   };
 
+  const updateProcedure = (instanceId: string, updates: { name?: string; price?: number }) => {
+    setActiveSections(prev => {
+      return prev.map(sec => ({
+        ...sec,
+        markers: sec.markers.map(m => ({
+          ...m,
+          procedureInstances: (m.procedureInstances || []).map(inst => {
+            if (inst.id !== instanceId) return inst;
+            return {
+              ...inst,
+              ...(updates.name !== undefined && { name: updates.name }),
+              ...(updates.price !== undefined && { price: updates.price }),
+            };
+          })
+        }))
+      }));
+    });
+  };
+
   const setTransparencyMode = (mode: boolean) => {
     setViewerState((prev) => ({
       ...prev,
@@ -315,6 +335,7 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
         updateToothSurfaceCondition,
         addProcedure,
         removeProcedure,
+        updateProcedure,
         setTransparencyMode,
         setLoading,
         setPresentationMode,

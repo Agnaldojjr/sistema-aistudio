@@ -3,10 +3,10 @@ import { usePlanning3D } from '../hooks/usePlanning3D';
 import { calculateBudget } from '../services/budgetEngine';
 import { usePatientContext } from '../../context/PatientContext';
 import { jsPDF } from 'jspdf';
-import { Coins, FileText, CheckCircle, Percent, DollarSign, Calendar, Printer } from 'lucide-react';
+import { Coins, Calendar, Printer, Trash2, PlusCircle, Pencil, Check, X, ChevronDown } from 'lucide-react';
 
 export function BudgetPanel3D() {
-  const { procedures, teeth, getPlanTotal } = usePlanning3D();
+  const { procedures, teeth, getPlanTotal, removeProcedure, updateProcedure, addProcedure, globalProcedures } = usePlanning3D();
   const { activeProposal, selectedPatient } = usePatientContext();
 
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD'>('PIX');
@@ -14,6 +14,15 @@ export function BudgetPanel3D() {
   const [discountValue, setDiscountValue] = useState<number>(5);
   const [installmentsCount, setInstallmentsCount] = useState<number>(1);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  // State para edição inline de procedimentos
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+
+  // State para adicionar procedimento
+  const [showAddDropdown, setShowAddDropdown] = useState(false);
+  const [addSearch, setAddSearch] = useState('');
 
   const prices = procedures.map((p) => p.price);
   
@@ -25,6 +34,44 @@ export function BudgetPanel3D() {
     paymentMethod
   );
 
+  const startEditing = (proc: { id: string; procedure: string; price: number }) => {
+    setEditingId(proc.id);
+    setEditName(proc.procedure);
+    setEditPrice(proc.price.toFixed(2));
+  };
+
+  const saveEdit = () => {
+    if (!editingId) return;
+    const newPrice = parseFloat(editPrice.replace(',', '.'));
+    updateProcedure(editingId, {
+      name: editName.trim() || undefined,
+      price: isNaN(newPrice) ? undefined : Math.max(0, newPrice),
+    });
+    setEditingId(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') saveEdit();
+    if (e.key === 'Escape') cancelEdit();
+  };
+
+  const filteredGlobalProcedures = globalProcedures.filter((p: any) =>
+    p.name.toLowerCase().includes(addSearch.toLowerCase())
+  );
+
+  const handleAddProcedure = (proc: any) => {
+    // Adiciona ao primeiro dente diagnosticado ou cria um genérico
+    const firstToothKey = Object.keys(teeth)[0];
+    const toothNumber = firstToothKey ? parseInt(firstToothKey) : 11;
+    addProcedure(toothNumber, proc.id, proc.price, proc.name);
+    setShowAddDropdown(false);
+    setAddSearch('');
+  };
+
   const handleExportPdf = () => {
     setGeneratingPdf(true);
     try {
@@ -35,7 +82,7 @@ export function BudgetPanel3D() {
       });
 
       // 1. Cabeçalho Clínico (Papel Timbrado Premium)
-      doc.setFillColor(139, 0, 0); // Burgundy (#8B0000)
+      doc.setFillColor(139, 0, 0);
       doc.rect(0, 0, 210, 30, 'F');
 
       doc.setTextColor(255, 255, 255);
@@ -75,10 +122,8 @@ export function BudgetPanel3D() {
           doc.setFontSize(9);
           doc.text('Mapa Anatômico Digital da Arcada:', 15, 71);
           
-          // Adiciona a imagem no PDF (x: 15, y: 74, w: 90, h: 60)
           doc.addImage(imgData, 'PNG', 15, 74, 90, 60);
           
-          // Notas no lado direito da imagem
           doc.setFont('Helvetica', 'normal');
           doc.setFontSize(8);
           doc.setTextColor(100, 100, 100);
@@ -111,9 +156,7 @@ export function BudgetPanel3D() {
       
       procedures.forEach((p, idx) => {
         const itemY = yOffset + 12 + (idx * 6);
-        // Evita estourar a página
         if (itemY < 270) {
-          // Busca o dente associado ao ID
           const toothObj = Object.values(teeth).find((t) => t.id === p.tooth_id);
           const toothNum = toothObj ? `Dente ${toothObj.tooth}` : 'Geral';
           
@@ -172,6 +215,148 @@ export function BudgetPanel3D() {
       <div className="flex items-center gap-2 text-sky-400 font-bold uppercase tracking-wider text-xs border-b border-slate-800 pb-3">
         <Coins className="w-4 h-4" />
         <span>Motor Financeiro Integrado</span>
+      </div>
+
+      {/* ═══ LISTA EDITÁVEL DE PROCEDIMENTOS ═══ */}
+      <div className="flex flex-col gap-2 bg-slate-900 border border-slate-800 p-4 rounded-xl">
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Procedimentos no Orçamento</p>
+          <span className="text-[10px] text-slate-500 font-semibold">{procedures.length} item(s)</span>
+        </div>
+
+        {/* Lista de procedimentos */}
+        <div className="flex flex-col gap-1.5 max-h-[200px] overflow-y-auto pr-1">
+          {procedures.length > 0 ? (
+            procedures.map((proc) => {
+              const toothObj = Object.values(teeth).find((t) => t.id === proc.tooth_id);
+              const toothLabel = toothObj ? `D${toothObj.tooth}` : '—';
+              const isEditing = editingId === proc.id;
+
+              return (
+                <div
+                  key={proc.id}
+                  className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                    isEditing
+                      ? 'bg-slate-800 border-sky-500/50 ring-1 ring-sky-500/30'
+                      : 'bg-slate-950/60 border-slate-800/60 hover:border-slate-700'
+                  }`}
+                >
+                  {/* Badge do dente */}
+                  <span className="text-[9px] font-bold text-sky-400 bg-sky-950 border border-sky-900 px-1.5 py-0.5 rounded shrink-0">
+                    {toothLabel}
+                  </span>
+
+                  {isEditing ? (
+                    /* ═══ MODO EDIÇÃO ═══ */
+                    <>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        className="flex-1 bg-slate-900 border border-slate-700 text-slate-200 text-[11px] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-sky-500 min-w-0"
+                        autoFocus
+                      />
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] text-slate-500">R$</span>
+                        <input
+                          type="text"
+                          value={editPrice}
+                          onChange={(e) => setEditPrice(e.target.value)}
+                          onKeyDown={handleKeyDown}
+                          className="w-16 bg-slate-900 border border-slate-700 text-emerald-400 text-[11px] font-bold rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-sky-500 text-right"
+                        />
+                      </div>
+                      <button onClick={saveEdit} className="p-1 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-800 transition-colors shrink-0" title="Salvar (Enter)">
+                        <Check className="w-3 h-3" />
+                      </button>
+                      <button onClick={cancelEdit} className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 transition-colors shrink-0" title="Cancelar (Esc)">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </>
+                  ) : (
+                    /* ═══ MODO LEITURA ═══ */
+                    <>
+                      <span className="flex-1 text-[11px] text-slate-200 font-medium truncate min-w-0">{proc.procedure}</span>
+                      <span className="text-[11px] text-emerald-400 font-bold shrink-0">
+                        R$ {proc.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <button
+                        onClick={() => startEditing(proc)}
+                        className="p-1 rounded bg-slate-800/50 hover:bg-sky-950 text-slate-500 hover:text-sky-400 border border-slate-700/50 hover:border-sky-800 transition-colors shrink-0"
+                        title="Editar procedimento"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => removeProcedure(proc.id)}
+                        className="p-1 rounded bg-slate-800/50 hover:bg-red-950 text-slate-500 hover:text-red-400 border border-slate-700/50 hover:border-red-900 transition-colors shrink-0"
+                        title="Remover procedimento"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <p className="text-[11px] text-slate-500 italic text-center py-4">
+              Nenhum procedimento adicionado ao orçamento.
+            </p>
+          )}
+        </div>
+
+        {/* Botão Adicionar Procedimento */}
+        <div className="relative mt-1">
+          <button
+            onClick={() => setShowAddDropdown(!showAddDropdown)}
+            className="w-full flex items-center justify-center gap-2 py-2 bg-sky-600/20 hover:bg-sky-600/30 text-sky-400 rounded-lg transition-all border border-sky-800/50 hover:border-sky-700 text-xs font-bold"
+          >
+            <PlusCircle className="w-3.5 h-3.5" />
+            Adicionar Procedimento
+            <ChevronDown className={`w-3 h-3 transition-transform ${showAddDropdown ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Dropdown de seleção */}
+          {showAddDropdown && (
+            <div className="absolute bottom-full left-0 right-0 mb-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-20 overflow-hidden">
+              {/* Campo de busca */}
+              <div className="p-2 border-b border-slate-800">
+                <input
+                  type="text"
+                  value={addSearch}
+                  onChange={(e) => setAddSearch(e.target.value)}
+                  placeholder="Buscar procedimento..."
+                  className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-sky-500 placeholder-slate-500"
+                  autoFocus
+                />
+              </div>
+
+              {/* Lista de procedimentos disponíveis */}
+              <div className="max-h-[160px] overflow-y-auto">
+                {filteredGlobalProcedures.length > 0 ? (
+                  filteredGlobalProcedures.map((proc: any) => (
+                    <button
+                      key={proc.id}
+                      onClick={() => handleAddProcedure(proc)}
+                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-800 text-left transition-colors border-b border-slate-800/50 last:border-b-0"
+                    >
+                      <span className="text-xs text-slate-200 font-medium">{proc.name}</span>
+                      <span className="text-xs text-emerald-400 font-bold shrink-0 ml-2">
+                        R$ {proc.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500 italic text-center py-3">
+                    {globalProcedures.length === 0 ? 'Nenhum procedimento cadastrado.' : 'Nenhum resultado encontrado.'}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Inputs de Configuração Financeira */}
