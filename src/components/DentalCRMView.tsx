@@ -719,7 +719,13 @@ export default function DentalCRMView({
       const loadPlanData = async () => {
         setIsLoadingPlanData(true);
         try {
-          const data = await (async () => { const url = await getPatientFileUrlFromSupabase(driveFolderId, selectedProposalId); const r = await fetch(url); return await r.json(); })();
+          const data = await (async () => { 
+            const url = await getPatientFileUrlFromSupabase(driveFolderId, selectedProposalId); 
+            if (!url) throw new Error("Plan not found");
+            const r = await fetch(url); 
+            if (!r.ok) throw new Error("Plan fetch failed");
+            return await r.json(); 
+          })();
           setSelectedProposalData(data);
           // Set as active plan if it's the latest proposal for the dashboard
           if (driveProposals.length > 0 && selectedProposalId === driveProposals[0].id) {
