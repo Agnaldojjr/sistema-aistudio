@@ -145,7 +145,7 @@ function JawModelRenderer({
   const groupRef = React.useRef<THREE.Group>(null);
   
   // Escala para ajustar ao visualizador
-  const modelScale = 85.0;
+  const modelScale = 1.0;
 
   const clonedScene = React.useMemo(() => {
     const clone = scene.clone();
@@ -219,7 +219,7 @@ function JawModelRenderer({
   return (
     <group ref={groupRef} position={[0, -0.2, 0]}>
       {/* 1. MODELO REALISTA COM SELEÇÃO DIRECTA POR CLIQUE */}
-      <group scale={[modelScale, modelScale, modelScale]} position={[0, 0, 1.5]}>
+      <group scale={[modelScale, modelScale, modelScale]} position={[0, -0.8, 0]}>
         <primitive 
           object={clonedScene} 
           onClick={(e: any) => {
