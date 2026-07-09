@@ -42,6 +42,7 @@ import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from './ty
 import { DEFAULT_PROCEDURES, DEMO_SVG_PLACEHOLDERS, DEFAULT_CLINIC_SETTINGS, INITIAL_PROPOSAL, INITIAL_SECTIONS } from './constants';
 import { initAuth, googleSignIn, logout } from './firebase';
 import TreatmentPlanning3D from './TreatmentPlanning3D';
+import FinancialView from './components/FinancialView';
 
 import type { User } from '@supabase/supabase-js';
 import { usePatientContext, PatientProvider } from './context/PatientContext';
@@ -67,10 +68,11 @@ const AFLogoSVG = ({ className = '', light = false }: { className?: string; ligh
 // ─── Initial State ─────────────────────────────────────────────────────────
 
 // ─── Navigation Config ──────────────────────────────────────────────────────
-type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings' | '3d-planning';
+type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings' | '3d-planning' | 'financeiro';
 
 const NAV_ITEMS = [
   { id: 'dashboard' as AppView, label: 'Painel', icon: LayoutDashboard, section: 'principal' },
+  { id: 'financeiro' as AppView, label: 'Financeiro', icon: Coins, section: 'principal' },
   { id: 'crm'       as AppView, label: 'Pacientes', icon: Users,           section: 'principal' },
   { id: 'calendar'  as AppView, label: 'Agenda',    icon: Calendar,        section: 'principal' },
   { id: '3d-planning' as AppView, label: 'Arcada 3D', icon: Layers,        section: 'principal' },
@@ -200,6 +202,7 @@ interface TopBarProps {
 function TopBar({ currentView, proposal, onChangeView, onOpenMobileMenu, isMobileOptimized, setIsMobileOptimized }: TopBarProps) {
   const VIEW_LABELS: Record<AppView, string> = {
     dashboard: 'Painel Geral',
+    financeiro: 'Painel Financeiro',
     crm: 'Gestão de Pacientes',
     calendar: 'Agenda',
     settings: 'Configurações',
@@ -649,6 +652,13 @@ export default function App() {
               isMobileOptimized={isMobileOptimized}
               setIsMobileOptimized={setIsMobileOptimized}
             />
+          </main>
+        )}
+
+        {/* ── Financeiro ───────────────────────────────────────── */}
+        {currentAppView === 'financeiro' && (
+          <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 w-full animate-fade-in-up">
+            <FinancialView />
           </main>
         )}
 

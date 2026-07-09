@@ -791,6 +791,27 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       if (res && res.id && setCurrentFileId && (!currentFileId || currentFileId === 'NEW_FILE')) {
         setCurrentFileId(res.id);
       }
+
+      // Integracao com o financeiro
+      if (proposal.status === 'Aprovado (paciente pagou)') {
+        const storedFin = localStorage.getItem('agnaldo_dent_financeiro');
+        const payments = storedFin ? JSON.parse(storedFin) : [];
+        const newPayment = {
+          id: Date.now().toString(),
+          patientName: patientName,
+          date: new Date().toISOString(),
+          amount: simulations[selectedPlanIndex]?.custoTotal || 0,
+          paymentMethod: proposal.paymentMethod || 'PIX',
+          status: 'Pago'
+        };
+        const existing = payments.find((p: any) => p.patientName === patientName && p.amount === newPayment.amount && new Date(p.date).toDateString() === new Date().toDateString());
+        if (!existing) {
+          payments.push(newPayment);
+          localStorage.setItem('agnaldo_dent_financeiro', JSON.stringify(payments));
+          window.dispatchEvent(new Event('local-storage'));
+        }
+      }
+
       setSaveSuccessMsg('Salvo no Supabase!');
       setTimeout(() => setSaveSuccessMsg(''), 4000);
     } catch (err: any) {
@@ -944,7 +965,16 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
               </label>
               <select
                 value={proposal.status || 'Aberto (paciente não pagou)'}
-                onChange={(e) => setProposal({ ...proposal, status: e.target.value as any })}
+                onChange={(e) => {
+                  const newStatus = e.target.value as any;
+                  setProposal(prev => {
+                    const next = { ...prev, status: newStatus };
+                    if (newStatus === 'Aprovado (paciente pagou)' && !next.paymentMethod) {
+                      next.paymentMethod = 'PIX';
+                    }
+                    return next;
+                  });
+                }}
                 className={`w-full border rounded-lg p-2.5 text-xs font-bold focus:outline-none transition-colors ${
                   (proposal.status === 'Aprovado (paciente pagou)' || proposal.status === 'Concluído')
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
@@ -959,6 +989,25 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                 <option value="Arquivado" className="bg-white text-zinc-700">📁 Arquivado</option>
               </select>
             </div>
+
+            {/* Forma de Pagamento (Condicional) */}
+            {(proposal.status === 'Aprovado (paciente pagou)' || proposal.status === 'Concluído') && (
+              <div className="space-y-1.5 border-b border-zinc-100 pb-4">
+                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wide">
+                  Forma de Pagamento
+                </label>
+                <select
+                  value={proposal.paymentMethod || 'PIX'}
+                  onChange={(e) => setProposal({ ...proposal, paymentMethod: e.target.value as any })}
+                  className="w-full border rounded-lg p-2.5 text-xs font-bold bg-white text-zinc-800 border-zinc-300 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                >
+                  <option value="Dinheiro">Dinheiro</option>
+                  <option value="PIX">PIX</option>
+                  <option value="Cartão de Crédito">Cartão de Crédito</option>
+                  <option value="Cartão de Débito">Cartão de Débito</option>
+                </select>
+              </div>
+            )}
 
             {/* Net Desired Value Input */}
             <div className="space-y-1.5">

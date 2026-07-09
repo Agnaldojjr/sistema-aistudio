@@ -151,4 +151,14 @@ export interface TreatmentProposal {
   customDiscountAmount: number; // manual discount over total if they want
   showTotalBySection: boolean; // if we want to show totals for Upper/Lower/Smile separately
   markerSize?: number; // customizable circle marker size in pixels
+  paymentMethod?: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito';
+}
+
+export interface PaymentRecord {
+  id: string;
+  patientName: string;
+  date: string;
+  amount: number;
+  paymentMethod: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito';
+  status: 'Pago' | 'Pendente';
 }
