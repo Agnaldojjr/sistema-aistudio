@@ -1,6 +1,5 @@
 import React from 'react';
 import { useGLTF } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { usePlanning3D } from '../hooks/usePlanning3D';
 
@@ -18,130 +17,23 @@ try {
 
 interface JawLoaderProps {
   getToothPosition: (fdiCode: number) => { position: [number, number, number]; rotation: [number, number, number] };
-  onUpdateToothPosition?: (fdiCode: number, position: [number, number, number]) => void;
   setControlsEnabled?: (enabled: boolean) => void;
   onLoadPositions?: (positions: Record<number, [number, number, number]>) => void;
-}
-
-// Geometria procedural leve para o highlight
-const hitBoxGeo = new THREE.SphereGeometry(0.32, 16, 16);
-
-// Componente da Esfera Arrastável 3D
-function DraggableSphere({
-  toothNum,
-  initialPosition,
-  geometry,
-  color,
-  emissive,
-  opacity,
-  depthTest,
-  onDoubleClick,
-  onDrag,
-  setControlsEnabled
-}: {
-  toothNum: number;
-  initialPosition: [number, number, number];
-  geometry: THREE.BufferGeometry;
-  color: string;
-  emissive: string;
-  opacity: number;
-  depthTest: boolean;
-  onDoubleClick: (e: any) => void;
-  onDrag: (position: [number, number, number]) => void;
-  setControlsEnabled?: (enabled: boolean) => void;
-}) {
-  const { camera, raycaster } = useThree();
-  const [isDragging, setIsDragging] = React.useState(false);
-  const meshRef = React.useRef<THREE.Mesh>(null);
-  
-  const planeRef = React.useRef(new THREE.Plane());
-  const intersectionRef = React.useRef(new THREE.Vector3());
-
-  const [pos, setPos] = React.useState<[number, number, number]>(initialPosition);
-
-  React.useEffect(() => {
-    setPos(initialPosition);
-  }, [initialPosition]);
-
-  return (
-    <mesh
-      ref={meshRef}
-      position={pos}
-      geometry={geometry}
-      onDoubleClick={onDoubleClick}
-      onPointerDown={(e: any) => {
-        e.stopPropagation();
-        e.target.setPointerCapture(e.pointerId);
-        setIsDragging(true);
-
-        // Desativa OrbitControls temporariamente
-        setControlsEnabled?.(false);
-
-        const normal = camera.getWorldDirection(new THREE.Vector3()).negate();
-        const worldPos = meshRef.current?.getWorldPosition(new THREE.Vector3()) || new THREE.Vector3(...pos);
-        planeRef.current.setFromNormalAndCoplanarPoint(normal, worldPos);
-      }}
-      onPointerMove={(e: any) => {
-        if (!isDragging) return;
-        e.stopPropagation();
-
-        raycaster.setFromCamera(e.pointer, camera);
-        if (raycaster.ray.intersectPlane(planeRef.current, intersectionRef.current)) {
-          const parent = meshRef.current?.parent;
-          if (parent) {
-            const localPoint = parent.worldToLocal(intersectionRef.current.clone());
-            const newPos: [number, number, number] = [localPoint.x, localPoint.y, localPoint.z];
-            setPos(newPos);
-            onDrag(newPos);
-          }
-        }
-      }}
-      onPointerUp={(e: any) => {
-        if (!isDragging) return;
-        e.stopPropagation();
-        e.target.releasePointerCapture(e.pointerId);
-        setIsDragging(false);
-
-        // Reativa OrbitControls
-        setControlsEnabled?.(true);
-      }}
-      onPointerOver={(e: any) => {
-        e.stopPropagation();
-        document.body.style.cursor = 'move';
-      }}
-      onPointerOut={() => {
-        document.body.style.cursor = 'default';
-      }}
-    >
-      <meshStandardMaterial 
-        color={isDragging ? '#ef4444' : color} 
-        emissive={isDragging ? '#ef4444' : emissive}
-        emissiveIntensity={0.6} 
-        transparent 
-        opacity={opacity} 
-        depthWrite={false}
-        depthTest={depthTest} 
-      />
-    </mesh>
-  );
 }
 
 // Renderizador interno do modelo
 function JawModelRenderer({
   modelPath,
-  getToothPosition,
-  onUpdateToothPosition,
   setControlsEnabled,
   onLoadPositions
 }: {
   modelPath: string;
   getToothPosition: any;
-  onUpdateToothPosition: any;
   setControlsEnabled?: (enabled: boolean) => void;
   onLoadPositions?: (positions: Record<number, [number, number, number]>) => void;
 }) {
   const { scene } = useGLTF(modelPath) as any;
-  const { procedures, selectTooth, viewerState, toggleMissingTooth } = usePlanning3D();
+  const { selectTooth, viewerState } = usePlanning3D();
   const groupRef = React.useRef<THREE.Group>(null);
   
   // Escala para ajustar ao visualizador
@@ -263,62 +155,16 @@ function JawModelRenderer({
           }}
         />
       </group>
-
-      {/* 2. HIGHLIGHTS DENTÁRIOS E CONTROLES DE ARRASTE */}
-      <group position={[0, 0, 0]}>
-        {ALL_TEETH.map((toothNum) => {
-          const isMissing = viewerState.missingTeeth?.includes(toothNum);
-          if (isMissing) return null;
-
-          const toothProcedures = procedures.filter(p => p.tooth_id === String(toothNum));
-          const hasBudget = toothProcedures.length > 0;
-          const isSelected = viewerState.activeTooth === toothNum;
-
-          if (!isSelected && !hasBudget) return null;
-
-          const { position } = getToothPosition(toothNum);
-          
-          let color = '#0ea5e9';
-          let emissive = '#0284c7';
-          let opacity = 0.5;
-
-          if (isSelected) {
-            color = '#3B82F6';
-            emissive = '#3B82F6';
-            opacity = 0.6;
-          }
-
-          return (
-            <DraggableSphere
-              key={toothNum}
-              toothNum={toothNum}
-              initialPosition={position}
-              geometry={hitBoxGeo}
-              color={color}
-              emissive={emissive}
-              opacity={opacity}
-              depthTest={true}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                toggleMissingTooth(toothNum);
-              }}
-              onDrag={(newPos) => onUpdateToothPosition?.(toothNum, newPos)}
-              setControlsEnabled={setControlsEnabled}
-            />
-          );
-        })}
-      </group>
     </group>
   );
 }
 
 // Componente exportado principal que carrega o modelo segmentado rotulado diretamente
-export function JawLoader({ getToothPosition, onUpdateToothPosition, setControlsEnabled, onLoadPositions }: JawLoaderProps) {
+export function JawLoader({ getToothPosition, setControlsEnabled, onLoadPositions }: JawLoaderProps) {
   return (
     <JawModelRenderer
       modelPath="/models/boca_ortodoncia_labeled.glb"
       getToothPosition={getToothPosition}
-      onUpdateToothPosition={onUpdateToothPosition}
       setControlsEnabled={setControlsEnabled}
       onLoadPositions={onLoadPositions}
     />

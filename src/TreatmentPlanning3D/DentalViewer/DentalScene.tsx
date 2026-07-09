@@ -251,12 +251,6 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
               ) : (
                 <JawLoader 
                   getToothPosition={getDynamicToothPosition} 
-                  onUpdateToothPosition={(fdiCode, position) => {
-                    setCustomPositions(prev => ({
-                      ...prev,
-                      [fdiCode]: position
-                    }));
-                  }}
                   setControlsEnabled={setControlsEnabled}
                   onLoadPositions={(positions) => {
                     setCustomPositions(prev => {
