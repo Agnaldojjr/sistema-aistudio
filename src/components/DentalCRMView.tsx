@@ -356,6 +356,11 @@ export default function DentalCRMView({
     observations: ''
   });
 
+  // Edit patient registration states
+  const [isEditingPatient, setIsEditingPatient] = useState(false);
+  const [editPatientData, setEditPatientData] = useState<Partial<CRMPatient>>({});
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [syncingAnamnesis, setSyncingAnamnesis] = useState(false);
@@ -2462,6 +2467,42 @@ export default function DentalCRMView({
     }
   };
 
+  // ── Edit Patient Registration Handler ──────────────────────────────
+  const handleOpenEditPatient = () => {
+    if (!selectedPatient) return;
+    setEditPatientData({ ...selectedPatient });
+    setIsEditingPatient(true);
+  };
+
+  const handleSaveEditPatient = async () => {
+    if (!selectedPatient || !editPatientData.name) return;
+    setIsSavingEdit(true);
+    try {
+      const crmData = await getSupabaseCRMDatabase();
+      const pIndex = (crmData.patients || []).findIndex((p: any) => p.id === selectedPatient.id);
+      if (pIndex === -1) {
+        alert('Paciente não encontrado no banco de dados.');
+        setIsSavingEdit(false);
+        return;
+      }
+      const updatedPatient = {
+        ...crmData.patients[pIndex],
+        ...editPatientData,
+        name: (editPatientData.name || '').trim().toUpperCase(),
+        updatedAt: new Date().toISOString()
+      };
+      crmData.patients[pIndex] = updatedPatient;
+      await saveSupabaseCRMDatabase(crmData);
+      setSelectedPatient(updatedPatient);
+      setIsEditingPatient(false);
+      await loadPatientsFromFirestore();
+    } catch (err: any) {
+      alert('Erro ao salvar edição do cadastro: ' + err.message);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   const handleDeletePatient = async (pId: string) => {
     if (!confirm("Aviso crítico: isto apagará o prontuário e histórico completo deste paciente permanentemente. Deseja continuar?")) {
       return;
@@ -3554,9 +3595,20 @@ export default function DentalCRMView({
                   {/* Panel A: Demographics and Core Patient Data */}
                   {activeDetailTab === 'info' && (
                     <div className="space-y-6">
-                      <div className="border-b border-zinc-100 pb-3">
-                        <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">DADOS DO PACIENTE</span>
-                        <h4 className="font-serif font-bold text-lg text-[#8B0000] mt-0.5">Ficha Cadastral Geral consolidada</h4>
+                      <div className="border-b border-zinc-100 pb-3 flex justify-between items-end">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">DADOS DO PACIENTE</span>
+                          <h4 className="font-serif font-bold text-lg text-[#8B0000] mt-0.5">Ficha Cadastral Geral consolidada</h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleOpenEditPatient}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-[#8B0000] hover:bg-[#6d0000] text-white text-[11px] font-bold rounded-xl uppercase tracking-wide transition-all cursor-pointer shadow-sm"
+                          title="Editar dados cadastrais do paciente"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Editar Cadastro</span>
+                        </button>
                       </div>
 
                       {/* Dashboard de Tratamento */}
@@ -3691,6 +3743,262 @@ export default function DentalCRMView({
                           {selectedPatient.observations ? `"${selectedPatient.observations}"` : 'Tudo limpo no cadastro. Nenhuma recomendação médica de alergia ou restrição cardíaca anexada ao paciente.'}
                         </p>
                       </div>
+
+                      {/* ── Modal de Edição de Cadastro ──────────────────── */}
+                      {isEditingPatient && (
+                        <div className="fixed inset-0 z-[130] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsEditingPatient(false)}>
+                          <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl border border-zinc-200 flex flex-col" onClick={e => e.stopPropagation()}>
+                            {/* Header */}
+                            <div className="bg-[#8B0000] text-white px-6 py-4 flex justify-between items-center shrink-0">
+                              <div className="flex items-center gap-2">
+                                <Pencil className="w-4.5 h-4.5 text-[#C09553]" />
+                                <h3 className="font-serif font-bold text-base">Editar Cadastro de Paciente</h3>
+                              </div>
+                              <button type="button" onClick={() => setIsEditingPatient(false)} className="text-white/60 hover:text-white transition-colors p-1 cursor-pointer">
+                                <X className="w-5 h-5" />
+                              </button>
+                            </div>
+
+                            {/* Form Body */}
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+                              {/* Section 1: Identificação Pessoal */}
+                              <div className="space-y-4">
+                                <h4 className="text-[10px] uppercase font-extrabold text-[#8B0000] tracking-widest border-b border-[#E6DEC9] pb-1 flex items-center gap-1.5">
+                                  <User className="w-3.5 h-3.5 text-[#C09553]" />
+                                  Identificação Pessoal
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                  <div className="md:col-span-2">
+                                    <label className="block text-zinc-500 font-semibold mb-1">Nome Completo *</label>
+                                    <input type="text" value={editPatientData.name || ''} onChange={e => setEditPatientData(prev => ({ ...prev, name: e.target.value.toUpperCase() }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">CPF</label>
+                                    <input type="text" placeholder="000.000.000-00" value={editPatientData.cpf || ''} onChange={e => setEditPatientData(prev => ({ ...prev, cpf: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Data de Nascimento</label>
+                                    <input type="date" value={editPatientData.birthDate || ''} onChange={e => setEditPatientData(prev => ({ ...prev, birthDate: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Sexo</label>
+                                    <select value={editPatientData.gender || ''} onChange={e => setEditPatientData(prev => ({ ...prev, gender: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all">
+                                      <option value="">Selecione</option>
+                                      <option value="Feminino">Feminino</option>
+                                      <option value="Masculino">Masculino</option>
+                                      <option value="Outro">Outro</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Estado Civil</label>
+                                    <select value={editPatientData.maritalStatus || ''} onChange={e => setEditPatientData(prev => ({ ...prev, maritalStatus: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all">
+                                      <option value="">Selecione</option>
+                                      <option value="Solteiro(a)">Solteiro(a)</option>
+                                      <option value="Casado(a)">Casado(a)</option>
+                                      <option value="Divorciado(a)">Divorciado(a)</option>
+                                      <option value="Viúvo(a)">Viúvo(a)</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">RG</label>
+                                    <input type="text" value={editPatientData.rg || ''} onChange={e => setEditPatientData(prev => ({ ...prev, rg: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Órgão Emissor/UF</label>
+                                    <input type="text" value={editPatientData.rgIssuer || ''} onChange={e => setEditPatientData(prev => ({ ...prev, rgIssuer: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Prontuário</label>
+                                    <input type="text" value={editPatientData.medicalRecord || ''} onChange={e => setEditPatientData(prev => ({ ...prev, medicalRecord: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Situação</label>
+                                    <select value={editPatientData.status || 'ATIVO'} onChange={e => setEditPatientData(prev => ({ ...prev, status: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all">
+                                      <option value="ATIVO">ATIVO</option>
+                                      <option value="INATIVO">INATIVO</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Como conheceu a clínica?</label>
+                                    <select value={editPatientData.howKnewClinic || ''} onChange={e => setEditPatientData(prev => ({ ...prev, howKnewClinic: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all">
+                                      <option value="">Selecione</option>
+                                      <option value="Indicação">Indicação</option>
+                                      <option value="Redes Sociais">Redes Sociais</option>
+                                      <option value="Google">Google</option>
+                                      <option value="Outros">Outros</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Código do Paciente</label>
+                                    <input type="text" value={editPatientData.codigo_paciente || ''} onChange={e => setEditPatientData(prev => ({ ...prev, codigo_paciente: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Section 2: Canais de Contato */}
+                              <div className="space-y-4">
+                                <h4 className="text-[10px] uppercase font-extrabold text-[#8B0000] tracking-widest border-b border-[#E6DEC9] pb-1 flex items-center gap-1.5">
+                                  <MessageSquare className="w-3.5 h-3.5 text-[#C09553]" />
+                                  Canais de Contato
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Celular / WhatsApp</label>
+                                    <input type="text" placeholder="(00) 00000-0000" value={editPatientData.mobile || ''} onChange={e => setEditPatientData(prev => ({ ...prev, mobile: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Telefone Fixo</label>
+                                    <input type="text" value={editPatientData.phone || ''} onChange={e => setEditPatientData(prev => ({ ...prev, phone: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <label className="block text-zinc-500 font-semibold mb-1">E-mail</label>
+                                    <input type="email" value={editPatientData.email || ''} onChange={e => setEditPatientData(prev => ({ ...prev, email: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <label className="block text-zinc-500 font-semibold mb-1">Observações</label>
+                                    <textarea rows={3} value={editPatientData.observations || ''} onChange={e => setEditPatientData(prev => ({ ...prev, observations: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all resize-y" />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Section 3: Endereço */}
+                              <div className="space-y-4">
+                                <h4 className="text-[10px] uppercase font-extrabold text-[#8B0000] tracking-widest border-b border-[#E6DEC9] pb-1 flex items-center gap-1.5">
+                                  <ExternalLink className="w-3.5 h-3.5 text-[#C09553]" />
+                                  Endereço
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">CEP</label>
+                                    <input type="text" placeholder="00000-000" value={editPatientData.cep || ''} onChange={e => setEditPatientData(prev => ({ ...prev, cep: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div className="md:col-span-3">
+                                    <label className="block text-zinc-500 font-semibold mb-1">Logradouro</label>
+                                    <input type="text" value={editPatientData.street || ''} onChange={e => setEditPatientData(prev => ({ ...prev, street: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Número</label>
+                                    <input type="text" value={editPatientData.number || ''} onChange={e => setEditPatientData(prev => ({ ...prev, number: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div className="md:col-span-3">
+                                    <label className="block text-zinc-500 font-semibold mb-1">Complemento</label>
+                                    <input type="text" value={editPatientData.complement || ''} onChange={e => setEditPatientData(prev => ({ ...prev, complement: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <label className="block text-zinc-500 font-semibold mb-1">Bairro</label>
+                                    <input type="text" value={editPatientData.neighborhood || ''} onChange={e => setEditPatientData(prev => ({ ...prev, neighborhood: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Cidade</label>
+                                    <input type="text" value={editPatientData.city || ''} onChange={e => setEditPatientData(prev => ({ ...prev, city: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Estado</label>
+                                    <input type="text" value={editPatientData.state || ''} onChange={e => setEditPatientData(prev => ({ ...prev, state: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Section 4: Convênio */}
+                              <div className="space-y-4">
+                                <h4 className="text-[10px] uppercase font-extrabold text-[#8B0000] tracking-widest border-b border-[#E6DEC9] pb-1 flex items-center gap-1.5">
+                                  <ClipboardList className="w-3.5 h-3.5 text-[#C09553]" />
+                                  Convênio
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Convênio</label>
+                                    <select value={editPatientData.healthInsurance || 'PARTICULAR'} onChange={e => setEditPatientData(prev => ({ ...prev, healthInsurance: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all">
+                                      <option value="PARTICULAR">PARTICULAR</option>
+                                      <option value="BRADESCO">BRADESCO SAÚDE</option>
+                                      <option value="SULAMERICA">SULAMÉRICA</option>
+                                      <option value="AMIL">AMIL</option>
+                                      <option value="UNIMED">UNIMED</option>
+                                      <option value="OUTRO">OUTRO</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Carteira</label>
+                                    <input type="text" value={editPatientData.healthInsuranceCard || ''} onChange={e => setEditPatientData(prev => ({ ...prev, healthInsuranceCard: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Validade</label>
+                                    <input type="text" placeholder="MM/AAAA" value={editPatientData.healthInsuranceValidity || ''} onChange={e => setEditPatientData(prev => ({ ...prev, healthInsuranceValidity: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Section 5: Dados do Responsável */}
+                              <div className="space-y-4">
+                                <h4 className="text-[10px] uppercase font-extrabold text-[#8B0000] tracking-widest border-b border-[#E6DEC9] pb-1 flex items-center gap-1.5">
+                                  <User className="w-3.5 h-3.5 text-[#C09553]" />
+                                  Dados do Responsável
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Nome do Responsável</label>
+                                    <input type="text" value={editPatientData.respName || ''} onChange={e => setEditPatientData(prev => ({ ...prev, respName: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Nascimento</label>
+                                    <input type="date" value={editPatientData.respBirthDate || ''} onChange={e => setEditPatientData(prev => ({ ...prev, respBirthDate: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Telefone</label>
+                                    <input type="text" value={editPatientData.respPhone || ''} onChange={e => setEditPatientData(prev => ({ ...prev, respPhone: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Celular</label>
+                                    <input type="text" value={editPatientData.respMobile || ''} onChange={e => setEditPatientData(prev => ({ ...prev, respMobile: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">CPF do Responsável</label>
+                                    <input type="text" value={editPatientData.respCpf || ''} onChange={e => setEditPatientData(prev => ({ ...prev, respCpf: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-zinc-500 font-semibold mb-1">Profissão</label>
+                                    <input type="text" value={editPatientData.respProfession || ''} onChange={e => setEditPatientData(prev => ({ ...prev, respProfession: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  </div>
+                                </div>
+                              </div>
+
+                            </div>
+
+                            {/* Footer Actions */}
+                            <div className="bg-zinc-50 px-6 py-4 border-t border-zinc-200 flex justify-between items-center shrink-0">
+                              <span className="text-[10px] text-zinc-400 font-mono">Última atualização: {editPatientData.updatedAt ? new Date(editPatientData.updatedAt).toLocaleString('pt-BR') : 'N/D'}</span>
+                              <div className="flex gap-2.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setIsEditingPatient(false)}
+                                  className="px-4 py-2 border border-zinc-300 text-zinc-600 text-xs font-bold rounded-xl uppercase tracking-wide hover:bg-zinc-100 transition-colors cursor-pointer"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleSaveEditPatient}
+                                  disabled={isSavingEdit || !editPatientData.name}
+                                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl uppercase tracking-wide transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {isSavingEdit ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      Salvando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Save className="w-3.5 h-3.5" />
+                                      Salvar Alterações
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
