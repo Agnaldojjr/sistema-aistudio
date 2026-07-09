@@ -219,7 +219,7 @@ function JawModelRenderer({
   return (
     <group ref={groupRef} position={[0, -0.2, 0]}>
       {/* 1. MODELO REALISTA COM SELEÇÃO DIRECTA POR CLIQUE */}
-      <group scale={[modelScale, modelScale, modelScale]} position={[0, -0.8, 0]}>
+      <group scale={[modelScale, modelScale, modelScale]} position={[0, -2.1, 0]}>
         <primitive 
           object={clonedScene} 
           onClick={(e: any) => {

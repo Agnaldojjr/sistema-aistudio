@@ -1,6 +1,6 @@
 import React, { Suspense, Component, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Environment } from '@react-three/drei';
 import { ToothMesh } from './ToothMesh';
 import { StructureMesh } from './StructureMesh';
 import { JawLoader } from './JawLoader';
@@ -220,17 +220,29 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
           shadows
           gl={{ preserveDrawingBuffer: true }}
         >
-          <ambientLight intensity={0.5} />
+          <ambientLight intensity={1.5} />
           
           <directionalLight
-            position={[5, 10, 5]}
-            intensity={0.8}
+            position={[10, 10, 10]}
+            intensity={1.5}
             castShadow
             shadow-mapSize-width={1024}
             shadow-mapSize-height={1024}
           />
 
-          <pointLight position={[-5, -5, -5]} intensity={0.4} />
+          <directionalLight
+            position={[-10, 10, 10]}
+            intensity={1.0}
+          />
+
+          <directionalLight
+            position={[0, -10, 10]}
+            intensity={0.8}
+          />
+
+          <pointLight position={[-5, -5, -5]} intensity={0.5} />
+          
+          <Environment preset="city" />
 
           <Suspense fallback={null}>
             <SceneErrorBoundary>
