@@ -4584,7 +4584,7 @@ export default function DentalCRMView({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  window.open(window.location.href.split('?')[0] + '?mode=patient', '_blank', 'width=1100,height=800');
+                                  window.open(window.location.origin + '?mode=patient', '_blank', 'width=1100,height=800');
                                 }}
                                 className="px-3 py-1 bg-[#FAF8F5] text-[#8B0000] text-xs font-bold rounded-lg transition-colors border-2 border-[#C09553]/30 hover:border-[#C09553] flex items-center gap-1.5 shadow-sm cursor-pointer select-none"
                                 title="Abrir pop-up da Tela do Paciente"

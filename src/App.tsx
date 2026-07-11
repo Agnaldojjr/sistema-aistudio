@@ -179,7 +179,7 @@ function Sidebar({
           ) : null}
           <button
             onClick={() => {
-              window.open(window.location.href.split('?')[0] + '?mode=sentinel', '_blank', 'width=1200,height=850');
+              window.open(window.location.origin + '?mode=sentinel', '_blank', 'width=1200,height=850');
             }}
             className={`nav-item w-full text-[#C09553]/70 hover:text-[#C09553] hover:bg-white/5 mb-1 ${collapsed ? 'justify-center px-0' : ''}`}
             title="Agente Sentinela 24h"
@@ -357,7 +357,20 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
 
   // --- URL PARAMS ---
-  const urlMode = new URLSearchParams(window.location.search).get('mode');
+  const getQueryParam = (name: string) => {
+    if (typeof window === 'undefined') return null;
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.has(name)) return searchParams.get(name);
+    
+    const hash = window.location.hash;
+    const qIndex = hash.indexOf('?');
+    if (qIndex !== -1) {
+      const hashParams = new URLSearchParams(hash.substring(qIndex));
+      if (hashParams.has(name)) return hashParams.get(name);
+    }
+    return null;
+  };
+  const urlMode = getQueryParam('mode');
 
   // --- APP STATE ---
   const [procedures, setProcedures] = useState<Procedure[]>(() => {
