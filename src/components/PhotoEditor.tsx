@@ -7,6 +7,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Info, Camera, X, SwitchCamera, Zap, ZapOff, ZoomIn, Loader2, ImageIcon, Focus, Plus } from 'lucide-react';
 import { PhotoSection, ToothMarker, Procedure } from '../types';
 import { DEMO_SVG_PLACEHOLDERS } from '../constants';
+import { compressImage, compressFileToDataUrl } from '../lib/imageUtils';
 import { listPatientFilesFromSupabase, downloadFileAsDataUrlFromSupabase, uploadPatientFileToSupabase } from '../lib/supabaseStorage';
 import ImageMarkupEditor from './ImageMarkupEditor';
 
@@ -302,8 +303,10 @@ export default function PhotoEditor({
           ctx.restore();
           
           const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-          onUpdateSection({ ...section, image: dataUrl, markers: [] });
-          stopCamera();
+          compressImage(dataUrl, 1024, 0.7).then((compressedDataUrl) => {
+            onUpdateSection({ ...section, image: compressedDataUrl, markers: [] });
+            stopCamera();
+          });
 
           // Upload to Supabase patient folder in the background
           if (patientName) {
@@ -381,26 +384,22 @@ export default function PhotoEditor({
       alert('Por favor, faça upload de um arquivo de imagem.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const dataUrl = e.target?.result as string;
+    try {
+      const compressedDataUrl = await compressFileToDataUrl(file, 1024, 0.7);
       onUpdateSection({
         ...section,
-        image: dataUrl,
+        image: compressedDataUrl,
       });
 
       // Upload to Supabase patient folder in the background
       if (patientName) {
-        try {
-          const filename = `${section.id}_upload_${Date.now()}_${file.name}`;
-          await uploadPatientFileToSupabase(patientName, file, filename);
-          console.log(`Quadrant upload saved to patient ${patientName} on Supabase`);
-        } catch (err) {
-          console.warn("Failed to upload quadrant image upload to Supabase:", err);
-        }
+        const filename = `${section.id}_upload_${Date.now()}_${file.name}`;
+        await uploadPatientFileToSupabase(patientName, file, filename);
+        console.log(`Quadrant upload saved to patient ${patientName} on Supabase`);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn("Failed to upload quadrant image upload to Supabase:", err);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -208,12 +208,20 @@ export function PatientProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isPresentation) return;
-    localStorage.setItem('agnaldo_dent_sections', JSON.stringify(activeSections));
+    try {
+      localStorage.setItem('agnaldo_dent_sections', JSON.stringify(activeSections));
+    } catch (e) {
+      console.warn('Não foi possível salvar activeSections no localStorage (limite excedido?)', e);
+    }
   }, [activeSections]);
 
   useEffect(() => {
     if (isPresentation) return;
-    localStorage.setItem('agnaldo_dent_proposal', JSON.stringify(activeProposal));
+    try {
+      localStorage.setItem('agnaldo_dent_proposal', JSON.stringify(activeProposal));
+    } catch (e) {
+      console.warn('Não foi possível salvar activeProposal no localStorage (limite excedido?)', e);
+    }
   }, [activeProposal]);
 
   const saveContextToSupabase = async () => {

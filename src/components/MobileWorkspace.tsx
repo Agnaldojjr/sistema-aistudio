@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { createCalendarEvent } from '../lib/calendar';
 import { uploadPatientFileToSupabase } from '../lib/supabaseStorage';
+import { compressImage, compressFileToDataUrl } from '../lib/imageUtils';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from '../types';
 import { format, parseISO, addMinutes } from 'date-fns';
 
@@ -342,22 +343,24 @@ export default function MobileWorkspace({
           }
           
           ctx.restore();
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          const rawDataUrl = canvas.toDataURL('image/jpeg', 0.9);
           
-          // Locate section and update image
-          const targetSectionId = activeCameraSection === 'smile' ? 'smile' : activeCameraSection;
-          const targetSection = sections.find((s) => s.id === targetSectionId);
-          if (targetSection) {
-            onUpdateSection({
-              ...targetSection,
-              image: dataUrl,
-              markers: [] // Reset markers for new placement
-            });
-          }
+          compressImage(rawDataUrl, 1024, 0.7).then((dataUrl) => {
+            // Locate section and update image
+            const targetSectionId = activeCameraSection === 'smile' ? 'smile' : activeCameraSection;
+            const targetSection = sections.find((s) => s.id === targetSectionId);
+            if (targetSection) {
+              onUpdateSection({
+                ...targetSection,
+                image: dataUrl,
+                markers: [] // Reset markers for new placement
+              });
+            }
 
-          stopLiveCamera();
-          setCapturing(true);
-          setTimeout(() => setCapturing(false), 800);
+            stopLiveCamera();
+            setCapturing(true);
+            setTimeout(() => setCapturing(false), 800);
+          });
 
           // Upload to Google Drive patient folder in the background
           const pName = proposal.patientName;
@@ -379,13 +382,12 @@ export default function MobileWorkspace({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
+    try {
+      const dataUrl = await compressFileToDataUrl(file, 1024, 0.7);
       if (dataUrl) {
         const targetSectionId = activeCameraSection === 'smile' ? 'smile' : activeCameraSection;
         const targetSection = sections.find((s) => s.id === targetSectionId);
@@ -408,8 +410,9 @@ export default function MobileWorkspace({
           });
         }
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const [syncsLoading, setSyncsLoading] = useState<Record<string, boolean>>({});

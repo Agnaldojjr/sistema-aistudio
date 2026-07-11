@@ -90,7 +90,7 @@ export async function deletePatientFileFromSupabase(patientName: string, filenam
   
   const userId = session.user.id;
   const patientFolder = getSafePatientPath(patientName);
-  const filePath = `${userId}/${patientFolder}/${filename}`;
+  const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${filename}`;
 
   const { error } = await supabase.storage
     .from(BUCKET_NAME)
@@ -129,7 +129,7 @@ export async function getPatientFileUrlFromSupabase(patientName: string, filenam
   
   const userId = session.user.id;
   const patientFolder = getSafePatientPath(patientName);
-  const filePath = `${userId}/${patientFolder}/${filename}`;
+  const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${filename}`;
 
   const { data, error } = await supabase.storage.from(BUCKET_NAME).createSignedUrl(filePath, 3600);
   if (error) {
@@ -145,8 +145,8 @@ export async function renamePatientFileInSupabase(patientName: string, oldFilena
   
   const userId = session.user.id;
   const patientFolder = getSafePatientPath(patientName);
-  const oldPath = `${userId}/${patientFolder}/${oldFilename}`;
-  const newPath = `${userId}/${patientFolder}/${newFilename}`;
+  const oldPath = oldFilename.includes('/') ? oldFilename : `${userId}/${patientFolder}/${oldFilename}`;
+  const newPath = newFilename.includes('/') ? newFilename : `${userId}/${patientFolder}/${newFilename}`;
 
   const { error } = await supabase.storage.from(BUCKET_NAME).move(oldPath, newPath);
   if (error) {
