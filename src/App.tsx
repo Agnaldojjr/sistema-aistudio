@@ -23,6 +23,7 @@ import {
   Monitor,
   Settings,
   ArrowRight,
+  Shield,
 } from 'lucide-react';
 import ProcedureManager from './components/ProcedureManager';
 import PhotoEditor from './components/PhotoEditor';
@@ -176,6 +177,16 @@ function Sidebar({
               <p className="text-[10px] text-white/40 truncate">{clinicSettings.cro}</p>
             </div>
           ) : null}
+          <button
+            onClick={() => {
+              window.open(window.location.href.split('?')[0] + '?mode=sentinel', '_blank', 'width=1200,height=850');
+            }}
+            className={`nav-item w-full text-[#C09553]/70 hover:text-[#C09553] hover:bg-white/5 mb-1 ${collapsed ? 'justify-center px-0' : ''}`}
+            title="Agente Sentinela 24h"
+          >
+            <Shield className="nav-item-icon flex-shrink-0" />
+            {!collapsed && <span>Sentinela de Bugs</span>}
+          </button>
           <button
             onClick={onLogout}
             className={`nav-item w-full text-red-300/70 hover:text-red-200 hover:bg-red-900/30 ${collapsed ? 'justify-center px-0' : ''}`}
