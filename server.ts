@@ -726,6 +726,146 @@ Mantenha o tom profissional mas acessível. Não inclua saudações iniciais sua
     }
   });
 
+  // ==========================================
+  // SENTINELA DE BUGS (AUTOMATIC ERROR ANALYSIS)
+  // ==========================================
+  const REPORTS_FILE = path.join(process.cwd(), "sentinel_reports.json");
+  if (!fs.existsSync(REPORTS_FILE)) {
+    fs.writeFileSync(REPORTS_FILE, JSON.stringify([]));
+  }
+
+  app.post("/api/sentinel/report", async (req, res) => {
+    try {
+      const { message, stack, url, userAgent } = req.body;
+      
+      let file = "";
+      let line = 0;
+      
+      // Tenta achar arquivo local na stack trace
+      const srcMatch = stack?.match(/src\/[a-zA-Z0-9_\/.-]+:\d+/);
+      if (srcMatch) {
+        const parts = srcMatch[0].split(":");
+        file = parts[0];
+        line = parseInt(parts[1], 10);
+      }
+      
+      const newReport = {
+        id: "err_" + Date.now(),
+        timestamp: new Date().toISOString(),
+        message,
+        stack,
+        url,
+        userAgent,
+        file,
+        line,
+        status: "pending",
+        diagnosis: "",
+        proposedFix: ""
+      };
+
+      if (file) {
+        const localPath = path.join(process.cwd(), file);
+        if (fs.existsSync(localPath)) {
+          try {
+            const fileContent = fs.readFileSync(localPath, "utf-8");
+            const prompt = `Analise este erro de runtime que ocorreu em uma aplicação React/Vite.
+Mensagem do erro: ${message}
+Stack trace: ${stack}
+Arquivo alvo: ${file} (próximo à linha ${line})
+
+Aqui está o conteúdo do arquivo:
+\`\`\`typescript
+${fileContent}
+\`\`\`
+
+Explique a causa raiz do erro e forneça o código completo corrigido para substituir o arquivo original.
+Você DEVE responder em formato JSON estrito correspondente a esta estrutura:
+{
+  "explanation": "Breve explicação sobre o erro em português",
+  "rootCause": "Análise da causa raiz em português",
+  "filePatch": "O código completo e idêntico do arquivo com a correção aplicada. Não trunque nem omita nada. Escreva o arquivo por inteiro."
+}`;
+
+            const geminiResponse = await ai.models.generateContent({
+              model: "gemini-2.5-flash",
+              contents: prompt,
+              config: {
+                responseMimeType: "application/json"
+              }
+            });
+            
+            const parsed = JSON.parse(geminiResponse.text || "{}");
+            newReport.diagnosis = (parsed.explanation || "") + "\n\n" + (parsed.rootCause || "");
+            newReport.proposedFix = parsed.filePatch || "";
+          } catch (e) {
+            console.error("Falha ao analisar erro com Gemini:", e);
+          }
+        }
+      }
+
+      const reports = JSON.parse(fs.readFileSync(REPORTS_FILE, "utf-8"));
+      reports.unshift(newReport);
+      fs.writeFileSync(REPORTS_FILE, JSON.stringify(reports.slice(0, 100), null, 2));
+
+      res.json({ success: true, report: newReport });
+    } catch (err: any) {
+      console.error("Erro no Sentinel report:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/sentinel/reports", (req, res) => {
+    try {
+      const reports = JSON.parse(fs.readFileSync(REPORTS_FILE, "utf-8"));
+      res.json(reports);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/sentinel/apply-fix", async (req, res) => {
+    try {
+      const { reportId } = req.body;
+      const reports = JSON.parse(fs.readFileSync(REPORTS_FILE, "utf-8"));
+      const rIdx = reports.findIndex((r: any) => r.id === reportId);
+      
+      if (rIdx === -1) return res.status(404).json({ error: "Relatório não localizado" });
+      const report = reports[rIdx];
+      
+      if (!report.file || !report.proposedFix) {
+        return res.status(400).json({ error: "Caminho do arquivo ou correção proposta ausentes" });
+      }
+
+      const localPath = path.join(process.cwd(), report.file);
+      if (!fs.existsSync(localPath)) {
+        return res.status(404).json({ error: "Arquivo original não encontrado no servidor" });
+      }
+
+      // Backup
+      fs.writeFileSync(localPath + ".bak", fs.readFileSync(localPath));
+      // Write patch
+      fs.writeFileSync(localPath, report.proposedFix, "utf-8");
+
+      // Auto Push to GitHub
+      const { exec } = await import("child_process");
+      exec(`git add ${report.file} && git commit -m "sentinel: correção automática ${report.id}" && git push`, (gitErr, stdout, stderr) => {
+        if (gitErr) {
+          console.error("Erro ao rodar push automático:", gitErr);
+        } else {
+          console.log("Git push automático concluído:", stdout);
+        }
+      });
+
+      report.status = "applied";
+      fs.writeFileSync(REPORTS_FILE, JSON.stringify(reports, null, 2));
+
+      res.json({ success: true, message: "Correção aplicada e enviada para o GitHub!" });
+    } catch (err: any) {
+      console.error("Erro ao aplicar correção:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
