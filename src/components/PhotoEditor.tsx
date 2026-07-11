@@ -379,7 +379,7 @@ export default function PhotoEditor({
   };
 
   // Upload actions
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('Por favor, faça upload de um arquivo de imagem.');
       return;
