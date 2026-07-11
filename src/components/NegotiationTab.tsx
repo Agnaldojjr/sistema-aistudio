@@ -1367,7 +1367,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         </div>
 
         {/* Informative Rate Detail */}
-        <div className="bg-[#FAF8F5] border border-[#E6DEC9] p-3.5 rounded-xl flex items-start gap-2.5 text-xs text-zinc-500 leading-normal">
+        <div className="bg-[#FAF8F5] border border-[#E6DEC9] p-3.5 rounded-xl flex items-start gap-2.5 text-xs text-zinc-500 leading-normal print:hidden">
           <HelpCircle className="w-4 h-4 text-[#B48C4D] flex-shrink-0 mt-0.5" />
           <p>
             * Taxa aplicada pela maquininha Ton para a bandeira <strong>{cardBrand === 'visa_master' ? 'Visa / Mastercard' : 'Elo / Amex'}</strong> em <strong>{installments} parcelas</strong> é de <strong>{machineFeePercent}%</strong>. O cálculo do valor cobrado utiliza a fórmula financeira reversa precisa repassando a taxa: <code className="bg-[#F5EFE3] px-1 py-0.5 rounded text-[#8B0000] font-mono text-[11px]">Restante / (1 - Taxa)</code>, garantindo que o cirurgião receba exatamente o valor líquido desejado estabelecido.
@@ -1390,12 +1390,23 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
             #printable-negotiation-envelope, #printable-negotiation-envelope * {
               visibility: visible;
             }
+            html, body, #root, .app-shell, .main-content, main, .space-y-8 {
+              height: auto !important;
+              min-height: 0 !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              position: static !important;
+              overflow: visible !important;
+              border: none !important;
+              box-shadow: none !important;
+              display: block !important;
+            }
             #printable-negotiation-envelope {
-              position: absolute;
-              left: 0;
-              top: 0;
+              position: relative !important;
+              left: 0 !important;
+              top: 0 !important;
               font-size: 11px !important;
-              line-height: 1.2 !important;
+              line-height: 1.25 !important;
               max-width: 100% !important;
               width: 100% !important;
               margin: 0 !important;
@@ -1407,9 +1418,12 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
             .no-print-break {
               page-break-inside: avoid !important;
             }
+            tr {
+              page-break-inside: avoid !important;
+            }
             @page {
               size: A4 portrait;
-              margin: 10mm 10mm 10mm 10mm !important;
+              margin: 15mm 15mm 15mm 15mm !important;
             }
           }
         `}
@@ -1460,7 +1474,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         </div>
 
         {/* Procedure List Summary Table (Very Compact to fit 1 page) */}
-        <div className="space-y-3 no-print-break">
+        <div className="space-y-3">
           <div className="flex justify-between items-center border-b border-zinc-100 pb-1">
             <h4 className="text-[10px] font-bold text-[#8B0000] uppercase tracking-wider">
               Diagnóstico de Mapeamento Clínico (Procedimentos Necessários)
