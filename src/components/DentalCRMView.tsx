@@ -989,9 +989,7 @@ export default function DentalCRMView({
         return await r.json(); 
       })();
       onLoadPatientData(data);
-      if (onChangeView) {
-        onChangeView('planning');
-      }
+      setActiveDetailTab('plan_editor');
     } catch (err: any) {
       alert("Erro ao carregar planejamento no espaço de trabalho: " + err.message);
     } finally {
