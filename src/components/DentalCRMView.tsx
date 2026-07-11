@@ -4561,7 +4561,10 @@ export default function DentalCRMView({
                           <p className="text-[10px] text-zinc-400 mt-1 max-w-sm mx-auto">Para gerar o plano de evolução, crie um orçamento clicando no botão abaixo ou abra o Planejador 3D.</p>
                           <button
                             onClick={() => {
-                              if (onNewProposal) onNewProposal(selectedPatient.name);
+                              if (onNewProposal) {
+                                onNewProposal(selectedPatient.name);
+                                setActiveDetailTab('plan_editor');
+                              }
                             }}
                             className="mt-4 px-4 py-2 bg-[#8B0000] hover:bg-[#a32c3d] text-[#FAF8F5] text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer"
                           >
@@ -4616,6 +4619,7 @@ export default function DentalCRMView({
                                 setActiveSections(newSections);
                               }}
                               patientName={selectedPatient?.name || ''}
+                              driveFolderId={driveFolderId || ''}
                               onAddProcedure={setProcedures ? (newProc) => {
                                 setProcedures((prev: any) => [...prev, newProc]);
                               } : undefined}
@@ -4939,6 +4943,7 @@ export default function DentalCRMView({
                             onClick={() => {
                               if (onNewProposal && selectedPatient) {
                                 onNewProposal(selectedPatient.name);
+                                setActiveDetailTab('plan_editor');
                               }
                             }}
                             className="px-3.5 py-2 bg-[#C09553] hover:bg-[#A97E3B] text-white font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95"

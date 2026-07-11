@@ -17,6 +17,7 @@ interface PhotoEditorProps {
   onUpdateSection: (updatedSection: PhotoSection) => void;
   markerSize?: number;
   patientName?: string;
+  driveFolderId?: string;
   onAddProcedure?: (proc: Procedure) => void;
 }
 
@@ -26,6 +27,7 @@ export default function PhotoEditor({
   onUpdateSection,
   markerSize = 26,
   patientName = '',
+  driveFolderId = '',
   onAddProcedure,
 }: PhotoEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,7 +98,8 @@ export default function PhotoEditor({
     setIsLoadingGallery(true);
     setGalleryError(null);
     try {
-      const imgs = await listPatientFilesFromSupabase(patientName);
+      const folderName = driveFolderId || patientName;
+      const imgs = await listPatientFilesFromSupabase(folderName);
       setGalleryImages(imgs);
       if (imgs.length === 0) {
         setGalleryError(`Nenhuma imagem encontrada na galeria do paciente "${patientName}".`);
@@ -309,12 +312,13 @@ export default function PhotoEditor({
           });
 
           // Upload to Supabase patient folder in the background
-          if (patientName) {
+          const folderName = driveFolderId || patientName;
+          if (folderName) {
             canvas.toBlob(async (blob) => {
               if (blob) {
                 try {
                   const filename = `${section.id}_capture_${Date.now()}.jpg`;
-                  await uploadPatientFileToSupabase(patientName, blob, filename);
+                  await uploadPatientFileToSupabase(folderName, blob, filename);
                   console.log(`Webcam capture saved to patient ${patientName} on Supabase`);
                 } catch (err) {
                   console.warn("Failed to upload quadrant webcam snapshot to Supabase:", err);
@@ -334,7 +338,8 @@ export default function PhotoEditor({
     });
     setIsMarkupEditorOpen(false);
 
-    if (patientName) {
+    const folderName = driveFolderId || patientName;
+    if (folderName) {
       try {
         const arr = editedImage.split(',');
         const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
@@ -346,7 +351,7 @@ export default function PhotoEditor({
         }
         const blob = new Blob([u8arr], { type: mime });
         const filename = `${section.id}_edited_${Date.now()}.jpg`;
-        await uploadPatientFileToSupabase(patientName, blob, filename);
+        await uploadPatientFileToSupabase(folderName, blob, filename);
         console.log(`Edited quadrant saved to patient ${patientName} on Supabase`);
       } catch (err) {
         console.warn("Failed to upload edited quadrant to Supabase:", err);
@@ -392,9 +397,10 @@ export default function PhotoEditor({
       });
 
       // Upload to Supabase patient folder in the background
-      if (patientName) {
+      const folderName = driveFolderId || patientName;
+      if (folderName) {
         const filename = `${section.id}_upload_${Date.now()}_${file.name}`;
-        await uploadPatientFileToSupabase(patientName, file, filename);
+        await uploadPatientFileToSupabase(folderName, file, filename);
         console.log(`Quadrant upload saved to patient ${patientName} on Supabase`);
       }
     } catch (err) {
