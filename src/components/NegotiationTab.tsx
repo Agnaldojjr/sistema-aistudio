@@ -1384,7 +1384,16 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
             body {
               background-color: white !important;
             }
+            body * {
+              visibility: hidden;
+            }
+            #printable-negotiation-envelope, #printable-negotiation-envelope * {
+              visibility: visible;
+            }
             #printable-negotiation-envelope {
+              position: absolute;
+              left: 0;
+              top: 0;
               font-size: 11px !important;
               line-height: 1.2 !important;
               max-width: 100% !important;
