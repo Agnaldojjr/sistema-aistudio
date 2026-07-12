@@ -481,7 +481,15 @@ export function setupToothShader(material: any, fdi: number) {
       '#include <color_fragment>',
       `#include <color_fragment>
        // Transforma a normal de view space para world space usando a camera matrix customizada
-       vec3 worldN = normalize( (uCameraWorldMatrix * vec4(normalize(vNormal), 0.0)).xyz );
+       vec3 worldN;
+       #ifdef USE_NORMAL
+         worldN = normalize( (uCameraWorldMatrix * vec4(normalize(vNormal), 0.0)).xyz );
+       #else
+         vec3 fdx = dFdx( vViewPosition );
+         vec3 fdy = dFdy( vViewPosition );
+         vec3 faceNormal = normalize( cross( fdx, fdy ) );
+         worldN = normalize( (uCameraWorldMatrix * vec4(faceNormal, 0.0)).xyz );
+       #endif
        
        // Rotaciona a normal no eixo Y pelo ângulo do arco dentário
        float c = cos(-uArchAngle);
