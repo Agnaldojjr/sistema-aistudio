@@ -100,8 +100,12 @@ export default function PhotoEditor({
     try {
       const folderName = driveFolderId || patientName;
       const imgs = await listPatientFilesFromSupabase(folderName);
-      setGalleryImages(imgs);
-      if (imgs.length === 0) {
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+      const filteredImgs = (imgs || []).filter(f => 
+        imageExtensions.some(ext => f.name.toLowerCase().endsWith(ext))
+      );
+      setGalleryImages(filteredImgs);
+      if (filteredImgs.length === 0) {
         setGalleryError(`Nenhuma imagem encontrada na galeria do paciente "${patientName}".`);
       }
     } catch (err: any) {

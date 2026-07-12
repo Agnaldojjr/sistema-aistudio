@@ -344,10 +344,10 @@ export default function MobileWorkspace({
           
           ctx.restore();
           const rawDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          const targetSectionId = activeCameraSection === 'smile' ? 'smile' : activeCameraSection;
           
           compressImage(rawDataUrl, 1024, 0.7).then((dataUrl) => {
             // Locate section and update image
-            const targetSectionId = activeCameraSection === 'smile' ? 'smile' : activeCameraSection;
             const targetSection = sections.find((s) => s.id === targetSectionId);
             if (targetSection) {
               onUpdateSection({

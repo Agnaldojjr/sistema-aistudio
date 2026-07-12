@@ -871,6 +871,15 @@ export default function DentalCRMView({
     }
   };
 
+  const filterSupabaseProposals = (files: any[]) => {
+    return (files || []).filter(f => f.name.toLowerCase().endsWith('.json'));
+  };
+
+  const filterSupabaseImages = (files: any[]) => {
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+    return (files || []).filter(f => imageExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+  };
+
   const syncGoogleSupabaseDataForPatient = async (patientName: string) => {
     setSupabaseError(null);
     setSupabaseFolderId(null);
@@ -887,7 +896,7 @@ export default function DentalCRMView({
       // Load proposals
       try {
         const proposals = await listPatientFilesFromSupabase(folderId);
-        setSupabaseProposals(proposals || []);
+        setSupabaseProposals(filterSupabaseProposals(proposals));
       } catch (err: any) {
         console.warn("Failed to load proposals for folder:", folderId, err);
       } finally {
@@ -897,7 +906,7 @@ export default function DentalCRMView({
       // Load images
       try {
         const images = await listPatientFilesFromSupabase(folderId);
-        setSupabaseImages(images || []);
+        setSupabaseImages(filterSupabaseImages(images));
       } catch (err: any) {
         console.warn("Failed to load images for folder:", folderId, err);
       } finally {
@@ -920,7 +929,7 @@ export default function DentalCRMView({
       await uploadPatientFileToSupabase(driveFolderId, file, name);
       // Refresh
       const images = await listPatientFilesFromSupabase(driveFolderId);
-      setSupabaseImages(images || []);
+      setSupabaseImages(filterSupabaseImages(images));
     } catch (err: any) {
       alert("Erro ao enviar imagem ao Supabase: " + err.message);
     } finally {
@@ -935,7 +944,7 @@ export default function DentalCRMView({
       await deletePatientFileFromSupabase(driveFolderId || selectedPatient?.name || "Unknown", fileId);
       if (driveFolderId) {
         const images = await listPatientFilesFromSupabase(driveFolderId);
-        setSupabaseImages(images || []);
+        setSupabaseImages(filterSupabaseImages(images));
       }
     } catch (err: any) {
       alert("Erro ao excluir arquivo: " + err.message);
@@ -951,7 +960,7 @@ export default function DentalCRMView({
       await deletePatientFileFromSupabase(driveFolderId || selectedPatient?.name || "Unknown", fileId);
       if (driveFolderId) {
         const proposals = await listPatientFilesFromSupabase(driveFolderId);
-        setSupabaseProposals(proposals || []);
+        setSupabaseProposals(filterSupabaseProposals(proposals));
       }
     } catch (err: any) {
       alert("Erro ao excluir orçamento: " + err.message);
@@ -968,7 +977,7 @@ export default function DentalCRMView({
       await renamePatientFileInSupabase(driveFolderId || selectedPatient?.name || "Unknown", fileId, newName.trim());
       if (driveFolderId) {
         const proposals = await listPatientFilesFromSupabase(driveFolderId);
-        setSupabaseProposals(proposals || []);
+        setSupabaseProposals(filterSupabaseProposals(proposals));
       }
     } catch (err: any) {
       alert("Erro ao renomear orçamento: " + err.message);
@@ -1251,7 +1260,7 @@ export default function DentalCRMView({
 
       // Refresh gallery
       const updatedImages = await listPatientFilesFromSupabase(driveFolderId);
-      setSupabaseImages(updatedImages);
+      setSupabaseImages(filterSupabaseImages(updatedImages));
     } catch (err: any) {
       alert('Erro ao salvar imagem editada: ' + err.message);
     } finally {
@@ -1362,7 +1371,7 @@ export default function DentalCRMView({
       
       // Refresh list
       const images = await listPatientFilesFromSupabase(driveFolderId);
-      setSupabaseImages(images || []);
+      setSupabaseImages(filterSupabaseImages(images));
       
       setIsCameraActive(false);
       stopCameraStream();

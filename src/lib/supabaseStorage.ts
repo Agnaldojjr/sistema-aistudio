@@ -66,15 +66,62 @@ export async function listPatientFilesFromSupabase(patientName: string) {
     if (signedUrlsError) {
       console.error('Erro ao gerar URLs assinadas:', signedUrlsError);
     } else {
-      return data
+      const fileObjects = data
         .filter(f => f.name !== '.emptyFolderPlaceholder')
         .map((f, i) => ({
           id: `${path}/${f.name}`,
           name: f.name,
           thumbnailLink: signedUrlsData?.[i]?.signedUrl || null, // Funciona como thumbnail (url temporária)
           createdTime: f.created_at,
+          modifiedTime: f.updated_at || f.created_at,
           mimeType: f.metadata?.mimetype || 'application/octet-stream'
         }));
+
+      const enrichedFiles = await Promise.all(fileObjects.map(async (file) => {
+        if (file.name.toLowerCase().endsWith('.json') && file.thumbnailLink) {
+          try {
+            const r = await fetch(file.thumbnailLink);
+            if (r.ok) {
+              const fileData = await r.json();
+              
+              let total = 0;
+              if (fileData.simulations && fileData.selectedPlanIndex !== undefined && fileData.simulations[fileData.selectedPlanIndex]) {
+                total = fileData.simulations[fileData.selectedPlanIndex].custoTotal;
+              } else {
+                const sections = fileData.sections || [];
+                const procedures = fileData.procedures || [];
+                sections.forEach((sec: any) => {
+                  sec.markers?.forEach((marker: any) => {
+                    if (marker.procedureInstances && marker.procedureInstances.length > 0) {
+                      marker.procedureInstances.forEach((inst: any) => {
+                        total += (inst.includeFinancial !== false ? (inst.price || 0) : 0);
+                      });
+                    } else if (marker.procedures) {
+                      marker.procedures.forEach((pid: any) => {
+                        const proc = procedures.find((p: any) => p.id === pid);
+                        total += (proc ? (proc.price || 0) : 0);
+                      });
+                    }
+                  });
+                });
+              }
+
+              return {
+                ...file,
+                appProperties: {
+                  status: fileData.proposal?.status || 'Aberto',
+                  total: total
+                }
+              };
+            }
+          } catch (e) {
+            console.warn("Failed to fetch/parse JSON content for", file.name, e);
+          }
+        }
+        return file;
+      }));
+
+      return enrichedFiles;
     }
   }
 

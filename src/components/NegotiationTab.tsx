@@ -71,6 +71,89 @@ const formatCurrency = (val: number) => {
   }).format(val);
 };
 
+const drawMarkersOnImage = (sec: PhotoSection, procedures: Procedure[]): Promise<string> => {
+  return new Promise((resolve) => {
+    if (!sec.image) {
+      resolve('');
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous'; // Evita problemas com canvas poluído
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const width = img.naturalWidth || 800;
+      const height = img.naturalHeight || 450;
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve('');
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const markerSize = width * 0.04; 
+      const radius = markerSize / 2;
+
+      sec.markers.forEach((marker) => {
+        const markerX = (marker.x / 100) * width;
+        const markerY = (marker.y / 100) * height;
+
+        // Círculo branco do dente
+        ctx.beginPath();
+        ctx.arc(markerX, markerY, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.lineWidth = Math.max(1, width * 0.002);
+        ctx.strokeStyle = '#d4d4d8';
+        ctx.stroke();
+
+        // Número do dente
+        ctx.fillStyle = '#09090b';
+        ctx.font = `bold ${Math.round(radius * 0.9)}px Helvetica, Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(marker.toothNumber.toString(), markerX, markerY);
+
+        // Pontos de cores dos procedimentos no canto inferior direito
+        if (marker.procedures && marker.procedures.length > 0) {
+          const dotRadius = radius * 0.3;
+          const dotSpacing = dotRadius * 2.2;
+          
+          const validProcedures = marker.procedures
+            .map(pid => procedures.find(p => p.id === pid))
+            .filter((p): p is Procedure => !!p);
+          
+          const totalDots = validProcedures.length;
+          const startX = markerX + radius * 0.7;
+          const startY = markerY + radius * 0.7;
+
+          validProcedures.forEach((proc, idx) => {
+            const dotX = startX - (totalDots - 1 - idx) * dotSpacing;
+            const dotY = startY;
+
+            ctx.beginPath();
+            ctx.arc(dotX, dotY, dotRadius, 0, 2 * Math.PI);
+            ctx.fillStyle = proc.color || '#3b82f6';
+            ctx.fill();
+            ctx.lineWidth = Math.max(0.5, width * 0.001);
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+          });
+        }
+      });
+
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => {
+      resolve('');
+    };
+    img.src = sec.image;
+  });
+};
+
 export default function NegotiationTab({
   sections,
   procedures,
@@ -622,10 +705,79 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         currentY += 8;
       });
 
-      // Total and simulations
-      if (currentY > 210) {
+      // compile images with markers
+      const sectionsWithImages: { title: string; subtitle: string; dataUrl: string }[] = [];
+      for (const sec of sections) {
+        if (sec.image && sec.markers && sec.markers.length > 0) {
+          try {
+            const dataUrl = await drawMarkersOnImage(sec, procedures);
+            if (dataUrl) {
+              sectionsWithImages.push({
+                title: sec.title,
+                subtitle: sec.subtitle,
+                dataUrl
+              });
+            }
+          } catch (e) {
+            console.error("Erro ao desenhar dentes marcados no PDF:", e);
+          }
+        }
+      }
+
+      if (sectionsWithImages.length > 0) {
         doc.addPage();
-        currentY = 25;
+        
+        // Title for the images page
+        doc.setFillColor(78, 17, 25);
+        doc.rect(0, 0, 210, 15, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text(('MAPEAMENTO VISUAL DOS DENTES / DIAGNÓSTICO').toUpperCase(), 15, 9);
+        
+        let imgY = 25;
+        for (let i = 0; i < sectionsWithImages.length; i++) {
+          const item = sectionsWithImages[i];
+          
+          if (imgY + 95 > 280) {
+            doc.addPage();
+            doc.setFillColor(78, 17, 25);
+            doc.rect(0, 0, 210, 15, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('Helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.text(('MAPEAMENTO VISUAL DOS DENTES / DIAGNÓSTICO (CONT.)').toUpperCase(), 15, 9);
+            imgY = 25;
+          }
+          
+          doc.setFontSize(9);
+          doc.setTextColor(78, 17, 25);
+          doc.setFont('Helvetica', 'bold');
+          doc.text(item.title.toUpperCase(), 15, imgY);
+          
+          if (item.subtitle) {
+            doc.setFontSize(7);
+            doc.setTextColor(120, 120, 120);
+            doc.setFont('Helvetica', 'normal');
+            doc.text(item.subtitle, 15, imgY + 4);
+          }
+          
+          const imgWidth = 145;
+          const imgHeight = 81.56; // 145 * (9/16)
+          const imgX = (210 - imgWidth) / 2;
+          doc.addImage(item.dataUrl, 'JPEG', imgX, imgY + 7, imgWidth, imgHeight);
+          
+          imgY += imgHeight + 17;
+        }
+        
+        doc.addPage();
+        currentY = 20;
+      } else {
+        // Total and simulations
+        if (currentY > 210) {
+          doc.addPage();
+          currentY = 25;
+        }
       }
 
       // Simulation details
