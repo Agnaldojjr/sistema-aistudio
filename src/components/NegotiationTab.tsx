@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from '../types';
 import { usePatientContext } from '../context/PatientContext';
-import { uploadPatientFileToSupabase } from '../lib/supabaseStorage';
+import { uploadPatientFileToSupabase, getPatientFileUrlFromSupabase } from '../lib/supabaseStorage';
 import { jsPDF } from 'jspdf';
 
 interface NegotiationTabProps {
@@ -429,6 +429,7 @@ export default function NegotiationTab({
   const [isSendingPdf, setIsSendingPdf] = useState<boolean>(false);
   const [pdfDispatchLogs, setPdfDispatchLogs] = useState<string[]>([]);
   const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
+  const [localPdfUrl, setLocalPdfUrl] = useState<string | null>(null);
   const [whatsappCustomMsg, setWhatsappCustomMsg] = useState<string>(() => {
     return `Olá *{paciente}*, tudo bem?
 
@@ -486,6 +487,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
     setSuccessStatus(false);
     setPdfDispatchLogs([]);
     setGeneratedPdfUrl(null);
+    setLocalPdfUrl(null);
 
     const log = (msg: string) => {
       setPdfDispatchLogs(prev => [...prev, msg]);
@@ -690,17 +692,22 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       const pdfBlob = doc.output('blob');
       log("✅ PDF estruturado com sucesso localmente!");
 
+      const localUrl = URL.createObjectURL(pdfBlob);
+      setLocalPdfUrl(localUrl);
+
       log("☁️ 2/5 - Iniciando upload seguro do PDF para o Supabase...");
       
       const safePatientName = patientName || 'Paciente_Anonimo';
       const cleanFileName = `Orcamento_${safePatientName.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
       
-      const driveResult = { id: 'supabase-' + cleanFileName, webViewLink: 'https://' + cleanFileName };
       await uploadPatientFileToSupabase(safePatientName, pdfBlob, cleanFileName);
       log(`✅ Sucesso! PDF salvo na pasta de Documentos no Supabase de "${safePatientName}".`);
 
       log("🔗 3/5 - Configurando permissões de leitura no Supabase...");
-      const pdfLink = driveResult.webViewLink;
+      const pdfLink = await getPatientFileUrlFromSupabase(safePatientName, cleanFileName, 315360000);
+      if (!pdfLink) {
+        throw new Error("Não foi possível obter a URL pública do PDF do Supabase.");
+      }
       setGeneratedPdfUrl(pdfLink);
       log(`✅ Link público e seguro ativado!`);
 
@@ -1909,7 +1916,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                 
                 <div className="flex items-center gap-2 shrink-0">
                   <a
-                    href={generatedPdfUrl}
+                    href={localPdfUrl || generatedPdfUrl || undefined}
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 py-1.5 px-3 rounded-lg font-bold text-[11px] border border-zinc-300 transition-colors cursor-pointer"

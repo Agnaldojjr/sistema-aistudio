@@ -2,6 +2,7 @@ import React from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { usePlanning3D } from '../hooks/usePlanning3D';
+import { setupToothShader, updateToothUniforms } from './ToothMesh';
 
 // Lista de dentes permanentes por quadrantes
 const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -46,7 +47,14 @@ function JawModelRenderer({
   onLoadPositions?: (positions: Record<number, [number, number, number]>) => void;
 }) {
   const { scene } = useGLTF(modelPath) as any;
-  const { selectTooth, viewerState } = usePlanning3D();
+  const { 
+    selectTooth, 
+    viewerState, 
+    teeth, 
+    getSurfaceCondition, 
+    getToothProcedures, 
+    globalProcedures 
+  } = usePlanning3D();
   const groupRef = React.useRef<THREE.Group>(null);
   
   // Escala para ajustar ao visualizador
@@ -64,7 +72,7 @@ function JawModelRenderer({
 
   // Calcula e notifica os centróides assim que a cena é clonada
   React.useEffect(() => {
-    if (!clonedScene || !onLoadPositions || !groupRef.current) return;
+    if (!clonedScene || !groupRef.current) return;
     const positions: Record<number, [number, number, number]> = {};
     
     // Força a atualização das matrizes do Three.js para coordenadas mundiais válidas
@@ -93,7 +101,7 @@ function JawModelRenderer({
     });
     
     if (Object.keys(positions).length > 0) {
-      onLoadPositions(positions);
+      if (onLoadPositions) onLoadPositions(positions);
     }
   }, [clonedScene, onLoadPositions]);
 
@@ -104,16 +112,27 @@ function JawModelRenderer({
         const rawFdi = parseInt(child.name);
         const fdi = fixFdiNumber(rawFdi);
         const isSelected = viewerState.activeTooth === fdi;
-        const isMissing = viewerState.missingTeeth?.includes(fdi);
+        const isMissing = viewerState.missingTeeth?.includes(fdi) || teeth[fdi]?.condition === 'MISSING';
         
         // Ocultar se o dente for marcado como ausente
         child.visible = !isMissing;
         
         if (child.material) {
+          setupToothShader(child.material, fdi);
+          updateToothUniforms(
+            child.material,
+            fdi,
+            isSelected,
+            viewerState,
+            getSurfaceCondition,
+            getToothProcedures,
+            globalProcedures
+          );
+          
           if (isSelected) {
-            // Emissive azul forte para destaque
+            // Emissive azul suave para destaque
             child.material.emissive.set('#3b82f6');
-            child.material.emissiveIntensity = 0.6;
+            child.material.emissiveIntensity = 0.25;
           } else {
             child.material.emissive.set('#000000');
             child.material.emissiveIntensity = 0.0;
@@ -121,7 +140,17 @@ function JawModelRenderer({
         }
       }
     });
-  }, [clonedScene, viewerState.activeTooth, viewerState.missingTeeth]);
+  }, [
+    clonedScene, 
+    viewerState.activeTooth, 
+    viewerState.missingTeeth, 
+    teeth, 
+    viewerState.activeSurfaces, 
+    viewerState.simulationState,
+    getSurfaceCondition,
+    getToothProcedures,
+    globalProcedures
+  ]);
 
   return (
     <group ref={groupRef} position={[0, -0.2, 0]}>
@@ -145,7 +174,7 @@ function JawModelRenderer({
             }
 
             if (clickedFdi !== null) {
-              const isMissing = viewerState.missingTeeth?.includes(clickedFdi);
+              const isMissing = viewerState.missingTeeth?.includes(clickedFdi) || teeth[clickedFdi]?.condition === 'MISSING';
               if (!isMissing) {
                 selectTooth(clickedFdi, { x: e.clientX, y: e.clientY });
               }
@@ -163,7 +192,11 @@ function JawModelRenderer({
               current = current.parent;
             }
             if (isTooth) {
-              document.body.style.cursor = 'pointer';
+              const clickedFdi = fixFdiNumber(parseInt(e.object.name));
+              const isMissing = viewerState.missingTeeth?.includes(clickedFdi) || teeth[clickedFdi]?.condition === 'MISSING';
+              if (!isMissing) {
+                document.body.style.cursor = 'pointer';
+              }
             }
           }}
           onPointerOut={() => {

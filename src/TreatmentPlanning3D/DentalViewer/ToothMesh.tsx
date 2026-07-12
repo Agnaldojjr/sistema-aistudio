@@ -22,6 +22,43 @@ export function isAnteriorTooth(toothNumber: number): boolean {
   return code >= 1 && code <= 3;
 }
 
+export const DEFAULT_ARCH_CONFIG = {
+  a: 4.5,
+  b: 4.0,
+  zOffset: -1.5,
+  yOffset: 1.0,
+  maxAngleDivider: 2.3,
+  hitboxScale: 0.8,
+};
+
+export type ArchConfig = typeof DEFAULT_ARCH_CONFIG;
+
+export function getToothPosition(fdiCode: number): { position: [number, number, number]; rotation: [number, number, number] } {
+  const isUpper = fdiCode < 30;
+  const config = DEFAULT_ARCH_CONFIG;
+  const quadrant = Math.floor(fdiCode / 10);
+  const positionIndex = fdiCode % 10;
+
+  let index = 0;
+  if (quadrant === 1 || quadrant === 4) {
+    index = -positionIndex;
+  } else {
+    index = positionIndex;
+  }
+
+  const maxAngle = Math.PI / config.maxAngleDivider;
+  const angle = (index / 8) * maxAngle;
+
+  const x = config.a * Math.sin(angle);
+  const z = config.b * Math.cos(angle) + config.zOffset;
+  const y = isUpper ? config.yOffset : -config.yOffset;
+
+  return {
+    position: [x, y, z],
+    rotation: [isUpper ? 0 : Math.PI, angle, 0],
+  };
+}
+
 // Geometrias compartilhadas para fallback procedural de alto nível
 const sharedMolarCrownCylinder = new THREE.CylinderGeometry(0.42, 0.42, 0.7, 16);
 const sharedMolarCrownSphere = new THREE.SphereGeometry(0.42, 16, 16);
@@ -87,45 +124,6 @@ export function ToothMesh({ toothNumber, position, rotation = [0, 0, 0], geometr
     return null;
   }
 
-  // Obter a cor de cada face (superfície) individual
-  const getSurfaceColor = (surface: ToothSurface) => {
-    let cond = getSurfaceCondition(toothNumber, surface);
-
-    if (isAfterSimulation) {
-      if (cond === 'CARIES' || cond === 'FRACTURE') {
-        cond = 'HEALTHY';
-      }
-    }
-
-    if (toothState?.condition === 'IMPLANT' || cond === 'IMPLANT') return '#9CA3AF';
-    if (toothState?.condition === 'CROWN' || cond === 'CROWN') return '#F59E0B';
-
-    switch (cond) {
-      case 'CARIES':
-      case 'FRACTURE':
-        return '#EF4444';
-      case 'HEALTHY':
-      default:
-        const isSurfaceSelected = isSelected && viewerState.activeSurfaces.includes(surface);
-        if (isSurfaceSelected) {
-          return '#3B82F6';
-        }
-        return '#FAF8F5';
-    }
-  };
-
-  const isSurfaceActive = (surface: ToothSurface) => {
-    const cond = getSurfaceCondition(toothNumber, surface);
-    
-    let activeCond = cond;
-    if (isAfterSimulation && (cond === 'CARIES' || cond === 'FRACTURE')) {
-      activeCond = 'HEALTHY';
-    }
-
-    const isSurfaceSelected = isSelected && viewerState.activeSurfaces.includes(surface);
-    return activeCond !== 'HEALTHY' || isSurfaceSelected;
-  };
-
   const getCrownMaterialProps = () => {
     let color = hovered ? '#E0F2FE' : '#FAF8F5';
     let roughness = 0.05;
@@ -142,17 +140,6 @@ export function ToothMesh({ toothNumber, position, rotation = [0, 0, 0], geometr
     }
 
     return { color, roughness, metalness };
-  };
-
-  const topSurface: ToothSurface = isAnterior ? 'I' : 'O';
-  
-  const faceColors = {
-    distal: getSurfaceColor('D'),
-    mesial: getSurfaceColor('M'),
-    top: getSurfaceColor(topSurface),
-    cervical: getSurfaceColor('C'),
-    vestibular: getSurfaceColor('V'),
-    lingual: getSurfaceColor('L'),
   };
 
   const handlePointerOver = (e: any) => {
@@ -353,14 +340,7 @@ export function ToothMesh({ toothNumber, position, rotation = [0, 0, 0], geometr
 
       {/* 4. OVERLAY DAS SUPERFÍCIES (Exibe as cores de patologias/seleção nas faces correspondentes) */}
       {showTeeth && (
-        <mesh castShadow receiveShadow geometry={isAnterior ? sharedAnteriorBox : sharedMolarBox}>
-          <meshStandardMaterial attach="material-0" color={faceColors.distal} roughness={0.1} transparent opacity={isSurfaceActive('D') ? 0.85 : 0} />
-          <meshStandardMaterial attach="material-1" color={faceColors.mesial} roughness={0.1} transparent opacity={isSurfaceActive('M') ? 0.85 : 0} />
-          <meshStandardMaterial attach="material-2" color={faceColors.top} roughness={0.1} transparent opacity={isSurfaceActive(topSurface) ? 0.85 : 0} />
-          <meshStandardMaterial attach="material-3" color={faceColors.cervical} roughness={0.1} transparent opacity={isSurfaceActive('C') ? 0.85 : 0} />
-          <meshStandardMaterial attach="material-4" color={faceColors.vestibular} roughness={0.1} transparent opacity={isSurfaceActive('V') ? 0.85 : 0} />
-          <meshStandardMaterial attach="material-5" color={faceColors.lingual} roughness={0.1} transparent opacity={isSurfaceActive('L') ? 0.85 : 0} />
-        </mesh>
+        <ToothSurfaceOverlay toothNumber={toothNumber} isSelected={isSelected} />
       )}
 
       {/* Rótulo de seleção ativo */}
@@ -372,3 +352,266 @@ export function ToothMesh({ toothNumber, position, rotation = [0, 0, 0], geometr
     </group>
   );
 }
+
+interface ToothSurfaceOverlayProps {
+  toothNumber: number;
+  isSelected?: boolean;
+}
+
+export function ToothSurfaceOverlay({ toothNumber, isSelected = false }: ToothSurfaceOverlayProps) {
+  const { viewerState, getSurfaceCondition, getToothProcedures, globalProcedures } = usePlanning3D();
+  const isAnterior = isAnteriorTooth(toothNumber);
+  const isAfterSimulation = viewerState.simulationState === 'AFTER';
+
+  const getSurfaceColor = (surface: ToothSurface) => {
+    let cond = getSurfaceCondition(toothNumber, surface);
+
+    if (isAfterSimulation) {
+      if (cond === 'CARIES' || cond === 'FRACTURE') {
+        cond = 'HEALTHY';
+      }
+    }
+
+    if (cond === 'IMPLANT') return '#9CA3AF';
+    if (cond === 'CROWN') return '#F59E0B';
+
+    // Verificar se há procedimento para esta face
+    const toothProcs = getToothProcedures(toothNumber);
+    const procForSurface = toothProcs.find(p => p.surfaces?.includes(surface));
+    if (procForSurface) {
+      const globalProc = globalProcedures.find(gp => gp.id === procForSurface.procedureId || gp.name === procForSurface.procedure);
+      if (globalProc?.color) {
+        return globalProc.color;
+      }
+    }
+
+    switch (cond) {
+      case 'CARIES':
+      case 'FRACTURE':
+        return '#EF4444';
+      case 'HEALTHY':
+      default:
+        const isSurfaceSelected = isSelected && viewerState.activeSurfaces.includes(surface);
+        if (isSurfaceSelected) {
+          return '#3B82F6';
+        }
+        return '#FAF8F5';
+    }
+  };
+
+  const isSurfaceActive = (surface: ToothSurface) => {
+    const cond = getSurfaceCondition(toothNumber, surface);
+    
+    let activeCond = cond;
+    if (isAfterSimulation && (cond === 'CARIES' || cond === 'FRACTURE')) {
+      activeCond = 'HEALTHY';
+    }
+
+    const isSurfaceSelected = isSelected && viewerState.activeSurfaces.includes(surface);
+
+    // Verificar se há procedimento para esta face
+    const toothProcs = getToothProcedures(toothNumber);
+    const hasProc = toothProcs.some(p => p.surfaces?.includes(surface));
+
+    return activeCond !== 'HEALTHY' || isSurfaceSelected || hasProc;
+  };
+
+  const topSurface: ToothSurface = isAnterior ? 'I' : 'O';
+  
+  const faceColors = {
+    distal: getSurfaceColor('D'),
+    mesial: getSurfaceColor('M'),
+    top: getSurfaceColor(topSurface),
+    cervical: getSurfaceColor('C'),
+    vestibular: getSurfaceColor('V'),
+    lingual: getSurfaceColor('L'),
+  };
+
+  return (
+    <mesh castShadow receiveShadow geometry={isAnterior ? sharedAnteriorBox : sharedMolarBox}>
+      <meshStandardMaterial attach="material-0" color={faceColors.distal} roughness={0.1} transparent opacity={isSurfaceActive('D') ? 0.85 : 0} />
+      <meshStandardMaterial attach="material-1" color={faceColors.mesial} roughness={0.1} transparent opacity={isSurfaceActive('M') ? 0.85 : 0} />
+      <meshStandardMaterial attach="material-2" color={faceColors.top} roughness={0.1} transparent opacity={isSurfaceActive(topSurface) ? 0.85 : 0} />
+      <meshStandardMaterial attach="material-3" color={faceColors.cervical} roughness={0.1} transparent opacity={isSurfaceActive('C') ? 0.85 : 0} />
+      <meshStandardMaterial attach="material-4" color={faceColors.vestibular} roughness={0.1} transparent opacity={isSurfaceActive('V') ? 0.85 : 0} />
+      <meshStandardMaterial attach="material-5" color={faceColors.lingual} roughness={0.1} transparent opacity={isSurfaceActive('L') ? 0.85 : 0} />
+    </mesh>
+  );
+}
+
+const toothShaderSetupMap = new WeakMap<any, boolean>();
+
+export function setupToothShader(material: any, fdi: number) {
+  if (toothShaderSetupMap.has(material)) return;
+  toothShaderSetupMap.set(material, true);
+
+  material.onBeforeCompile = (shader: any) => {
+    shader.uniforms.uSelectedSurfaces = { value: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0] };
+    shader.uniforms.uSurfaceColors = {
+      value: [
+        new THREE.Color('#FAF8F5'), // M
+        new THREE.Color('#FAF8F5'), // D
+        new THREE.Color('#FAF8F5'), // O/I
+        new THREE.Color('#FAF8F5'), // C
+        new THREE.Color('#FAF8F5'), // V
+        new THREE.Color('#FAF8F5'), // L
+      ]
+    };
+    shader.uniforms.uArchAngle = { value: 0.0 };
+    shader.uniforms.uIsUpper = { value: 1.0 };
+    shader.uniforms.uMidlineDirection = { value: 1.0 };
+    shader.uniforms.uCameraWorldMatrix = { value: new THREE.Matrix4() };
+
+    material.userData.shaderUniforms = shader.uniforms;
+
+    // Injeta varyings e uniforms no Fragment Shader
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <common>',
+      `#include <common>
+       uniform float uSelectedSurfaces[6];
+       uniform vec3 uSurfaceColors[6];
+       uniform float uArchAngle;
+       uniform float uIsUpper;
+       uniform float uMidlineDirection;
+       uniform mat4 uCameraWorldMatrix;`
+    );
+
+    // Injeta a lógica de coloração no Fragment Shader baseado na normal de mundo rotacionada
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <color_fragment>',
+      `#include <color_fragment>
+       // Transforma a normal de view space para world space usando a camera matrix customizada
+       vec3 worldN = normalize( (uCameraWorldMatrix * vec4(normalize(vNormal), 0.0)).xyz );
+       
+       // Rotaciona a normal no eixo Y pelo ângulo do arco dentário
+       float c = cos(-uArchAngle);
+       float s = sin(-uArchAngle);
+       vec3 localN = vec3(
+         worldN.x * c - worldN.z * s,
+         worldN.y,
+         worldN.x * s + worldN.z * c
+       );
+
+       // Ajusta por conta da inversão da mandíbula [Math.PI, Math.PI, 0] no GLB
+       localN.x = -localN.x;
+       localN.y = -localN.y;
+
+       float absX = abs(localN.x);
+       float absY = abs(localN.y);
+       float absZ = abs(localN.z);
+
+       int faceIndex = -1;
+       
+       if (absY > absX && absY > absZ) {
+         if (localN.y * uIsUpper > 0.0) {
+           faceIndex = 2; // Oclusal / Incisal
+         } else {
+           faceIndex = 3; // Cervical
+         }
+       } else if (absZ > absX && absZ > absY) {
+         if (localN.z > 0.0) {
+           faceIndex = 4; // Vestibular
+         } else {
+           faceIndex = 5; // Lingual
+         }
+       } else {
+         if (localN.x * uMidlineDirection > 0.0) {
+           faceIndex = 0; // Mesial
+         } else {
+           faceIndex = 1; // Distal
+         }
+       }
+
+       if (faceIndex >= 0 && uSelectedSurfaces[faceIndex] > 0.5) {
+         diffuseColor.rgb = uSurfaceColors[faceIndex];
+       }`
+    );
+  };
+
+  material.needsUpdate = true;
+}
+
+export function updateToothUniforms(
+  material: any,
+  fdi: number,
+  isSelected: boolean,
+  viewerState: any,
+  getSurfaceCondition: any,
+  getToothProcedures: any,
+  globalProcedures: any
+) {
+  const uniforms = material.userData.shaderUniforms;
+  if (!uniforms) return;
+
+  const isAnterior = fdi % 10 >= 1 && fdi % 10 <= 3;
+  const topSurface = isAnterior ? 'I' : 'O';
+  const surfacesOrder: ('M' | 'D' | 'O' | 'I' | 'V' | 'L' | 'C')[] = ['M', 'D', topSurface, 'C', 'V', 'L'];
+
+  const selectedSurfacesValue = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+  const surfaceColorsValue = [
+    new THREE.Color('#FAF8F5'),
+    new THREE.Color('#FAF8F5'),
+    new THREE.Color('#FAF8F5'),
+    new THREE.Color('#FAF8F5'),
+    new THREE.Color('#FAF8F5'),
+    new THREE.Color('#FAF8F5'),
+  ];
+
+  const isAfterSimulation = viewerState.simulationState === 'AFTER';
+
+  surfacesOrder.forEach((surface, idx) => {
+    let cond = getSurfaceCondition(fdi, surface);
+    if (isAfterSimulation && (cond === 'CARIES' || cond === 'FRACTURE')) {
+      cond = 'HEALTHY';
+    }
+
+    let isActive = cond !== 'HEALTHY' && cond !== undefined;
+    let colorHex = '#FAF8F5';
+
+    if (cond === 'IMPLANT') {
+      colorHex = '#9CA3AF';
+    } else if (cond === 'CROWN') {
+      colorHex = '#F59E0B';
+    } else if (cond === 'CARIES' || cond === 'FRACTURE') {
+      colorHex = '#EF4444';
+    }
+
+    // Verificar procedimento associado a esta face
+    const toothProcs = getToothProcedures(fdi);
+    const procForSurface = toothProcs.find((p: any) => p.surfaces?.includes(surface));
+    if (procForSurface) {
+      const globalProc = globalProcedures.find((gp: any) => gp.id === procForSurface.procedureId || gp.name === procForSurface.procedure);
+      if (globalProc?.color) {
+        colorHex = globalProc.color;
+        isActive = true;
+      }
+    }
+
+    // Verificar se a face está atualmente selecionada pelo usuário
+    const isSurfaceSelected = isSelected && viewerState.activeSurfaces.includes(surface);
+    if (isSurfaceSelected) {
+      colorHex = '#3B82F6'; // Azul de seleção
+      isActive = true;
+    }
+
+    selectedSurfacesValue[idx] = isActive ? 1.0 : 0.0;
+    surfaceColorsValue[idx].set(colorHex);
+  });
+
+  // Cálculo das diretrizes do dente
+  const isUpper = fdi < 30;
+  const quadrant = Math.floor(fdi / 10);
+  const midlineDirection = (quadrant === 1 || quadrant === 4) ? 1.0 : -1.0;
+  const { rotation } = getToothPosition(fdi);
+  const archAngle = rotation[1];
+
+  uniforms.uSelectedSurfaces.value = selectedSurfacesValue;
+  uniforms.uArchAngle.value = archAngle;
+  uniforms.uIsUpper.value = isUpper ? 1.0 : -1.0;
+  uniforms.uMidlineDirection.value = midlineDirection;
+  
+  for (let i = 0; i < 6; i++) {
+    uniforms.uSurfaceColors.value[i].copy(surfaceColorsValue[i]);
+  }
+}
+

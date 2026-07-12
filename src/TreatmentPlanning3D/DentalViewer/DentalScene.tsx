@@ -2,13 +2,14 @@ import React, { Suspense, Component, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
-import { ToothMesh } from './ToothMesh';
+import { ToothMesh, getToothPosition, DEFAULT_ARCH_CONFIG, ArchConfig } from './ToothMesh';
 import { StructureMesh } from './StructureMesh';
 import { JawLoader } from './JawLoader';
 import { ToothDetailLoader } from './ToothDetailLoader';
 import { usePlanning3D } from '../hooks/usePlanning3D';
 import { ArrowLeft, Dna, Activity, Settings, Eye } from 'lucide-react';
 import { motion } from 'motion/react';
+import { CameraSync } from './CameraSync';
 
 const presetViews: Record<string, { position: [number, number, number], target: [number, number, number] }> = {
   frontal: { position: [0, 0, 10], target: [0, 0, 0] },
@@ -48,44 +49,7 @@ const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27,
 const LOWER_TEETH = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 const ALL_TEETH = [...UPPER_TEETH, ...LOWER_TEETH];
 
-// Configuração estática padrão apenas para o Fallback Procedural
-export const DEFAULT_ARCH_CONFIG = {
-  a: 4.5,
-  b: 4.0,
-  zOffset: -1.5,
-  yOffset: 1.0,
-  maxAngleDivider: 2.3,
-  hitboxScale: 0.8,
-};
 
-export type ArchConfig = typeof DEFAULT_ARCH_CONFIG;
-
-// Função auxiliar simples para posicionar dentes procedurais no Fallback
-export function getToothPosition(fdiCode: number): { position: [number, number, number]; rotation: [number, number, number] } {
-  const isUpper = fdiCode < 30;
-  const config = DEFAULT_ARCH_CONFIG;
-  const quadrant = Math.floor(fdiCode / 10);
-  const positionIndex = fdiCode % 10;
-
-  let index = 0;
-  if (quadrant === 1 || quadrant === 4) {
-    index = -positionIndex;
-  } else {
-    index = positionIndex;
-  }
-
-  const maxAngle = Math.PI / config.maxAngleDivider;
-  const angle = (index / 8) * maxAngle;
-
-  const x = config.a * Math.sin(angle);
-  const z = config.b * Math.cos(angle) + config.zOffset;
-  const y = isUpper ? config.yOffset : -config.yOffset;
-
-  return {
-    position: [x, y, z],
-    rotation: [isUpper ? 0 : Math.PI, angle, 0],
-  };
-}
 
 // Fallback procedural se falhar ao ler GLB
 function FallbackProcedural() {
@@ -346,9 +310,11 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
 
           <CameraController targetView={activeView} onAnimationComplete={() => setActiveView(null)} />
 
+          <CameraSync isPresentationMode={isPresentationMode} />
+
           <OrbitControls
             makeDefault
-            enabled={controlsEnabled && !activeView}
+            enabled={!isPresentationMode && controlsEnabled && !activeView}
             enableDamping
             dampingFactor={0.05}
             maxPolarAngle={Math.PI}

@@ -1,7 +1,8 @@
 import React, { Component, Suspense } from 'react';
 import { useGLTF, Environment, Center } from '@react-three/drei';
-import { ToothMesh } from './ToothMesh';
+import { ToothMesh, setupToothShader, updateToothUniforms } from './ToothMesh';
 import * as THREE from 'three';
+import { usePlanning3D } from '../hooks/usePlanning3D';
 
 interface ToothDetailLoaderProps {
   toothNumber: number;
@@ -95,8 +96,46 @@ function DetailedToothGLB({ toothNumber, variant }: { toothNumber: number, varia
   // Clone to avoid mutating cached scene if same model is used
   const clonedScene = React.useMemo(() => scene.clone(), [scene]);
 
-  // If variant === 'endodontic', we could maybe apply a material change or transparency to show root canals if we had them.
-  // Since we only downloaded anatomic, we'll just show anatomic for both.
+  const { 
+    viewerState, 
+    getSurfaceCondition, 
+    getToothProcedures, 
+    globalProcedures 
+  } = usePlanning3D();
+
+  // Clone de materiais
+  React.useEffect(() => {
+    clonedScene.traverse((child: any) => {
+      if (child.isMesh) {
+        child.material = child.material.clone();
+      }
+    });
+  }, [clonedScene]);
+
+  // Atualização dos Shaders e Uniforms
+  React.useEffect(() => {
+    clonedScene.traverse((child: any) => {
+      if (child.isMesh) {
+        setupToothShader(child.material, toothNumber);
+        updateToothUniforms(
+          child.material,
+          toothNumber,
+          true, // Sempre isSelected=true na vista detalhada do dente
+          viewerState,
+          getSurfaceCondition,
+          getToothProcedures,
+          globalProcedures
+        );
+      }
+    });
+  }, [
+    clonedScene, 
+    toothNumber, 
+    viewerState, 
+    getSurfaceCondition, 
+    getToothProcedures, 
+    globalProcedures
+  ]);
   
   return (
     <Center>

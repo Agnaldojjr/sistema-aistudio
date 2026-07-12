@@ -101,7 +101,9 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
               id: inst.id,
               tooth_id: marker.id,
               procedure: inst.name,
-              price: inst.price
+              price: inst.price,
+              procedureId: inst.procedureId,
+              surfaces: inst.faces || []
             });
           });
         } else if (marker.procedures) {
@@ -233,7 +235,8 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
         includeFinancial: true,
         status: 'A realizar',
         date: new Date().toISOString(),
-        dentist: 'Sistema 3D'
+        dentist: 'Sistema 3D',
+        faces: [...viewerState.activeSurfaces]
       };
       
       const instances = [...(marker.procedureInstances || []), newInst];
@@ -241,6 +244,9 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
       
       return { ...marker, procedureInstances: instances, procedures: procs };
     });
+
+    // Limpar faces selecionadas após o lançamento do procedimento
+    selectTooth(toothNumber);
   };
 
   const removeProcedure = (procedureInstanceId: string) => {

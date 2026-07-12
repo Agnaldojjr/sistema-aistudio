@@ -123,7 +123,7 @@ export async function downloadFileAsDataUrlFromSupabase(filePath: string): Promi
 }
 
 
-export async function getPatientFileUrlFromSupabase(patientName: string, filename: string) {
+export async function getPatientFileUrlFromSupabase(patientName: string, filename: string, expiresIn: number = 3600) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
   if (authErr || !session) throw new Error('Usuário não autenticado');
   
@@ -131,7 +131,7 @@ export async function getPatientFileUrlFromSupabase(patientName: string, filenam
   const patientFolder = getSafePatientPath(patientName);
   const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${filename}`;
 
-  const { data, error } = await supabase.storage.from(BUCKET_NAME).createSignedUrl(filePath, 3600);
+  const { data, error } = await supabase.storage.from(BUCKET_NAME).createSignedUrl(filePath, expiresIn);
   if (error) {
     console.error('Erro ao obter URL:', error);
     return null;

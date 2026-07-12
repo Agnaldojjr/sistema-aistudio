@@ -25,6 +25,8 @@ export interface TreatmentProcedure {
   tooth_id: string; // FK do TreatmentTooth
   procedure: string; // Ex: 'CANAL', 'IMPLANTE', 'RESTAURACAO', 'FACETA'
   price: number;
+  procedureId?: string;
+  surfaces?: string[];
 }
 
 export interface LayerState {
