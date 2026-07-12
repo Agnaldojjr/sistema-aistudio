@@ -150,8 +150,52 @@ def save_report(message, stack, file_path, line):
     reports.insert(0, new_report)
     with open(REPORTS_FILE, "w", encoding="utf-8") as f:
         json.dump(reports[:100], f, indent=2, ensure_ascii=False)
+    
+    # Sync to Supabase so reports are visible on the Vercel production site
+    sync_reports_to_supabase(reports[:100])
         
     return new_report
+
+def sync_reports_to_supabase(reports):
+    """Sincroniza os relatórios do Sentinel com o Supabase para exibição na Central IA em produção"""
+    supabase_url = os.environ.get("VITE_SUPABASE_URL", "")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    user_id = os.environ.get("DEFAULT_USER_ID", "")
+    
+    if not supabase_url or not supabase_key or not user_id:
+        log("AVISO: Credenciais do Supabase ausentes. Relatórios não sincronizados com a nuvem.")
+        return
+    
+    try:
+        # 1. Read current crm_data
+        read_url = f"{supabase_url}/rest/v1/clinic_data?user_id=eq.{user_id}&select=crm_data"
+        read_headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "application/json"
+        }
+        req = urllib.request.Request(read_url, headers=read_headers)
+        with urllib.request.urlopen(req) as res:
+            rows = json.loads(res.read().decode("utf-8"))
+        
+        crm_data = rows[0]["crm_data"] if rows else {}
+        crm_data["sentinelReports"] = reports
+        
+        # 2. Upsert back to Supabase
+        write_url = f"{supabase_url}/rest/v1/clinic_data?user_id=eq.{user_id}"
+        write_headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        payload = json.dumps({"crm_data": crm_data, "updated_at": datetime.now().isoformat()}).encode("utf-8")
+        req = urllib.request.Request(write_url, data=payload, headers=write_headers, method="PATCH")
+        urllib.request.urlopen(req)
+        
+        log("Relatórios sincronizados com o Supabase (produção).")
+    except Exception as e:
+        log(f"AVISO: Falha ao sincronizar relatórios com o Supabase: {e}")
 
 def main():
     log("Iniciando auditoria 24/7 de experiência do usuário...")
@@ -309,6 +353,8 @@ Você DEVE responder rigorosamente no formato JSON com esta estrutura:
                 all_reports[0]["proposedFix"] = proposed_fix
                 with open(REPORTS_FILE, "w", encoding="utf-8") as f:
                     json.dump(all_reports, f, indent=2, ensure_ascii=False)
+                # Sync updated reports to Supabase
+                sync_reports_to_supabase(all_reports)
                     
             log(f"Diagnóstico da IA: {explanation}")
             
