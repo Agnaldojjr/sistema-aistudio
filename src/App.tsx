@@ -24,6 +24,7 @@ import {
   Settings,
   ArrowRight,
   Shield,
+  Bot,
 } from 'lucide-react';
 import ProcedureManager from './components/ProcedureManager';
 import PhotoEditor from './components/PhotoEditor';
@@ -70,7 +71,7 @@ const AFLogoSVG = ({ className = '', light = false }: { className?: string; ligh
 // ─── Initial State ─────────────────────────────────────────────────────────
 
 // ─── Navigation Config ──────────────────────────────────────────────────────
-type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings' | '3d-planning' | 'financeiro';
+type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings' | '3d-planning' | 'financeiro' | 'agent-center';
 
 const NAV_ITEMS = [
   { id: 'dashboard' as AppView, label: 'Painel', icon: LayoutDashboard, section: 'principal' },
@@ -78,6 +79,7 @@ const NAV_ITEMS = [
   { id: 'crm'       as AppView, label: 'Pacientes', icon: Users,           section: 'principal' },
   { id: 'calendar'  as AppView, label: 'Agenda',    icon: Calendar,        section: 'principal' },
   { id: '3d-planning' as AppView, label: 'Arcada 3D', icon: Layers,        section: 'principal' },
+  { id: 'agent-center' as AppView, label: 'Central IA', icon: Bot,          section: 'principal' },
   { id: 'settings'  as AppView, label: 'Ajustes',   icon: Settings,        section: 'principal' },
 ];
 
@@ -219,6 +221,7 @@ function TopBar({ currentView, proposal, onChangeView, onOpenMobileMenu, isMobil
     calendar: 'Agenda',
     settings: 'Configurações',
     '3d-planning': 'Planejamento 3D',
+    'agent-center': 'Central IA',
   };
 
   return (
@@ -740,6 +743,13 @@ export default function App() {
         {currentAppView === '3d-planning' && (
           <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 w-full animate-fade-in-up">
             <TreatmentPlanning3D procedures={procedures} onOpenProcedureManager={() => setShowProcedureManager(true)} />
+          </main>
+        )}
+
+        {/* ── Central IA ────────────────────────────────────────── */}
+        {currentAppView === 'agent-center' && (
+          <main className="flex-1 w-full animate-fade-in-up">
+            <SentinelDashboard />
           </main>
         )}
 

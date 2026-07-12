@@ -288,6 +288,7 @@ Examples:
     print(f"URL: {args.url}")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
+    results = []
     start_time = datetime.now()
     # Detect agent directory dynamically (default to .agents if exists, fallback to .agent)
     agent_dir_name = ".agents" if (project_path / ".agents").exists() else ".agents"

@@ -7,6 +7,29 @@ export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
 ) => {
+  const isDev = import.meta.env.DEV;
+  const isBypassEnabled = import.meta.env.VITE_ENABLE_AUTH_BYPASS === 'true';
+  const hasBypassParam = typeof window !== 'undefined' && 
+    (new URLSearchParams(window.location.search).get('bypass_auth') === 'true' || 
+     localStorage.getItem('bypass_auth') === 'true');
+
+  if (isDev && isBypassEnabled && hasBypassParam) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bypass_auth', 'true');
+    }
+    const mockUser: any = {
+      id: 'mock-user-id-dr-agnaldo',
+      email: 'dr.agnaldo@example.com',
+      user_metadata: { full_name: 'Dr. Agnaldo Ferreira (Mock)' },
+      aud: 'authenticated',
+      role: 'authenticated'
+    };
+    setTimeout(() => {
+      if (onAuthSuccess) onAuthSuccess(mockUser, 'mock-access-token');
+    }, 100);
+    return () => {};
+  }
+
   supabase.auth.getSession().then(({ data: { session } }) => {
     if (session) {
       if (session.provider_token) {

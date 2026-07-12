@@ -867,6 +867,57 @@ Você DEVE responder em formato JSON estrito correspondente a esta estrutura:
     }
   });
 
+  // ==========================================
+  // CHAT COM O AGENTE DE VPS (Central IA)
+  // ==========================================
+  app.post("/api/agent/chat", async (req, res) => {
+    try {
+      const { message } = req.body;
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ error: "Mensagem inválida" });
+      }
+
+      // Buscar os relatórios recentes do Sentinel para servir de contexto das atividades
+      let reportsSummary = "";
+      try {
+        if (fs.existsSync(REPORTS_FILE)) {
+          const reports = JSON.parse(fs.readFileSync(REPORTS_FILE, "utf-8"));
+          const pending = reports.filter((r: any) => r.status === "pending");
+          const applied = reports.filter((r: any) => r.status === "applied");
+          reportsSummary = `Erros Pendentes (${pending.length}):\n` + 
+            pending.slice(0, 10).map((r: any) => `- [${r.timestamp}] ${r.message} no arquivo ${r.file}:${r.line}`).join("\n") +
+            `\n\nCorreções Aplicadas (${applied.length}):\n` +
+            applied.slice(0, 10).map((r: any) => `- [${r.timestamp}] ${r.message} (PR criado para o arquivo ${r.file})`).join("\n");
+        } else {
+          reportsSummary = "Nenhum relatório de erros registrado no momento.";
+        }
+      } catch (err) {
+        reportsSummary = "Não foi possível carregar o histórico de relatórios.";
+      }
+
+      const prompt = `Você é o Agente IA DevOps e de Qualidade de Software do Consultório Odontológico do Dr. Agnaldo Ferreira.
+O Dr. Agnaldo está conversando com você pela Central IA do sistema.
+Seu papel é responder com palavras simples, claras e fáceis de entender ("palavras de leigo", sem jargões de programação excessivos) sobre o status do sistema, o que você andou analisando, corrigindo ou melhorando.
+
+Aqui está o histórico das suas atividades de auditoria recentes (Sentinel Reports) na VPS Oracle para seu contexto:
+${reportsSummary}
+
+Responda à mensagem abaixo de forma amigável, prestativa e muito clara (seja conciso e direto):
+Mensagem do Dr. Agnaldo: "${message}"`;
+
+      const geminiResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt
+      });
+
+      const reply = geminiResponse.text || "Desculpe, Dr. Agnaldo. Não consegui processar a resposta agora.";
+      res.json({ reply });
+    } catch (err: any) {
+      console.error("Erro no endpoint de chat do agente:", err);
+      res.status(500).json({ error: "Erro interno no servidor do agente" });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

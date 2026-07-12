@@ -2071,7 +2071,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                     rel="noreferrer"
                     className="text-[#C09553] hover:underline font-bold font-mono text-[10.5px] truncate max-w-xs block"
                   >
-                    {generatedPdfUrl}
+                    {generatedPdfUrl ? decodeURIComponent(generatedPdfUrl.split('/').pop()?.split('?')[0] || '') : ''}
                   </a>
                 </div>
                 
