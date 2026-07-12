@@ -734,12 +734,18 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         doc.setFont('Helvetica', 'bold');
         doc.setFontSize(10);
         doc.text(('MAPEAMENTO VISUAL DOS DENTES / DIAGNÓSTICO').toUpperCase(), 15, 9);
+
+        const imgWidth = 82;
+        const imgHeight = 46.12; // 82 * 9/16
+        const gapX = 10;
+        const startY = 25;
+        const rowHeight = 75; // 75mm per row (3 rows = 225mm)
         
-        let imgY = 25;
         for (let i = 0; i < sectionsWithImages.length; i++) {
           const item = sectionsWithImages[i];
+          const localIdx = i % 6;
           
-          if (imgY + 95 > 280) {
+          if (i > 0 && localIdx === 0) {
             doc.addPage();
             doc.setFillColor(78, 17, 25);
             doc.rect(0, 0, 210, 15, 'F');
@@ -747,27 +753,30 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
             doc.setFont('Helvetica', 'bold');
             doc.setFontSize(10);
             doc.text(('MAPEAMENTO VISUAL DOS DENTES / DIAGNÓSTICO (CONT.)').toUpperCase(), 15, 9);
-            imgY = 25;
           }
           
-          doc.setFontSize(9);
+          const col = localIdx % 2;
+          const row = Math.floor(localIdx / 2);
+          
+          const imgX = 15 + col * (imgWidth + gapX);
+          const itemY = startY + row * rowHeight;
+          
+          // Title
+          doc.setFontSize(8);
           doc.setTextColor(78, 17, 25);
           doc.setFont('Helvetica', 'bold');
-          doc.text(item.title.toUpperCase(), 15, imgY);
+          doc.text(item.title.toUpperCase(), imgX, itemY);
           
+          // Subtitle
           if (item.subtitle) {
-            doc.setFontSize(7);
+            doc.setFontSize(6.5);
             doc.setTextColor(120, 120, 120);
             doc.setFont('Helvetica', 'normal');
-            doc.text(item.subtitle, 15, imgY + 4);
+            doc.text(item.subtitle, imgX, itemY + 3.5);
           }
           
-          const imgWidth = 145;
-          const imgHeight = 81.56; // 145 * (9/16)
-          const imgX = (210 - imgWidth) / 2;
-          doc.addImage(item.dataUrl, 'JPEG', imgX, imgY + 7, imgWidth, imgHeight);
-          
-          imgY += imgHeight + 17;
+          // Add image
+          doc.addImage(item.dataUrl, 'JPEG', imgX, itemY + 6, imgWidth, imgHeight);
         }
         
         doc.addPage();
