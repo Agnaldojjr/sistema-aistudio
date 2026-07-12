@@ -92,5 +92,6 @@ export const logout = async () => {
   await supabase.auth.signOut();
   cachedAccessToken = null;
   localStorage.removeItem('provider_token');
+  localStorage.removeItem('bypass_auth');
 };
 
