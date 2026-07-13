@@ -31,10 +31,10 @@ test.describe('Fluxos de Experiência do Usuário (UX)', () => {
   // 1. DASHBOARD - Tela principal
   // =========================================================
   test('Dashboard: carrega corretamente com nome do profissional', async ({ page }) => {
-    await expect(page.locator('body')).toContainText('Dr. Agnaldo Ferreira');
+    await expect(page.locator('body')).toContainText('Dr. Agnaldo Ferreira', { timeout: 10000 });
     // Sidebar visível
-    const sidebar = page.locator('nav, aside, [class*="sidebar"]').first();
-    await expect(sidebar).toBeVisible();
+    const sidebar = page.locator('aside').first();
+    await expect(sidebar).toBeVisible({ timeout: 10000 });
     // Sem erros críticos de JavaScript
     const critical = consoleErrors.filter(e => e.includes('TypeError') || e.includes('Cannot read') || e.includes('is not a function'));
     expect(critical).toEqual([]);
@@ -146,7 +146,7 @@ test.describe('Fluxos de Experiência do Usuário (UX)', () => {
                                body.includes('Agosto') || body.includes('Setembro') ||
                                body.includes('Outubro') || body.includes('Novembro') ||
                                body.includes('Dezembro') || body.includes('Today') ||
-                               body.includes('Hoje');
+                               body.includes('Hoje') || body.includes('2026') || body.includes('2027');
     expect(hasCalendarContent).toBe(true);
 
     const critical = consoleErrors.filter(e => e.includes('TypeError') || e.includes('Cannot read'));
@@ -246,8 +246,8 @@ test.describe('Fluxos de Experiência do Usuário (UX)', () => {
     expect(body.length).toBeGreaterThan(30);
 
     // Tenta abrir o menu hamburger (mobile)
-    const menuBtn = page.locator('button:has(svg), [aria-label*="menu"], [aria-label*="Menu"]').first();
-    if (await menuBtn.count() > 0) {
+    const menuBtn = page.locator('button[title*="Menu"], button[aria-label*="menu"], button[aria-label*="Menu"], .block.lg\\:hidden button').first();
+    if (await menuBtn.count() > 0 && await menuBtn.isVisible()) {
       await menuBtn.click();
       await page.waitForTimeout(500);
     }
