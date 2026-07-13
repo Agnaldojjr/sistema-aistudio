@@ -872,7 +872,7 @@ Você DEVE responder em formato JSON estrito correspondente a esta estrutura:
   // ==========================================
   app.post("/api/agent/chat", async (req, res) => {
     try {
-      const { message } = req.body;
+      const { message, history } = req.body;
       if (!message || typeof message !== "string") {
         return res.status(400).json({ error: "Mensagem inválida" });
       }
@@ -895,14 +895,25 @@ Você DEVE responder em formato JSON estrito correspondente a esta estrutura:
         reportsSummary = "Não foi possível carregar o histórico de relatórios.";
       }
 
-      const prompt = `Você é o Agente IA DevOps e de Qualidade de Software do Consultório Odontológico do Dr. Agnaldo Ferreira.
-O Dr. Agnaldo está conversando com você pela Central IA do sistema.
-Seu papel é responder com palavras simples, claras e fáceis de entender ("palavras de leigo", sem jargões de programação excessivos) sobre o status do sistema, o que você andou analisando, corrigindo ou melhorando.
+      let historyText = "";
+      if (Array.isArray(history)) {
+        // Formata o histórico passado pelo frontend (array de objetos { sender, text })
+        historyText = "Histórico recente da conversa:\n" + history.slice(-10).map(msg => 
+          `${msg.sender === 'user' ? 'Dr. Agnaldo' : 'Agente IA'}: ${msg.text}`
+        ).join("\n") + "\n\n";
+      }
 
-Aqui está o histórico das suas atividades de auditoria recentes (Sentinel Reports) na VPS Oracle para seu contexto:
+      const prompt = `Você é o Agente IA de Monitoramento do Consultório Odontológico do Dr. Agnaldo Ferreira.
+O Dr. Agnaldo está conversando com você pela Central IA do sistema.
+
+REGRA CRUCIAL: Você é APENAS um assistente de conversação e monitoramento de relatórios. Você NÃO TEM acesso ou capacidade de modificar código, mudar menus, editar o site ou salvar bancos de dados. Se o usuário pedir para você mudar algo no sistema (ex: remover um botão, mudar a cor), VOCÊ DEVE explicar educadamente que o seu papel é apenas monitorar os testes e analisar relatórios, e que alterações de código devem ser pedidas ao Desenvolvedor (o Agente Antigravity/Cursor no terminal). NUNCA alucine que você vai ou pode fazer a alteração.
+
+Seu papel principal é responder com palavras simples, claras e amigáveis sobre o status do sistema, utilizando os relatórios abaixo como contexto do que está acontecendo "nos bastidores".
+
+Aqui está o histórico das suas atividades de auditoria recentes (Sentinel Reports) na VPS Oracle:
 ${reportsSummary}
 
-Responda à mensagem abaixo de forma amigável, prestativa e muito clara (seja conciso e direto):
+${historyText}Responda de forma direta e gentil (sem jargões técnicos confusos) à nova mensagem:
 Mensagem do Dr. Agnaldo: "${message}"`;
 
       const geminiResponse = await ai.models.generateContent({

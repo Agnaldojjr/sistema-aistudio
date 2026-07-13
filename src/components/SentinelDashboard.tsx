@@ -109,7 +109,8 @@ export default function SentinelDashboard() {
       const res = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText })
+        // Passando o histórico atual (messages) e a nova mensagem
+        body: JSON.stringify({ message: userText, history: messages })
       });
       const data = await res.json();
       setMessages(prev => [...prev, { 
