@@ -2,7 +2,6 @@ import React from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { usePlanning3D } from '../hooks/usePlanning3D';
-import { setupToothShader, updateToothUniforms } from './ToothMesh';
 
 // Lista de dentes permanentes por quadrantes
 const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -50,10 +49,7 @@ function JawModelRenderer({
   const { 
     selectTooth, 
     viewerState, 
-    teeth, 
-    getSurfaceCondition, 
-    getToothProcedures, 
-    globalProcedures 
+    teeth
   } = usePlanning3D();
   const groupRef = React.useRef<THREE.Group>(null);
   
@@ -108,34 +104,59 @@ function JawModelRenderer({
   // Efeito para sincronizar visibilidade (dentes ausentes) e emissive (dente selecionado) diretamente nas malhas do 3D
   React.useEffect(() => {
     clonedScene.traverse((child: any) => {
-      if (child.isMesh && /^\d{2}$/.test(child.name)) {
-        const rawFdi = parseInt(child.name);
-        const fdi = fixFdiNumber(rawFdi);
-        const isSelected = viewerState.activeTooth === fdi;
-        const isMissing = viewerState.missingTeeth?.includes(fdi) || teeth[fdi]?.condition === 'MISSING';
-        
-        // Ocultar se o dente for marcado como ausente
-        child.visible = !isMissing;
-        
-        if (child.material) {
-          setupToothShader(child.material, fdi);
-          updateToothUniforms(
-            child.material,
-            fdi,
-            isSelected,
-            viewerState,
-            getSurfaceCondition,
-            getToothProcedures,
-            globalProcedures
-          );
+      if (child.isMesh) {
+        if (/^\d{2}$/.test(child.name)) {
+          const rawFdi = parseInt(child.name);
+          const fdi = fixFdiNumber(rawFdi);
+          const isSelected = viewerState.activeTooth === fdi;
+          const isMissing = viewerState.missingTeeth?.includes(fdi) || teeth[fdi]?.condition === 'MISSING';
+          const isTeethLayerVisible = viewerState.layers?.teeth?.visible ?? true;
+          const teethOpacity = viewerState.layers?.teeth?.opacity ?? 1.0;
           
-          if (isSelected) {
-            // Emissive azul suave para destaque
-            child.material.emissive.set('#3b82f6');
-            child.material.emissiveIntensity = 0.25;
-          } else {
-            child.material.emissive.set('#000000');
-            child.material.emissiveIntensity = 0.0;
+          // Ocultar se o dente for marcado como ausente ou se a camada estiver oculta
+          child.visible = !isMissing && isTeethLayerVisible;
+          
+          if (child.material) {
+            // Forçar configurações de material (previne bugs de materiais importados invisíveis)
+            child.material.transparent = teethOpacity < 1.0;
+            child.material.opacity = teethOpacity;
+            child.material.depthWrite = true;
+            child.material.needsUpdate = true;
+
+            // Highlight de seleção via emissive - sem shader customizado
+            if (isSelected) {
+              child.material.emissive = new THREE.Color('#3b82f6');
+              child.material.emissiveIntensity = 0.25;
+            } else {
+              child.material.emissive = new THREE.Color('#000000');
+              child.material.emissiveIntensity = 0.0;
+            }
+
+            // Aplicar condição visual do dente
+            const toothState = teeth[fdi];
+            if (toothState?.condition === 'IMPLANT') {
+              child.material.color = new THREE.Color('#9CA3AF');
+              child.material.roughness = 0.2;
+              child.material.metalness = 0.8;
+            } else if (toothState?.condition === 'CROWN') {
+              child.material.color = new THREE.Color('#F59E0B');
+              child.material.roughness = 0.1;
+              child.material.metalness = 0.7;
+            } else {
+              // Resetar cor para padrão caso estava modificado (se houver cor original guardada, idealmente deveria restaurar, 
+              // mas para simplificar vamos apenas garantir que a cor branca seja aplicada caso não seja implante/coroa)
+              child.material.color = new THREE.Color('#FFFFFF');
+            }
+          }
+        } else if (child.name === 'Gengiva' || child.name === 'gums') {
+          const isGumsLayerVisible = viewerState.layers?.gums?.visible ?? true;
+          const gumsOpacity = viewerState.layers?.gums?.opacity ?? 1.0;
+
+          child.visible = isGumsLayerVisible;
+          if (child.material) {
+            child.material.transparent = gumsOpacity < 1.0;
+            child.material.opacity = gumsOpacity;
+            child.material.needsUpdate = true;
           }
         }
       }
@@ -147,9 +168,7 @@ function JawModelRenderer({
     teeth, 
     viewerState.activeSurfaces, 
     viewerState.simulationState,
-    getSurfaceCondition,
-    getToothProcedures,
-    globalProcedures
+    viewerState.layers
   ]);
 
   return (

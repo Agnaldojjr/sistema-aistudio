@@ -485,9 +485,9 @@ export function setupToothShader(material: any, fdi: number) {
        #ifdef USE_NORMAL
          worldN = normalize( (uCameraWorldMatrix * vec4(normalize(vNormal), 0.0)).xyz );
        #else
-         vec3 fdx = dFdx( vViewPosition );
-         vec3 fdy = dFdy( vViewPosition );
-         vec3 faceNormal = normalize( cross( fdx, fdy ) );
+         vec3 customFdx = dFdx( vViewPosition );
+         vec3 customFdy = dFdy( vViewPosition );
+         vec3 faceNormal = normalize( cross( customFdx, customFdy ) );
          worldN = normalize( (uCameraWorldMatrix * vec4(faceNormal, 0.0)).xyz );
        #endif
        
