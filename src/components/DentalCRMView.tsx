@@ -2438,6 +2438,8 @@ export default function DentalCRMView({
     return Math.abs(hash).toString(36);
   };
 
+  const normalizePhone = (val: string) => (val || '').replace(/\D/g, '');
+
   const handleSaveDocNewPatient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPatientData.name) return;
@@ -2445,15 +2447,30 @@ export default function DentalCRMView({
     try {
       const crmData = await getSupabaseCRMDatabase();
       if (!crmData.patients) crmData.patients = [];
-      
+
+      // ── Duplicate check: same name + same WhatsApp ──
+      const newName = newPatientData.name.trim().toUpperCase();
+      const newPhone = normalizePhone(newPatientData.mobile || '');
+      if (newName && newPhone) {
+        const duplicate = crmData.patients.find((p: any) =>
+          (p.name || '').trim().toUpperCase() === newName &&
+          normalizePhone(p.mobile || '') === newPhone
+        );
+        if (duplicate) {
+          alert(`⚠️ Paciente duplicado!\n\nJá existe um cadastro com o nome "${newName}" e o WhatsApp "${newPatientData.mobile}".\n\nPor favor, verifique o cadastro existente antes de continuar.`);
+          return;
+        }
+      }
+
       const code = newPatientData.codigo_paciente || `COD-${Math.floor(1000 + Math.random() * 9000)}`;
       const pId = `pat_${Date.now()}`;
+      const unifiedPhone = newPatientData.mobile || '';
       const payload = {
         id: pId,
-        name: newPatientData.name.trim().toUpperCase(),
+        name: newName,
         codigo_paciente: String(code),
-        phone: newPatientData.phone || '',
-        mobile: newPatientData.mobile || '',
+        phone: unifiedPhone,
+        mobile: unifiedPhone,
         healthInsurance: newPatientData.healthInsurance?.toUpperCase() || 'PARTICULAR',
         medicalRecord: newPatientData.medicalRecord || '',
         observations: newPatientData.observations || '',
@@ -2498,10 +2515,31 @@ export default function DentalCRMView({
         setIsSavingEdit(false);
         return;
       }
+
+      // ── Duplicate check (excluding self): same name + same WhatsApp ──
+      const editName = (editPatientData.name || '').trim().toUpperCase();
+      const editPhone = normalizePhone(editPatientData.mobile || '');
+      if (editName && editPhone) {
+        const duplicate = (crmData.patients || []).find((p: any) =>
+          p.id !== selectedPatient.id &&
+          (p.name || '').trim().toUpperCase() === editName &&
+          normalizePhone(p.mobile || '') === editPhone
+        );
+        if (duplicate) {
+          alert(`⚠️ Paciente duplicado!\n\nJá existe outro cadastro com o nome "${editName}" e o WhatsApp "${editPatientData.mobile}".\n\nPor favor, verifique o cadastro existente antes de continuar.`);
+          setIsSavingEdit(false);
+          return;
+        }
+      }
+
+      // Sync phone = mobile (unified field)
+      const unifiedPhone = editPatientData.mobile || '';
       const updatedPatient = {
         ...crmData.patients[pIndex],
         ...editPatientData,
-        name: (editPatientData.name || '').trim().toUpperCase(),
+        name: editName,
+        phone: unifiedPhone,
+        mobile: unifiedPhone,
         updatedAt: new Date().toISOString()
       };
       crmData.patients[pIndex] = updatedPatient;
@@ -3348,25 +3386,15 @@ export default function DentalCRMView({
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="font-bold text-zinc-500 uppercase tracking-widest text-[9px]">WhatsApp</label>
-                        <input
-                          type="text"
-                          value={newPatientData.mobile}
-                          onChange={(e) => setNewPatientData({ ...newPatientData, mobile: e.target.value })}
-                          className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="font-bold text-zinc-500 uppercase tracking-widest text-[9px]">Fixo</label>
-                        <input
-                          type="text"
-                          value={newPatientData.phone}
-                          onChange={(e) => setNewPatientData({ ...newPatientData, phone: e.target.value })}
-                          className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none"
-                        />
-                      </div>
+                    <div className="space-y-1">
+                      <label className="font-bold text-zinc-500 uppercase tracking-widest text-[9px]">📱 Telefone / WhatsApp</label>
+                      <input
+                        type="text"
+                        placeholder="(00) 00000-0000"
+                        value={newPatientData.mobile}
+                        onChange={(e) => setNewPatientData({ ...newPatientData, mobile: e.target.value, phone: e.target.value })}
+                        className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none"
+                      />
                     </div>
                     <div className="space-y-1">
                       <label className="font-bold text-zinc-500 uppercase tracking-widest text-[9px]">Histórico Médico / Observações</label>
@@ -3712,7 +3740,7 @@ export default function DentalCRMView({
                         <div className="space-y-3 bg-[#FAF8F5] p-4 rounded-xl border border-[#E6DEC9]/45">
                           <h5 className="font-bold text-zinc-800 uppercase tracking-wide text-[9px] border-b pb-1">Canais de Contato</h5>
                           <div className="flex justify-between items-center">
-                            <span className="font-semibold text-zinc-400">WhatsApp / Celular:</span>
+                            <span className="font-semibold text-zinc-400">📱 Telefone / WhatsApp:</span>
                             {selectedPatient.mobile ? (
                               <a
                                 href={`https://wa.me/${selectedPatient.mobile.replace(/\D/g, '').length === 10 || selectedPatient.mobile.replace(/\D/g, '').length === 11 ? '55' + selectedPatient.mobile.replace(/\D/g, '') : selectedPatient.mobile.replace(/\D/g, '')}`}
@@ -3726,10 +3754,6 @@ export default function DentalCRMView({
                             ) : (
                               <span className="text-zinc-500">Não informado</span>
                             )}
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="font-semibold text-zinc-400">Telefone Fixo:</span>
-                            <span className="font-semibold text-zinc-800">{selectedPatient.phone || 'Não informado'}</span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="font-semibold text-zinc-400">E-mail pessoal:</span>
@@ -3856,13 +3880,9 @@ export default function DentalCRMView({
                                   Canais de Contato
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                                  <div>
-                                    <label className="block text-zinc-500 font-semibold mb-1">Celular / WhatsApp</label>
-                                    <input type="text" placeholder="(00) 00000-0000" value={editPatientData.mobile || ''} onChange={e => setEditPatientData(prev => ({ ...prev, mobile: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
-                                  </div>
-                                  <div>
-                                    <label className="block text-zinc-500 font-semibold mb-1">Telefone Fixo</label>
-                                    <input type="text" value={editPatientData.phone || ''} onChange={e => setEditPatientData(prev => ({ ...prev, phone: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                  <div className="md:col-span-2">
+                                    <label className="block text-zinc-500 font-semibold mb-1">📱 Telefone / WhatsApp</label>
+                                    <input type="text" placeholder="(00) 00000-0000" value={editPatientData.mobile || ''} onChange={e => setEditPatientData(prev => ({ ...prev, mobile: e.target.value, phone: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
                                   </div>
                                   <div className="md:col-span-2">
                                     <label className="block text-zinc-500 font-semibold mb-1">E-mail</label>
@@ -5493,25 +5513,15 @@ export default function DentalCRMView({
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-zinc-500 uppercase tracking-widest text-[9px]">WhatsApp</label>
-                  <input
-                    type="text"
-                    value={newPatientData.mobile}
-                    onChange={(e) => setNewPatientData({ ...newPatientData, mobile: e.target.value })}
-                    className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-zinc-500 uppercase tracking-widest text-[9px]">Fixo</label>
-                  <input
-                    type="text"
-                    value={newPatientData.phone}
-                    onChange={(e) => setNewPatientData({ ...newPatientData, phone: e.target.value })}
-                    className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none"
-                  />
-                </div>
+              <div className="space-y-1">
+                <label className="font-bold text-zinc-500 uppercase tracking-widest text-[9px]">📱 Telefone / WhatsApp</label>
+                <input
+                  type="text"
+                  placeholder="(00) 00000-0000"
+                  value={newPatientData.mobile}
+                  onChange={(e) => setNewPatientData({ ...newPatientData, mobile: e.target.value, phone: e.target.value })}
+                  className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none"
+                />
               </div>
               <div className="space-y-1">
                 <label className="font-bold text-zinc-500 uppercase tracking-widest text-[9px]">Histórico Médico / Observações</label>
