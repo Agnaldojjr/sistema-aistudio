@@ -49,7 +49,8 @@ function JawModelRenderer({
   const { 
     selectTooth, 
     viewerState, 
-    teeth
+    teeth,
+    getToothProcedures
   } = usePlanning3D();
   const groupRef = React.useRef<THREE.Group>(null);
   
@@ -113,13 +114,13 @@ function JawModelRenderer({
           const isTeethLayerVisible = viewerState.layers?.teeth?.visible ?? true;
           const teethOpacity = viewerState.layers?.teeth?.opacity ?? 1.0;
           
-          // Ocultar se o dente for marcado como ausente ou se a camada estiver oculta
-          child.visible = !isMissing && isTeethLayerVisible;
+          // Tornar sempre visível (a menos que a camada toda esteja oculta), para podermos clicar no dente fantasma
+          child.visible = isTeethLayerVisible;
           
           if (child.material) {
             // Forçar configurações de material (previne bugs de materiais importados invisíveis)
-            child.material.transparent = teethOpacity < 1.0;
-            child.material.opacity = teethOpacity;
+            child.material.transparent = isMissing || teethOpacity < 1.0;
+            child.material.opacity = isMissing ? 0.15 : teethOpacity;
             child.material.depthWrite = true;
             child.material.needsUpdate = true;
 
@@ -134,7 +135,22 @@ function JawModelRenderer({
 
             // Aplicar condição visual do dente
             const toothState = teeth[fdi];
-            if (toothState?.condition === 'IMPLANT') {
+            const toothProcs = getToothProcedures(fdi);
+
+            if (isMissing) {
+              child.material.color = new THREE.Color('#ef4444');
+            } else if (toothProcs && toothProcs.length > 0) {
+              const hasInProgress = toothProcs.some((p: any) => p.status === 'Em andamento' || p.status === 'Executando');
+              const isAllCompleted = toothProcs.every((p: any) => p.status === 'Concluído' || p.status === 'Executado');
+              
+              if (hasInProgress) {
+                child.material.color = new THREE.Color('#EAB308'); // Amarelo
+              } else if (isAllCompleted) {
+                child.material.color = new THREE.Color('#22C55E'); // Verde
+              } else {
+                child.material.color = new THREE.Color('#EF4444'); // Vermelho
+              }
+            } else if (toothState?.condition === 'IMPLANT') {
               child.material.color = new THREE.Color('#9CA3AF');
               child.material.roughness = 0.2;
               child.material.metalness = 0.8;
@@ -143,8 +159,6 @@ function JawModelRenderer({
               child.material.roughness = 0.1;
               child.material.metalness = 0.7;
             } else {
-              // Resetar cor para padrão caso estava modificado (se houver cor original guardada, idealmente deveria restaurar, 
-              // mas para simplificar vamos apenas garantir que a cor branca seja aplicada caso não seja implante/coroa)
               child.material.color = new THREE.Color('#FFFFFF');
             }
           }
@@ -193,10 +207,7 @@ function JawModelRenderer({
             }
 
             if (clickedFdi !== null) {
-              const isMissing = viewerState.missingTeeth?.includes(clickedFdi) || teeth[clickedFdi]?.condition === 'MISSING';
-              if (!isMissing) {
-                selectTooth(clickedFdi, { x: e.clientX, y: e.clientY });
-              }
+              selectTooth(clickedFdi, { x: e.clientX, y: e.clientY });
             }
           }}
           onPointerOver={(e: any) => {
@@ -211,11 +222,7 @@ function JawModelRenderer({
               current = current.parent;
             }
             if (isTooth) {
-              const clickedFdi = fixFdiNumber(parseInt(e.object.name));
-              const isMissing = viewerState.missingTeeth?.includes(clickedFdi) || teeth[clickedFdi]?.condition === 'MISSING';
-              if (!isMissing) {
-                document.body.style.cursor = 'pointer';
-              }
+              document.body.style.cursor = 'pointer';
             }
           }}
           onPointerOut={() => {

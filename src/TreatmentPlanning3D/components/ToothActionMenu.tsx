@@ -4,7 +4,7 @@ import { PlusCircle, Activity, X, ChevronLeft, Settings } from 'lucide-react';
 import { motion, useDragControls } from 'motion/react';
 
 export function ToothActionMenu() {
-  const { viewerState, setViewingAnatomy, selectTooth, onOpenProcedureManager, globalProcedures, addProcedure, updateToothCondition } = usePlanning3D();
+  const { viewerState, setViewingAnatomy, selectTooth, onOpenProcedureManager, globalProcedures, addProcedure, updateToothCondition, teeth, toggleMissingTooth } = usePlanning3D();
   const [view, setView] = useState<'MENU' | 'PROCEDURES'>('MENU');
   const dragControls = useDragControls();
 
@@ -25,6 +25,7 @@ export function ToothActionMenu() {
   }
 
   const toothNumber = viewerState.activeTooth;
+  const isMissing = viewerState.missingTeeth?.includes(toothNumber) || teeth[toothNumber]?.condition === 'MISSING';
 
   const style = position 
     ? { top: position.y, left: position.x }
@@ -83,17 +84,37 @@ export function ToothActionMenu() {
               <span className="text-sm font-semibold">Ver Anatomia Individual</span>
             </button>
 
-            <button
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => {
-                updateToothCondition(toothNumber, 'MISSING');
-                selectTooth(null);
-              }}
-              className="w-full flex items-center justify-start gap-3 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-slate-200 rounded-xl transition-all border border-slate-700 hover:border-zinc-500 cursor-pointer text-left"
-            >
-              <X className="w-5 h-5 text-zinc-400" />
-              <span className="text-sm font-semibold">Marcar Dente Ausente</span>
-            </button>
+            {isMissing ? (
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => {
+                  updateToothCondition(toothNumber, 'HEALTHY');
+                  if (viewerState.missingTeeth?.includes(toothNumber)) {
+                    toggleMissingTooth(toothNumber);
+                  }
+                  selectTooth(null);
+                }}
+                className="w-full flex items-center justify-start gap-3 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-slate-200 rounded-xl transition-all border border-slate-700 hover:border-emerald-500 cursor-pointer text-left"
+              >
+                <PlusCircle className="w-5 h-5 text-emerald-400" />
+                <span className="text-sm font-semibold">Restaurar Dente na Arcada</span>
+              </button>
+            ) : (
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => {
+                  updateToothCondition(toothNumber, 'MISSING');
+                  if (!viewerState.missingTeeth?.includes(toothNumber)) {
+                    toggleMissingTooth(toothNumber);
+                  }
+                  selectTooth(null);
+                }}
+                className="w-full flex items-center justify-start gap-3 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-slate-200 rounded-xl transition-all border border-slate-700 hover:border-zinc-500 cursor-pointer text-left"
+              >
+                <X className="w-5 h-5 text-zinc-400" />
+                <span className="text-sm font-semibold">Marcar Dente Ausente</span>
+              </button>
+            )}
 
             <button
               onPointerDown={(e) => e.stopPropagation()}
