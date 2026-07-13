@@ -85,6 +85,18 @@ export function ToothActionMenu() {
 
             <button
               onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => {
+                updateToothCondition(toothNumber, 'MISSING');
+                selectTooth(null);
+              }}
+              className="w-full flex items-center justify-start gap-3 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-slate-200 rounded-xl transition-all border border-slate-700 hover:border-zinc-500 cursor-pointer text-left"
+            >
+              <X className="w-5 h-5 text-zinc-400" />
+              <span className="text-sm font-semibold">Marcar Dente Ausente</span>
+            </button>
+
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={() => setView('PROCEDURES')}
               className="w-full flex items-center justify-start gap-3 px-4 py-3 bg-sky-600 hover:bg-sky-500 text-white rounded-xl transition-all border border-sky-500 shadow-lg shadow-sky-900/50 cursor-pointer text-left"
             >

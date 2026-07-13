@@ -27,6 +27,8 @@ export interface TreatmentProcedure {
   price: number;
   procedureId?: string;
   surfaces?: string[];
+  status?: string;
+  date?: string;
 }
 
 export interface LayerState {

@@ -103,7 +103,9 @@ export function Planning3DProvider({ children, globalProcedures = [], onOpenProc
               procedure: inst.name,
               price: inst.price,
               procedureId: inst.procedureId,
-              surfaces: inst.faces || []
+              surfaces: inst.faces || [],
+              status: inst.status,
+              date: inst.date
             });
           });
         } else if (marker.procedures) {

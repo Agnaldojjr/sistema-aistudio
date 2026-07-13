@@ -129,7 +129,19 @@ export function ToothMesh({ toothNumber, position, rotation = [0, 0, 0], geometr
     let roughness = 0.05;
     let metalness = 0.15;
 
-    if (toothState?.condition === 'IMPLANT') {
+    const toothProcs = getToothProcedures(toothNumber);
+    if (toothProcs && toothProcs.length > 0) {
+      const hasInProgress = toothProcs.some((p: any) => p.status === 'Em andamento' || p.status === 'Executando');
+      const isAllCompleted = toothProcs.every((p: any) => p.status === 'Concluído' || p.status === 'Executado');
+      
+      if (hasInProgress) {
+        color = '#EAB308'; // Amarelo
+      } else if (isAllCompleted) {
+        color = '#22C55E'; // Verde
+      } else {
+        color = '#EF4444'; // Vermelho (A realizar / Pendente)
+      }
+    } else if (toothState?.condition === 'IMPLANT') {
       color = '#9CA3AF';
       roughness = 0.2;
       metalness = 0.8;
@@ -375,15 +387,7 @@ export function ToothSurfaceOverlay({ toothNumber, isSelected = false }: ToothSu
     if (cond === 'IMPLANT') return '#9CA3AF';
     if (cond === 'CROWN') return '#F59E0B';
 
-    // Verificar se há procedimento para esta face
-    const toothProcs = getToothProcedures(toothNumber);
-    const procForSurface = toothProcs.find(p => p.surfaces?.includes(surface));
-    if (procForSurface) {
-      const globalProc = globalProcedures.find(gp => gp.id === procForSurface.procedureId || gp.name === procForSurface.procedure);
-      if (globalProc?.color) {
-        return globalProc.color;
-      }
-    }
+    // A cor geral do dente baseada nos procedimentos já é aplicada no getCrownMaterialProps
 
     switch (cond) {
       case 'CARIES':
@@ -409,11 +413,7 @@ export function ToothSurfaceOverlay({ toothNumber, isSelected = false }: ToothSu
 
     const isSurfaceSelected = isSelected && viewerState.activeSurfaces.includes(surface);
 
-    // Verificar se há procedimento para esta face
-    const toothProcs = getToothProcedures(toothNumber);
-    const hasProc = toothProcs.some(p => p.surfaces?.includes(surface));
-
-    return activeCond !== 'HEALTHY' || isSurfaceSelected || hasProc;
+    return activeCond !== 'HEALTHY' || isSurfaceSelected;
   };
 
   const topSurface: ToothSurface = isAnterior ? 'I' : 'O';
@@ -584,16 +584,8 @@ export function updateToothUniforms(
       colorHex = '#EF4444';
     }
 
-    // Verificar procedimento associado a esta face
-    const toothProcs = getToothProcedures(fdi);
-    const procForSurface = toothProcs.find((p: any) => p.surfaces?.includes(surface));
-    if (procForSurface) {
-      const globalProc = globalProcedures.find((gp: any) => gp.id === procForSurface.procedureId || gp.name === procForSurface.procedure);
-      if (globalProc?.color) {
-        colorHex = globalProc.color;
-        isActive = true;
-      }
-    }
+    // A cor geral baseada nos procedimentos já é configurada no material base pelo getCrownMaterialProps,
+    // então não aplicamos sobreposição de shader a menos que seja selecionado ou com cárie.
 
     // Verificar se a face está atualmente selecionada pelo usuário
     const isSurfaceSelected = isSelected && viewerState.activeSurfaces.includes(surface);
