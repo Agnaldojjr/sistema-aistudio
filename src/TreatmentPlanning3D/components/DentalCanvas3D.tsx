@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import * as THREE from 'three';
 import { ToothMesh } from './ToothMesh';
 import { usePlanning3D } from '../hooks/usePlanning3D';
 
@@ -74,7 +75,7 @@ export function DentalCanvas3D() {
       {/* Canvas R3F */}
       <Canvas
         camera={{ position: [0, 0, 10], fov: 50 }}
-        shadows
+        shadows={{ type: THREE.PCFShadowMap }}
         gl={{ preserveDrawingBuffer: true }}
       >
         <ambientLight intensity={0.5} />

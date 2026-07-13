@@ -262,7 +262,7 @@ export function DentalScene({ isPresentationMode = false }: DentalSceneProps) {
 
         <Canvas
           camera={{ position: [0, 0, 10], fov: 48 }}
-          shadows
+          shadows={{ type: THREE.PCFShadowMap }}
           gl={{ preserveDrawingBuffer: true }}
         >
           <ambientLight intensity={1.5} />
