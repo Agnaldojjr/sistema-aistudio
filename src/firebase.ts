@@ -13,7 +13,7 @@ export const initAuth = (
     (new URLSearchParams(window.location.search).get('bypass_auth') === 'true' || 
      localStorage.getItem('bypass_auth') === 'true');
 
-  if (isDev && isBypassEnabled && hasBypassParam) {
+  if ((isDev || isBypassEnabled) && hasBypassParam) {
     if (typeof window !== 'undefined') {
       localStorage.setItem('bypass_auth', 'true');
     }

@@ -11,7 +11,7 @@ from datetime import datetime
 # Configurações do Repositório e Servidor
 PORT = 3000
 HOST = "127.0.0.1"
-DEV_URL = f"http://{HOST}:{PORT}"
+DEV_URL = "https://sistema-aistudio.vercel.app"
 REPORTS_FILE = "sentinel_reports.json"
 
 # Garantir codificação UTF-8
@@ -208,28 +208,12 @@ def main():
         log(f"Erro ao sincronizar repositório: {e}")
         # Prossegue com o código local existente
         
-    # 2. Inicia o servidor local vinculado estritamente ao IP local
+    # 2. Configura ambiente para testar a Vercel
     dev_process = None
     try:
-        log(f"Iniciando o servidor local em {DEV_URL}...")
+        log(f"Testando ambiente de produção na Vercel: {DEV_URL}...")
         env = os.environ.copy()
-        env["PORT"] = str(PORT)
-        env["HOST"] = HOST
-        env["VITE_ENABLE_AUTH_BYPASS"] = "true"
-        
-        dev_process = subprocess.Popen(
-            ["npm", "run", "dev"], 
-            env=env, 
-            stdout=subprocess.DEVNULL, 
-            stderr=subprocess.DEVNULL
-        )
-        
-        # Espera o servidor carregar
-        if not check_server_up():
-            log("ERRO: Servidor local não respondeu na porta 3000.")
-            sys.exit(1)
-            
-        log("Servidor carregado e respondendo.")
+        env["TEST_BASE_URL"] = f"{DEV_URL}/?bypass_auth=true"
 
         # 3. Executa testes E2E Playwright
         log("Executando suíte de testes UX...")
@@ -376,8 +360,32 @@ Você DEVE responder rigorosamente no formato JSON com esta estrutura:
                 
             log("Código corrigido. Executando testes locais de integridade...")
             
-            # Executa verify_all.py
-            verify_res = subprocess.run([sys.executable, ".agents/scripts/verify_all.py"], text=True)
+            # Inicia servidor local para validação
+            log(f"Iniciando o servidor local em http://{HOST}:{PORT} para validar a correção...")
+            env_val = os.environ.copy()
+            env_val["PORT"] = str(PORT)
+            env_val["HOST"] = HOST
+            env_val["VITE_ENABLE_AUTH_BYPASS"] = "true"
+            # Assegura que o teste de validação rodará contra o localhost, e não Vercel
+            env_val["TEST_BASE_URL"] = f"http://{HOST}:{PORT}/?bypass_auth=true"
+            
+            val_process = subprocess.Popen(
+                ["npm", "run", "dev"], 
+                env=env_val, 
+                stdout=subprocess.DEVNULL, 
+                stderr=subprocess.DEVNULL
+            )
+            
+            # Pequeno delay para servidor iniciar
+            time.sleep(5)
+            
+            # Executa verify_all.py com a url local
+            verify_res = subprocess.run([sys.executable, ".agents/scripts/verify_all.py", ".", "--url", f"http://{HOST}:{PORT}"], text=True, env=env_val)
+            
+            # Encerra o servidor de validação
+            val_process.terminate()
+            val_process.wait()
+
             if verify_res.returncode == 0:
                 log("Sucesso! O patch de correção foi validado localmente pelo verify_all.")
                 

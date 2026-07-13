@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = 'http://127.0.0.1:3000/?bypass_auth=true';
+const BASE_URL = process.env.TEST_BASE_URL || 'https://sistema-aistudio.vercel.app/?bypass_auth=true';
 
 test.describe('Fluxos de Experiência do Usuário (UX)', () => {
   
@@ -24,7 +24,7 @@ test.describe('Fluxos de Experiência do Usuário (UX)', () => {
     });
 
     await page.goto(BASE_URL);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
   });
 
   // =========================================================
@@ -238,7 +238,7 @@ test.describe('Fluxos de Experiência do Usuário (UX)', () => {
   test('Responsividade: layout mobile não produz erros de JS', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 }); // iPhone X
     await page.goto(BASE_URL);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await page.waitForTimeout(1000);
 
     // Corpo deve ter conteúdo
