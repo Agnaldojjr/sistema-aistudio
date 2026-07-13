@@ -4652,6 +4652,38 @@ export default function DentalCRMView({
                               } : undefined}
                             />
                           ))}
+
+                          {/* Campo para editar as observações do orçamento */}
+                          <div className="bg-white border border-[#E6DEC9] rounded-2xl p-6 shadow-sm mt-6">
+                            <h4 className="font-bold text-sm text-[#8B0000] uppercase mb-2 flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-[#C09553]" />
+                              Observações do Orçamento
+                            </h4>
+                            <p className="text-xs text-zinc-500 mb-3">Este texto aparecerá no rodapé do documento de proposta de tratamento.</p>
+                            <textarea
+                              value={activeProposal?.notes || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setActiveProposal((prev: any) => {
+                                  if (prev) return { ...prev, notes: val };
+                                  return { 
+                                    patientName: selectedPatient?.name || '', 
+                                    status: 'Em Andamento', 
+                                    notes: val, 
+                                    discountPercent: 5, 
+                                    pixDiscountLabel: '5% DESCONTO NO PIX', 
+                                    installments: 12, 
+                                    installmentsLabel: 'Parcelamento em até 12x (com taxas)', 
+                                    customDiscountAmount: 0, 
+                                    showTotalBySection: false 
+                                  };
+                                });
+                              }}
+                              placeholder="Ex: Orçamento feito sem radiografia atual..."
+                              className="w-full min-h-[80px] p-3 rounded-xl border border-zinc-200 bg-zinc-50 text-sm focus:outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-colors resize-y"
+                            />
+                          </div>
+
                         </div>
                       ) : (
                         <div className="text-center py-16 text-zinc-400">

@@ -4,7 +4,7 @@ import { PlusCircle, Activity, X, ChevronLeft, Settings } from 'lucide-react';
 import { motion, useDragControls } from 'motion/react';
 
 export function ToothActionMenu() {
-  const { viewerState, setViewingAnatomy, selectTooth, onOpenProcedureManager, globalProcedures, addProcedure } = usePlanning3D();
+  const { viewerState, setViewingAnatomy, selectTooth, onOpenProcedureManager, globalProcedures, addProcedure, updateToothCondition } = usePlanning3D();
   const [view, setView] = useState<'MENU' | 'PROCEDURES'>('MENU');
   const dragControls = useDragControls();
 
