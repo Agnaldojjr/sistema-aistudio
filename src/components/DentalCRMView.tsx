@@ -57,6 +57,7 @@ import {
   renamePatientFileInSupabase,
   getPatientFileUrlFromSupabase
 } from '../lib/supabaseStorage';
+import { compressFileToDataUrl } from '../lib/imageUtils';
 import ImageMarkupEditor from './ImageMarkupEditor';
 import { AIAssistedWhatsApp } from './AIAssistedWhatsApp';
 import { usePatientContext } from '../context/PatientContext';
@@ -924,9 +925,11 @@ export default function DentalCRMView({
     if (!driveFolderId || !e.target.files || e.target.files.length === 0) return;
     try {
       setIsSupabaseUploading(true);
-      const file = e.target.files[0];
-      const name = file.name;
-      await uploadPatientFileToSupabase(driveFolderId, file, name);
+      const files = Array.from(e.target.files);
+      for (const file of files) {
+        const name = file.name;
+        await uploadPatientFileToSupabase(driveFolderId, file, name);
+      }
       // Refresh
       const images = await listPatientFilesFromSupabase(driveFolderId);
       setSupabaseImages(filterSupabaseImages(images));
@@ -4632,6 +4635,32 @@ export default function DentalCRMView({
                                 <Plus className="w-3.5 h-3.5" />
                                 Procedimento Avulso
                               </button>
+                              <label className="px-3 py-1 bg-[#FAF8F5] text-[#8B0000] text-xs font-bold rounded-lg transition-colors border-2 border-[#C09553]/30 hover:border-[#C09553] flex items-center gap-1.5 shadow-sm cursor-pointer select-none" title="Fazer upload de várias fotos de uma vez para mapeamento clínico">
+                                <Upload className="w-3.5 h-3.5" />
+                                + Fotos (Lote)
+                                <input 
+                                  type="file" 
+                                  multiple 
+                                  accept="image/*" 
+                                  className="hidden" 
+                                  onChange={async (e) => {
+                                    if (!e.target.files || e.target.files.length === 0) return;
+                                    const files = Array.from(e.target.files);
+                                    const newSections: any[] = [];
+                                    for (const file of files) {
+                                      const dataUrl = await compressFileToDataUrl(file, 1024, 0.7);
+                                      newSections.push({
+                                        id: `extra-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                                        title: `Quadrante Adicional`,
+                                        subtitle: file.name,
+                                        image: dataUrl,
+                                        markers: []
+                                      });
+                                    }
+                                    setActiveSections(prev => [...(prev || []), ...newSections]);
+                                  }} 
+                                />
+                              </label>
                             </div>
                             <span className="text-[10px] text-zinc-400">{activeSections.filter(s => s.image).length} de {activeSections.length} fotos carregadas</span>
                           </div>
@@ -5120,6 +5149,7 @@ export default function DentalCRMView({
                                 type="file" 
                                 className="hidden" 
                                 accept="image/*" 
+                                multiple
                                 onChange={uploadSupabaseFile} 
                                 disabled={isSupabaseUploading} 
                               />
