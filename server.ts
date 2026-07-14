@@ -1003,7 +1003,7 @@ Você DEVE responder em formato JSON estrito correspondente a esta estrutura:
   });
 
   // ==========================================
-  // CHAT COM O AGENTE DE VPS (Central IA)
+  // CHAT COM O COPILOTO HERMES
   // ==========================================
   app.post("/api/agent/chat", async (req, res) => {
     try {
@@ -1012,43 +1012,92 @@ Você DEVE responder em formato JSON estrito correspondente a esta estrutura:
         return res.status(400).json({ error: "Mensagem inválida" });
       }
 
-      // Buscar os relatórios recentes do Sentinel para servir de contexto das atividades
-      let reportsSummary = "";
+      const userId = getTargetUserId();
+      let dbSummary = "";
       try {
-        if (fs.existsSync(REPORTS_FILE)) {
-          const reports = JSON.parse(fs.readFileSync(REPORTS_FILE, "utf-8"));
-          const pending = reports.filter((r: any) => r.status === "pending");
-          const applied = reports.filter((r: any) => r.status === "applied");
-          reportsSummary = `Erros Pendentes (${pending.length}):\n` + 
-            pending.slice(0, 10).map((r: any) => `- [${r.timestamp}] ${r.message} no arquivo ${r.file}:${r.line}`).join("\n") +
-            `\n\nCorreções Aplicadas (${applied.length}):\n` +
-            applied.slice(0, 10).map((r: any) => `- [${r.timestamp}] ${r.message} (PR criado para o arquivo ${r.file})`).join("\n");
-        } else {
-          reportsSummary = "Nenhum relatório de erros registrado no momento.";
+        const db = await getCRMDatabase(userId);
+        const patientsCount = db.patients?.length || 0;
+        const apptsCount = db.appointments?.length || 0;
+        const transactions = db.transactions || [];
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+        const monthlyRevenue = transactions
+          .filter((t: any) => {
+            if (t.type !== "revenue") return false;
+            const tDate = new Date(t.date);
+            return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
+          })
+          .reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
+
+        dbSummary = `Dados Atuais do CRM da Clínica:
+- Total de Pacientes Cadastrados: ${patientsCount}
+- Total de Agendamentos Registrados: ${apptsCount}
+- Faturamento do Mês Atual: R$ ${monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+`;
+      } catch (dbErr) {
+        console.error("Erro ao buscar dados do CRM para contexto do Hermes:", dbErr);
+        dbSummary = "Não foi possível carregar as métricas atuais do CRM.";
+      }
+
+      // Se a mensagem for sobre testar o site
+      if (message.toLowerCase().includes("varredura completa") || message.toLowerCase().includes("testar abas")) {
+        const { execSync } = await import("child_process");
+        try {
+          const testBaseUrl = "https://sistema-aistudio.vercel.app/?bypass_auth=true";
+          const execOptions = {
+            env: { ...process.env, TEST_BASE_URL: testBaseUrl },
+            timeout: 60000
+          };
+          
+          let testOutput = "";
+          try {
+            testOutput = execSync("npx playwright test tests/ux_flow.test.ts --reporter=line", execOptions).toString();
+          } catch (execErr: any) {
+            testOutput = execErr.stdout?.toString() || execErr.stderr?.toString() || execErr.message;
+          }
+
+          const promptTest = `Você é o Hermes, o Copiloto IA da clínica. O Dr. Agnaldo pediu para rodar testes nas abas do site.
+Aqui está o resultado da execução do teste automatizado (Playwright):
+${testOutput}
+
+Resuma os resultados de forma amigável para o Dr. Agnaldo.
+Se todos os testes passaram, diga que o site está 100% íntegro e funcionando.
+Se houve algum erro de teste ou erro crítico no console de alguma aba, aponte detalhadamente qual foi o erro para que o desenvolvedor possa corrigir.
+Responda de forma objetiva, profissional e em português.`;
+
+          const geminiResponse = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: promptTest
+          });
+
+          return res.json({ reply: geminiResponse.text || "Testes executados, mas sem resposta detalhada." });
+        } catch (testErr: any) {
+          return res.json({ reply: `Ocorreu um erro ao tentar executar a varredura automática: ${testErr.message}` });
         }
-      } catch (err) {
-        reportsSummary = "Não foi possível carregar o histórico de relatórios.";
       }
 
       let historyText = "";
       if (Array.isArray(history)) {
-        // Formata o histórico passado pelo frontend (array de objetos { sender, text })
         historyText = "Histórico recente da conversa:\n" + history.slice(-10).map(msg => 
-          `${msg.sender === 'user' ? 'Dr. Agnaldo' : 'Agente IA'}: ${msg.text}`
+          `${msg.sender === 'user' ? 'Dr. Agnaldo' : 'Hermes'}: ${msg.text}`
         ).join("\n") + "\n\n";
       }
 
-      const prompt = `Você é o Agente IA de Monitoramento do Consultório Odontológico do Dr. Agnaldo Ferreira.
-O Dr. Agnaldo está conversando com você pela Central IA do sistema.
+      const prompt = `Você é o Hermes, o Agente Copiloto IA do Consultório Odontológico do Dr. Agnaldo Ferreira.
+O Dr. Agnaldo está conversando com você pelo painel de controle do CRM.
 
-REGRA CRUCIAL: Você é APENAS um assistente de conversação e monitoramento de relatórios. Você NÃO TEM acesso ou capacidade de modificar código, mudar menus, editar o site ou salvar bancos de dados. Se o usuário pedir para você mudar algo no sistema (ex: remover um botão, mudar a cor), VOCÊ DEVE explicar educadamente que o seu papel é apenas monitorar os testes e analisar relatórios, e que alterações de código devem ser pedidas ao Desenvolvedor (o Agente Antigravity/Cursor no terminal). NUNCA alucine que você vai ou pode fazer a alteração.
+Seu papel principal é atuar como assistente clínico e de gestão. Você pode ajudar com:
+- Geração de orientações pós-operatórias para pacientes particulares (ex: cuidados pós-cirurgia ou clareamento).
+- Resumos de prontuários com base nos dados.
+- Relatórios rápidos de faturamento e agenda (utilize as métricas abaixo).
 
-Seu papel principal é responder com palavras simples, claras e amigáveis sobre o status do sistema, utilizando os relatórios abaixo como contexto do que está acontecendo "nos bastidores".
+Métricas Clínicas de Contexto Real do CRM:
+${dbSummary}
 
-Aqui está o histórico das suas atividades de auditoria recentes (Sentinel Reports) na VPS Oracle:
-${reportsSummary}
+Histórico da Conversa:
+${historyText}
 
-${historyText}Responda de forma direta e gentil (sem jargões técnicos confusos) à nova mensagem:
+Responda de forma amigável, clara e objetiva à nova mensagem em português:
 Mensagem do Dr. Agnaldo: "${message}"`;
 
       const geminiResponse = await ai.models.generateContent({

@@ -50,7 +50,7 @@ test.describe('Fluxos de Experiência do Usuário (UX)', () => {
       { text: 'Pacientes', expectContent: ['Pacientes', 'Cadastrar'] },
       { text: 'Agenda', expectContent: ['Agenda', 'Calendário'] },
       { text: 'Arcada 3D', expectContent: ['3D', 'Arcada'] },
-      { text: 'Central IA', expectContent: ['Central', 'Agente', 'Sentinela'] },
+      { text: 'Copiloto Hermes', expectContent: ['Copiloto', 'Agente', 'Hermes'] },
       { text: 'Ajustes', expectContent: ['Configurações', 'Ajustes'] },
     ];
 
