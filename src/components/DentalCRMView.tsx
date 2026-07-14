@@ -205,6 +205,8 @@ export default function DentalCRMView({
   onNewAppointment,
   initialPatientName,
   onClearInitialPatient,
+  initialNewPatientData,
+  onClearInitialNewPatientData,
   procedures,
   setProcedures,
   setClinicSettings,
@@ -220,6 +222,8 @@ export default function DentalCRMView({
   onNewAppointment?: (patientName: string) => void;
   initialPatientName?: string;
   onClearInitialPatient?: () => void;
+  initialNewPatientData?: { name: string; phone: string; email: string };
+  onClearInitialNewPatientData?: () => void;
   procedures?: any;
   setProcedures?: (p: any) => void;
   currentFileId?: string | null;
@@ -674,6 +678,23 @@ export default function DentalCRMView({
       }
     }
   }, [initialPatientName, patients, selectedPatient, onClearInitialPatient, setSelectedPatient]);
+
+  // Handle auto-open new patient modal from calendar
+  useEffect(() => {
+    if (initialNewPatientData) {
+      setIsAddingPatient(true);
+      setNewPatientData({
+        name: initialNewPatientData.name.toUpperCase(),
+        mobile: initialNewPatientData.phone,
+        phone: initialNewPatientData.phone,
+        email: initialNewPatientData.email,
+        codigo_paciente: `COD-${Math.floor(1000 + Math.random() * 9000)}`
+      });
+      if (onClearInitialNewPatientData) {
+        onClearInitialNewPatientData();
+      }
+    }
+  }, [initialNewPatientData, onClearInitialNewPatientData]);
 
   // Sync related lists when selected patient changes
   useEffect(() => {

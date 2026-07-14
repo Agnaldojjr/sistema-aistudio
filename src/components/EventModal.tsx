@@ -17,9 +17,10 @@ interface EventModalProps {
   selectedDate?: Date;
   existingEvent?: any; // Google Calendar event object
   initialPatientName?: string;
+  onNewPatient?: (name: string, phone: string, email: string) => void;
 }
 
-export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, existingEvent, initialPatientName }: EventModalProps) {
+export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, existingEvent, initialPatientName, onNewPatient }: EventModalProps) {
   const isEditing = !!existingEvent;
   
   // Initialize form state
@@ -223,7 +224,7 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
                   );
                   setSuggestions(filtered);
                   setShowSuggestions(true);
-                } else if (crmPatients.length > 0) {
+                } else {
                   setSuggestions(crmPatients.slice(0, 10));
                   setShowSuggestions(true);
                 }
@@ -234,7 +235,7 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
               placeholder="Ex: Lucimara dos Santos Firmino"
               className="w-full px-3 py-2 border border-zinc-300 rounded-xl focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20"
             />
-            {showSuggestions && suggestions.length > 0 && (
+            {showSuggestions && (
               <div className="absolute left-0 right-0 z-50 bg-white border border-zinc-200 rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto">
                 {suggestions.map((p, idx) => (
                   <button
@@ -255,6 +256,19 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
                     </span>
                   </button>
                 ))}
+                
+                {onNewPatient && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onNewPatient(title, patientPhone, patientEmail);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-zinc-50 font-sans text-xs flex items-center gap-2 cursor-pointer border-t border-zinc-100 text-[#8B0000] font-bold"
+                  >
+                    <User className="w-4 h-4" />
+                    Cadastrar "{title || 'Novo Paciente'}" no CRM
+                  </button>
+                )}
               </div>
             )}
           </div>

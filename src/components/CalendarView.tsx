@@ -9,7 +9,7 @@ import { Loader2, Plus, Users, RefreshCcw } from 'lucide-react';
 import { addMonths, subMonths } from 'date-fns';
 
 interface CalendarViewProps {
-  onNewPatient?: () => void;
+  onNewPatient?: (name?: string, phone?: string, email?: string) => void;
   initialPatientName?: string;
   onClearInitialPatient?: () => void;
   isMobile?: boolean;
@@ -184,6 +184,10 @@ export default function CalendarView({ onNewPatient, initialPatientName, onClear
           onClose={() => {
             setIsModalOpen(false);
             if (onClearInitialPatient) onClearInitialPatient();
+          }}
+          onNewPatient={(name, phone, email) => {
+            setIsModalOpen(false);
+            if (onNewPatient) onNewPatient(name, phone, email);
           }}
           onSaved={() => {
             setIsModalOpen(false);

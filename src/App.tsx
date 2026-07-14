@@ -382,6 +382,7 @@ export default function App() {
   const [showPatientsModal, setShowPatientsModal] = useState(false);
   const [currentAppView, setCurrentAppView] = useState<AppView>('dashboard');
   const [appointmentPatientName, setAppointmentPatientName] = useState<string | undefined>();
+  const [initialNewPatientData, setInitialNewPatientData] = useState<{name: string, phone: string, email: string} | undefined>();
   const [crmPatientName, setCrmPatientName] = useState<string | undefined>();
   const [currentTheme, setCurrentTheme] = useState(() => {
     const saved = localStorage.getItem('agnaldo_dent_theme') || 'padrao';
@@ -696,6 +697,8 @@ export default function App() {
               setClinicSettings={setClinicSettings}
               initialPatientName={crmPatientName}
               onClearInitialPatient={() => setCrmPatientName(undefined)}
+              initialNewPatientData={initialNewPatientData}
+              onClearInitialNewPatientData={() => setInitialNewPatientData(undefined)}
               onNewAppointment={(patientName) => {
                 setAppointmentPatientName(patientName);
                 setCurrentAppView('calendar');
@@ -712,7 +715,11 @@ export default function App() {
         {currentAppView === 'calendar' && (
           <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 w-full h-[calc(100vh-60px)] animate-fade-in-up">
             <CalendarView
-              onNewPatient={() => { handleResetAll(); setCurrentAppView('crm'); }}
+              onNewPatient={(name, phone, email) => {
+                setInitialNewPatientData({ name: name || '', phone: phone || '', email: email || '' });
+                handleResetAll();
+                setCurrentAppView('crm');
+              }}
               initialPatientName={appointmentPatientName}
               onClearInitialPatient={() => setAppointmentPatientName(undefined)}
             />
