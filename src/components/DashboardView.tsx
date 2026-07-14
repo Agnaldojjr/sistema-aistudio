@@ -302,10 +302,25 @@ export default function DashboardView({
                 const newPatId = `pat_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
                 const extractedPhone = extractPhone(rawDesc);
                 const formattedPhone = extractedPhone || '';
+                let finalName = eventSummary.toUpperCase();
+
+                if (formattedPhone) {
+                  try {
+                    const hermesRes = await fetch(`/api/hermes/name?phone=${formattedPhone}`);
+                    if (hermesRes.ok) {
+                      const data = await hermesRes.json();
+                      if (data.name) {
+                        finalName = data.name.toUpperCase();
+                      }
+                    }
+                  } catch (e) {
+                    console.error("Erro ao consultar Hermes:", e);
+                  }
+                }
 
                 const newPatient = {
                   id: newPatId,
-                  name: eventSummary.toUpperCase(),
+                  name: finalName,
                   codigo_paciente: `COD-${Math.floor(1000 + Math.random() * 9000)}`,
                   phone: formattedPhone,
                   mobile: formattedPhone,

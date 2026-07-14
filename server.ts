@@ -349,6 +349,141 @@ async function startServer() {
   });
 
   // ==========================================
+  // BUSCA NOME DE PACIENTE NO HERMES (VPS)
+  // ==========================================
+  app.get("/api/hermes/name", async (req, res) => {
+    try {
+      const phone = req.query.phone as string;
+      if (!phone) {
+        return res.status(400).json({ error: "Telefone é obrigatório." });
+      }
+
+      const hermesUrl = process.env.HERMES_API_URL || "http://147.15.30.138:9119";
+      const username = process.env.HERMES_USERNAME || "granmagos";
+      const password = process.env.HERMES_PASSWORD || "Granmagos123.";
+
+      if (!hermesUrl || !username || !password) {
+        return res.json({ name: null });
+      }
+
+      // 1. Login
+      const loginRes = await fetch(`${hermesUrl}/auth/password-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: "basic",
+          username,
+          password,
+          next: "/sessions"
+        })
+      });
+
+      if (!loginRes.ok) {
+        console.error("[Hermes API] Falha no login do Hermes:", loginRes.statusText);
+        return res.json({ name: null });
+      }
+
+      const cookieHeader = loginRes.headers.get("set-cookie");
+      if (!cookieHeader) {
+        console.error("[Hermes API] set-cookie ausente");
+        return res.json({ name: null });
+      }
+
+      // 2. Fetch Sessions
+      const sessionsRes = await fetch(`${hermesUrl}/api/sessions`, {
+        headers: { "Cookie": cookieHeader }
+      });
+
+      if (!sessionsRes.ok) {
+        console.error("[Hermes API] Falha ao buscar sessões do Hermes:", sessionsRes.statusText);
+        return res.json({ name: null });
+      }
+
+      const { sessions } = await sessionsRes.json();
+      if (!Array.isArray(sessions)) {
+        return res.json({ name: null });
+      }
+
+      const targetPhone = phone.replace(/\D/g, "");
+      const matchedSession = sessions.find((s: any) => {
+        if (s.source !== "whatsapp") return false;
+        const skey = s.session_key || "";
+        const phoneMatch = skey.match(/:(\d+)$/);
+        if (phoneMatch) {
+          const sessPhone = phoneMatch[1];
+          return sessPhone.includes(targetPhone) || targetPhone.includes(sessPhone);
+        }
+        return false;
+      });
+
+      if (!matchedSession) {
+        return res.json({ name: null });
+      }
+
+      const sessionId = matchedSession.id;
+      const displayName = matchedSession.display_name || "";
+
+      // 3. Fetch Messages
+      const messagesRes = await fetch(`${hermesUrl}/api/sessions/${sessionId}/messages`, {
+        headers: { "Cookie": cookieHeader }
+      });
+
+      if (!messagesRes.ok) {
+        return res.json({ name: displayName || null });
+      }
+
+      const { messages } = await messagesRes.json();
+      if (!Array.isArray(messages) || messages.length === 0) {
+        return res.json({ name: displayName || null });
+      }
+
+      const chatHistory = messages
+        .filter((m: any) => m.role === "user" || m.role === "assistant")
+        .map((m: any) => `${m.role === 'user' ? 'Paciente' : 'Assistente'}: ${m.content || ''}`)
+        .join("\n");
+
+      if (!chatHistory.trim()) {
+        return res.json({ name: displayName || null });
+      }
+
+      // 4. Use Gemini
+      const geminiApiKey = process.env.GEMINI_API_KEY;
+      if (!geminiApiKey) {
+        return res.json({ name: displayName || null });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey: geminiApiKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+      });
+
+      const prompt = `Analise o histórico de conversa de WhatsApp abaixo entre um paciente e o assistente virtual da clínica.
+Identifique e extraia o NOME COMPLETO do paciente (como ele se apresentou ou assinou).
+Se o paciente não informou o nome completo na conversa, retorne apenas o nome de exibição (Display Name): "${displayName}".
+Responda APENAS com o nome extraído. Não adicione nenhuma introdução, explicação ou formatação de markdown.
+
+Histórico de Conversa:
+${chatHistory}`;
+
+      const geminiResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: { temperature: 0.1 }
+      });
+
+      const extractedName = geminiResponse.text?.trim();
+      if (extractedName && extractedName.length < 50) {
+        return res.json({ name: extractedName });
+      }
+
+      return res.json({ name: displayName || null });
+    } catch (err: any) {
+      console.error("Erro na API /api/hermes/name:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ==========================================
   // ROTAS DE INTEGRAÇÃO CRM - TYPEBOT / N8N
   // ==========================================
 
