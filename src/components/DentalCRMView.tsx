@@ -5258,6 +5258,7 @@ export default function DentalCRMView({
                                 <th className="p-2.5">Forma de Pagamento</th>
                                 <th className="p-2.5">Descrição do Item</th>
                                 <th className="p-2.5 text-right">Valor Final</th>
+                                <th className="p-2.5 text-center">Ações</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-100 text-zinc-700">
@@ -5272,6 +5273,36 @@ export default function DentalCRMView({
                                   <td className="p-2.5 font-bold uppercase tracking-wide text-zinc-800">{pay.description}</td>
                                   <td className="p-2.5 font-mono text-zinc-900 font-bold text-right">
                                     {String(pay.value).startsWith('R$') ? pay.value : `R$ ${Math.abs(Number(pay.value)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                                  </td>
+                                  <td className="p-2.5 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (window.confirm("Deseja realmente excluir este lançamento financeiro do paciente?")) {
+                                          const updated = pagamentosList.filter(p => p.id !== pay.id);
+                                          setPagamentosList(updated);
+                                          
+                                          // Also delete from global agnaldo_dent_financeiro in LocalStorage
+                                          const globalFinanceStr = localStorage.getItem('agnaldo_dent_financeiro');
+                                          if (globalFinanceStr) {
+                                            try {
+                                              const globalFinance = JSON.parse(globalFinanceStr);
+                                              const updatedGlobal = globalFinance.filter((p: any) => p.id !== pay.id);
+                                              localStorage.setItem('agnaldo_dent_financeiro', JSON.stringify(updatedGlobal));
+                                              window.dispatchEvent(new Event('storage'));
+                                            } catch (e) {
+                                              console.error(e);
+                                            }
+                                          }
+
+                                          // Save context to Supabase
+                                          setTimeout(() => saveContextToSupabase(), 100);
+                                        }
+                                      }}
+                                      className="text-rose-600 hover:text-rose-800 font-bold uppercase transition-colors cursor-pointer text-[9px] tracking-wider"
+                                    >
+                                      Excluir
+                                    </button>
                                   </td>
                                 </tr>
                               ))}
@@ -6210,12 +6241,22 @@ export default function DentalCRMView({
 // Simple display date formats
 function normalizeDateDisplay(isoString: string): string {
   if (!isoString) return '';
-  const cleanStr = isoString.split('T')[0];
-  const parts = cleanStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  if (isoString.includes('Invalid Date')) return '';
+  
+  const d = new Date(isoString);
+  if (!isNaN(d.getTime())) {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
   }
-  return cleanStr;
+  
+  const match = isoString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (match) {
+    return `${match[1].padStart(2, '0')}/${match[2].padStart(2, '0')}/${match[3]}`;
+  }
+  
+  return isoString.split('T')[0];
 }
 
 function formatBRL(value: any): string {

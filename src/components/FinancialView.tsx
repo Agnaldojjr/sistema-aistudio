@@ -12,6 +12,30 @@ export default function FinancialView({ onOpenPatient }: FinancialViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMethod, setFilterMethod] = useState<string>('Todos');
 
+  const parseSafeDate = (dateStr: string): Date => {
+    if (!dateStr) return new Date();
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) return d;
+    
+    // Parse pt-BR formats like "14/07/2026, 14:10:30"
+    const match = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (match) {
+      const day = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      const year = parseInt(match[3], 10);
+      
+      const timeMatch = dateStr.match(/(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+      if (timeMatch) {
+        const hour = parseInt(timeMatch[1], 10);
+        const min = parseInt(timeMatch[2], 10);
+        const sec = parseInt(timeMatch[3], 10);
+        return new Date(year, month, day, hour, min, sec);
+      }
+      return new Date(year, month, day);
+    }
+    return new Date();
+  };
+
   const totalRevenue = useMemo(() => {
     return payments
       .filter(p => p.status === 'Pago')
@@ -31,7 +55,7 @@ export default function FinancialView({ onOpenPatient }: FinancialViewProps) {
       const matchSearch = p.patientName.toLowerCase().includes(searchTerm.toLowerCase());
       const matchMethod = filterMethod === 'Todos' || p.paymentMethod === filterMethod;
       return matchSearch && matchMethod;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }).sort((a, b) => parseSafeDate(b.date).getTime() - parseSafeDate(a.date).getTime());
   }, [payments, searchTerm, filterMethod]);
 
   const formatCurrency = (val: number) => {
@@ -113,20 +137,21 @@ export default function FinancialView({ onOpenPatient }: FinancialViewProps) {
                 <th className="px-6 py-4">Forma de Pagamento</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Valor</th>
+                <th className="px-6 py-4 text-center">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {filteredPayments.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-zinc-400">
+                  <td colSpan={7} className="px-6 py-8 text-center text-zinc-400">
                     Nenhum registro encontrado.
                   </td>
                 </tr>
               ) : (
                 filteredPayments.map((payment) => (
                   <tr key={payment.id} className="hover:bg-zinc-50/50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {new Date(payment.date).toLocaleDateString('pt-BR')}
+                    <td className="px-6 py-4 whitespace-nowrap font-mono">
+                      {parseSafeDate(payment.date).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-6 py-4 font-medium text-zinc-800">
                       <button
@@ -160,6 +185,20 @@ export default function FinancialView({ onOpenPatient }: FinancialViewProps) {
                     </td>
                     <td className="px-6 py-4 text-right font-bold text-zinc-800 font-mono">
                       {formatCurrency(payment.amount)}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('Deseja realmente excluir este lançamento financeiro?')) {
+                            const updated = payments.filter(p => p.id !== payment.id);
+                            setPayments(updated);
+                          }
+                        }}
+                        className="text-rose-600 hover:text-rose-800 font-bold transition-colors cursor-pointer text-xs uppercase tracking-wider"
+                      >
+                        Excluir
+                      </button>
                     </td>
                   </tr>
                 ))
