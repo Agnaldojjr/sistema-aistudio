@@ -328,6 +328,92 @@ export default function DentalCRMView({
     }
   };
 
+  // Auto-sync completed procedures with financial records (self-healing)
+  useEffect(() => {
+    if (!selectedPatient || driveProposals.length === 0) return;
+
+    let updatedLocal = false;
+    const localList = [...pagamentosList];
+
+    // Load global finance
+    const globalFinanceStr = localStorage.getItem('agnaldo_dent_financeiro');
+    let globalFinance: any[] = [];
+    if (globalFinanceStr) {
+      try {
+        globalFinance = JSON.parse(globalFinanceStr);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    let updatedGlobal = false;
+
+    // Scan all proposals
+    const proposalsToScan = [...driveProposals];
+    if (selectedProposalData && !proposalsToScan.some(p => p.id === selectedProposalId)) {
+      proposalsToScan.push({
+        id: selectedProposalId,
+        name: driveProposals.find(p => p.id === selectedProposalId)?.name || 'orcamento.json',
+        content: selectedProposalData
+      });
+    }
+
+    proposalsToScan.forEach(prop => {
+      const data = prop.content;
+      if (!data) return;
+      const instances = getProcedureInstancesFromProposal(data, prop.id, prop.name);
+      
+      instances.forEach(inst => {
+        const cleanStatus = (inst.status || '').toLowerCase().trim();
+        const isDone = cleanStatus === 'executado' || cleanStatus === 'realizado';
+        const payId = `pay-${inst.instanceId}`;
+
+        if (isDone) {
+          // Check local pagamentosList
+          const hasLocal = localList.some(p => p.id === payId);
+          if (!hasLocal) {
+            localList.push({
+              id: payId,
+              patientId: selectedPatient.id,
+              date: inst.updatedAt || inst.date || new Date().toISOString().split('T')[0],
+              method: data.proposal?.paymentMethod || 'PIX',
+              description: `${inst.name} (${inst.toothNumber ? `Dente ${inst.toothNumber}` : 'Geral'}) - Executado`,
+              value: inst.price || 0
+            });
+            updatedLocal = true;
+          }
+
+          // Check global finance list
+          const hasGlobal = globalFinance.some(p => p.id === payId);
+          if (!hasGlobal) {
+            globalFinance.unshift({
+              id: payId,
+              patientId: selectedPatient.id,
+              patientName: selectedPatient.name,
+              date: inst.date || new Date().toISOString(),
+              amount: inst.price || 0,
+              paymentMethod: data.proposal?.paymentMethod || 'PIX',
+              status: 'Pago',
+              description: `${inst.name} (${inst.toothNumber ? `Dente ${inst.toothNumber}` : 'Geral'}) - Executado`
+            });
+            updatedGlobal = true;
+          }
+        }
+      });
+    });
+
+    if (updatedLocal) {
+      setPagamentosList(localList);
+      setTimeout(() => {
+        saveContextToSupabase();
+      }, 500);
+    }
+
+    if (updatedGlobal) {
+      localStorage.setItem('agnaldo_dent_financeiro', JSON.stringify(globalFinance));
+      window.dispatchEvent(new Event('storage'));
+    }
+  }, [driveProposals, pagamentosList, selectedPatient, selectedProposalData, selectedProposalId]);
+
   const handleUploadTimelinePhoto = async (
     proposalName: string,
     instanceId: string,
