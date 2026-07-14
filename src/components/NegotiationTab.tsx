@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   CreditCard, 
   Percent, 
@@ -163,7 +163,14 @@ export default function NegotiationTab({
   currentFileId,
   setCurrentFileId
 }: NegotiationTabProps) {
-  const { selectedPatient } = usePatientContext();
+  const { 
+    selectedPatient, 
+    activeSections, 
+    setActiveSections, 
+    pagamentosList, 
+    setPagamentosList, 
+    saveContextToSupabase 
+  } = usePatientContext();
   const patientName = selectedPatient ? selectedPatient.name : (proposal.patientName || '');
   const pd = selectedPatient || proposal.patientData || {};
   
@@ -500,6 +507,156 @@ export default function NegotiationTab({
 
     return list;
   }, [sections, procedures]);
+
+  // ponytail: tracking procedures for payment-per-procedure mode when status is "Em Andamento"
+  const proceduresTrackingList = useMemo(() => {
+    const list: Array<{
+      sectionId: string;
+      sectionTitle: string;
+      markerId: string;
+      toothNumber: number;
+      procedureId: string;
+      procedureName: string;
+      price: number;
+      status: 'A realizar' | 'Realizado' | 'Em andamento' | 'Cancelado';
+      paid: boolean;
+      paymentMethod?: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito';
+    }> = [];
+
+    activeSections.forEach((sec) => {
+      sec.markers.forEach((marker) => {
+        marker.procedures.forEach((pid) => {
+          const proc = procedures.find((p) => p.id === pid);
+          if (proc) {
+            const inst = marker.procedureInstances?.find((i) => i.procedureId === pid);
+            list.push({
+              sectionId: sec.id,
+              sectionTitle: sec.title,
+              markerId: marker.id,
+              toothNumber: marker.toothNumber,
+              procedureId: pid,
+              procedureName: proc.name,
+              price: proc.price,
+              status: inst ? inst.status : 'A realizar',
+              paid: inst ? !!inst.paid : false,
+              paymentMethod: inst ? inst.paymentMethod : undefined
+            });
+          }
+        });
+      });
+    });
+
+    return list;
+  }, [activeSections, procedures]);
+
+  const handleUpdateProcedure = useCallback((
+    sectionId: string,
+    markerId: string,
+    procId: string,
+    fields: { status?: 'A realizar' | 'Realizado' | 'Em andamento' | 'Cancelado'; paid?: boolean; paymentMethod?: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito' }
+  ) => {
+    const nowStr = new Date().toLocaleString('pt-BR');
+    let targetPrice = 0;
+
+    setActiveSections(prevSections => {
+      return prevSections.map(sec => {
+        if (sec.id !== sectionId) return sec;
+        return {
+          ...sec,
+          markers: sec.markers.map(marker => {
+            if (marker.id !== markerId) return marker;
+            
+            const currentInstances = marker.procedureInstances || [];
+            const existingInstIndex = currentInstances.findIndex(i => i.procedureId === procId);
+            let updatedInstances = [...currentInstances];
+            
+            if (existingInstIndex !== -1) {
+              const prevInst = updatedInstances[existingInstIndex];
+              targetPrice = prevInst.price;
+              
+              const newFields: any = { ...fields };
+              if (fields.status) {
+                newFields.date = nowStr;
+                newFields.updatedAt = nowStr;
+              }
+              if (fields.paid !== undefined) {
+                newFields.paymentDate = fields.paid ? nowStr : undefined;
+              }
+
+              updatedInstances[existingInstIndex] = {
+                ...prevInst,
+                ...newFields
+              };
+            } else {
+              const proc = procedures.find(p => p.id === procId);
+              targetPrice = proc?.price || 0;
+
+              const newInst = {
+                id: `${marker.id}-${procId}`,
+                procedureId: procId,
+                name: proc?.name || 'Procedimento',
+                price: targetPrice,
+                includeFinancial: true,
+                status: fields.status || 'A realizar',
+                paid: fields.paid || false,
+                paymentMethod: fields.paymentMethod,
+                paymentDate: fields.paid ? nowStr : undefined,
+                date: nowStr,
+                updatedAt: nowStr,
+                dentist: clinicSettings?.doctorName || 'Dentista'
+              };
+              updatedInstances.push(newInst as any);
+            }
+            
+            return {
+              ...marker,
+              procedureInstances: updatedInstances
+            };
+          })
+        };
+      });
+    });
+
+    if (fields.paid !== undefined) {
+      const payId = `pay-proc-${sectionId}-${markerId}-${procId}`;
+      const filtered = pagamentosList.filter((p: any) => p.id !== payId);
+      
+      if (fields.paid) {
+        const newPayment = {
+          id: payId,
+          patientName: patientName,
+          date: new Date().toISOString(),
+          amount: targetPrice || procedures.find(p => p.id === procId)?.price || 0,
+          paymentMethod: fields.paymentMethod || 'PIX',
+          status: 'Pago' as const
+        };
+        setPagamentosList([...filtered, newPayment]);
+      } else {
+        setPagamentosList(filtered);
+      }
+      
+      // Sync localstorage for financial view compatibility
+      setTimeout(() => {
+        const storedFin = localStorage.getItem('agnaldo_dent_financeiro');
+        let payments = storedFin ? JSON.parse(storedFin) : [];
+        const payId = `pay-proc-${sectionId}-${markerId}-${procId}`;
+        payments = payments.filter((p: any) => p.id !== payId);
+        
+        if (fields.paid) {
+          payments.push({
+            id: payId,
+            patientName: patientName,
+            date: new Date().toISOString(),
+            amount: targetPrice || procedures.find(p => p.id === procId)?.price || 0,
+            paymentMethod: fields.paymentMethod || 'PIX',
+            status: 'Pago'
+          });
+        }
+        localStorage.setItem('agnaldo_dent_financeiro', JSON.stringify(payments));
+        window.dispatchEvent(new Event('local-storage'));
+      }, 50);
+    }
+  }, [setActiveSections, setPagamentosList, procedures, clinicSettings, patientName]);
 
   // --- ESTADOS DA INTEGRACAO DO WHATSAPP DE ENVIAR PDF ---
   const [whatsappApiUrl, setWhatsappApiUrl] = useState<string>(() => {
@@ -1287,84 +1444,209 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           </div>
         </div>
 
-        {/* Right Side: Configure Simulation Sliders */}
+        {/* Right Side: Configure Simulation Sliders / Procedure Tracking */}
         <div className="lg:col-span-7 bg-white border border-[#E6DEC9] p-5 rounded-2xl shadow-sm space-y-6">
-          <h3 className="font-serif font-bold text-[#8B0000] text-sm tracking-wide uppercase flex items-center gap-2 border-b border-zinc-100 pb-3">
-            <Percent className="w-4 h-4 text-[#B48C4D]" />
-            Ajustar Valores de Entrada
-          </h3>
+          {proposal.status === 'Em Andamento' ? (
+            // Acompanhamento por procedimento
+            <>
+              <h3 className="font-serif font-bold text-[#8B0000] text-sm tracking-wide uppercase flex items-center gap-2 border-b border-zinc-100 pb-3">
+                <CheckCircle2 className="w-4 h-4 text-[#B48C4D]" />
+                Controle de Execução & Pagamento por Procedimento
+              </h3>
+              
+              <div className="space-y-4">
+                <div className="bg-[#FAF8F5] border border-[#E6DEC9] text-zinc-600 text-[11px] px-3.5 py-2.5 rounded-lg flex items-start gap-2 max-w-full">
+                  <AlertCircle className="w-4.5 h-4.5 flex-shrink-0 mt-0.5 text-[#C09553]" />
+                  <div>
+                    <span className="font-bold text-zinc-800">Orçamento em Andamento:</span> O paciente optou por pagar individualmente à medida que realiza cada procedimento. Marque as baixas de execução e pagamento abaixo para manter o prontuário organizado.
+                  </div>
+                </div>
 
-          <div className="space-y-5">
-            
-            {/* Slider 1 */}
-            <div className="space-y-2 bg-[#FAF8F5] p-3 border border-zinc-100 rounded-xl">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-[#8B0000] uppercase tracking-wide flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 bg-[#B48C4D] rounded-full" />
-                  Simulação 1
-                </span>
-                <span className="font-mono font-bold bg-[#FAF8F5] border border-[#D5CBB3] text-[#8B0000] px-2 py-0.5 rounded-md">
-                  {percentSim1}% / {formatCurrency((desiredNet * percentSim1) / 100)}
-                </span>
+                {proceduresTrackingList.length === 0 ? (
+                  <div className="text-center py-8 border-2 border-dashed border-zinc-200 rounded-xl text-zinc-400 text-xs">
+                    Nenhum procedimento mapeado no odontograma deste paciente.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs font-sans">
+                      <thead>
+                        <tr className="border-b border-zinc-200 text-zinc-400 text-[10px] uppercase font-bold tracking-wider">
+                          <th className="py-2.5 px-2">Dente</th>
+                          <th className="py-2.5 px-2">Procedimento</th>
+                          <th className="py-2.5 px-2">Valor</th>
+                          <th className="py-2.5 px-2">Execução</th>
+                          <th className="py-2.5 px-2">Pagamento</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {proceduresTrackingList.map((item, idx) => (
+                          <tr key={`${item.sectionId}-${item.markerId}-${item.procedureId}-${idx}`} className="hover:bg-zinc-50/50 transition-colors">
+                            <td className="py-3 px-2 font-mono font-bold text-zinc-700">
+                              D{item.toothNumber}
+                            </td>
+                            <td className="py-3 px-2">
+                              <div className="font-semibold text-zinc-800">{item.procedureName}</div>
+                              <div className="text-[10px] text-zinc-400 font-medium">{item.sectionTitle}</div>
+                            </td>
+                            <td className="py-3 px-2 font-mono font-bold text-zinc-600">
+                              {formatCurrency(item.price)}
+                            </td>
+                            <td className="py-3 px-2">
+                              <select
+                                value={item.status}
+                                onChange={(e) => handleUpdateProcedure(item.sectionId, item.markerId, item.procedureId, { status: e.target.value as any })}
+                                className={`border rounded px-2 py-1 text-[11px] font-bold focus:outline-none transition-colors ${
+                                  item.status === 'Realizado'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : item.status === 'Em andamento'
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                    : 'bg-zinc-50 text-zinc-600 border-zinc-200'
+                                }`}
+                              >
+                                <option value="A realizar">A realizar</option>
+                                <option value="Em andamento">Em andamento</option>
+                                <option value="Realizado">✔ Executado</option>
+                                <option value="Cancelado">Cancelado</option>
+                              </select>
+                            </td>
+                            <td className="py-3 px-2">
+                              <div className="flex items-center gap-2">
+                                <label className="relative inline-flex items-center cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={item.paid}
+                                    onChange={(e) => handleUpdateProcedure(item.sectionId, item.markerId, item.procedureId, { paid: e.target.checked })}
+                                    className="sr-only peer"
+                                  />
+                                  <div className="w-9 h-5 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                                </label>
+                                
+                                {item.paid ? (
+                                  <select
+                                    value={item.paymentMethod || 'PIX'}
+                                    onChange={(e) => handleUpdateProcedure(item.sectionId, item.markerId, item.procedureId, { paid: true, paymentMethod: e.target.value as any })}
+                                    className="border border-zinc-200 rounded px-1.5 py-0.5 text-[10px] font-bold text-zinc-700 bg-white"
+                                  >
+                                    <option value="PIX">PIX</option>
+                                    <option value="Dinheiro">Dinheiro</option>
+                                    <option value="Cartão de Crédito">Crédito</option>
+                                    <option value="Cartão de Débito">Débito</option>
+                                  </select>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100">
+                                    Pendente
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                
+                {/* Auto-save explanation / indicator */}
+                <div className="flex justify-between items-center pt-3 border-t border-zinc-100 text-[10.5px] text-zinc-400">
+                  <span>ℹ️ Lançamentos pagos são vinculados automaticamente ao Fluxo de Caixa.</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await saveContextToSupabase();
+                        alert('Alterações salvas com sucesso no Supabase!');
+                      } catch (err: any) {
+                        alert('Erro ao salvar: ' + err.message);
+                      }
+                    }}
+                    className="text-[#8B0000] font-bold hover:underline"
+                  >
+                    Salvar Banco Supabase
+                  </button>
+                </div>
               </div>
-              <input
-                type="range"
-                min="5"
-                max="95"
-                step="5"
-                value={percentSim1}
-                onChange={(e) => setPercentSim1(parseInt(e.target.value))}
-                className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-[#8B0000]"
-              />
-            </div>
+            </>
+          ) : (
+            // Slider simulators
+            <>
+              <h3 className="font-serif font-bold text-[#8B0000] text-sm tracking-wide uppercase flex items-center gap-2 border-b border-zinc-100 pb-3">
+                <Percent className="w-4 h-4 text-[#B48C4D]" />
+                Ajustar Valores de Entrada
+              </h3>
 
-            {/* Slider 2 */}
-            <div className="space-y-2 bg-[#FAF8F5] p-3 border border-zinc-100 rounded-xl">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-[#8B0000] uppercase tracking-wide flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 bg-[#B48C4D] rounded-full" />
-                  Simulação 2
-                </span>
-                <span className="font-mono font-bold bg-[#FAF8F5] border border-[#D5CBB3] text-[#8B0000] px-2 py-0.5 rounded-md">
-                  {percentSim2}% / {formatCurrency((desiredNet * percentSim2) / 100)}
-                </span>
-              </div>
-              <input
-                type="range"
-                min="5"
-                max="95"
-                step="5"
-                value={percentSim2}
-                onChange={(e) => setPercentSim2(parseInt(e.target.value))}
-                className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-[#8B0000]"
-              />
-            </div>
+              <div className="space-y-5">
+                
+                {/* Slider 1 */}
+                <div className="space-y-2 bg-[#FAF8F5] p-3 border border-zinc-100 rounded-xl">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-[#8B0000] uppercase tracking-wide flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-[#B48C4D] rounded-full" />
+                      Simulação 1
+                    </span>
+                    <span className="font-mono font-bold bg-[#FAF8F5] border border-[#D5CBB3] text-[#8B0000] px-2 py-0.5 rounded-md">
+                      {percentSim1}% / {formatCurrency((desiredNet * percentSim1) / 100)}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="95"
+                    step="5"
+                    value={percentSim1}
+                    onChange={(e) => setPercentSim1(parseInt(e.target.value))}
+                    className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-[#8B0000]"
+                  />
+                </div>
 
-            {/* Slider 3: Specific monetary offer */}
-            <div className="space-y-2 bg-[#FAF8F5] p-3 border border-zinc-100 rounded-xl">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-[#8B0000] uppercase tracking-wide flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 bg-[#B48C4D] rounded-full" />
-                  Entrada da Oferta do Paciente
-                </span>
-                <span className="font-mono font-bold bg-[#FAF8F5] border border-[#D5CBB3] text-[#8B0000] px-2 py-0.5 rounded-md">
-                  {desiredNet > 0 ? `${Math.round((patientOfferInput / desiredNet) * 100)}%` : '0%'}
-                </span>
-              </div>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xs text-zinc-400">R$</span>
-                <input
-                  type="number"
-                  min="0"
-                  max={desiredNet}
-                  value={patientOfferInput}
-                  onChange={(e) => setPatientOfferInput(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-white border border-[#D5CBB3] pl-8 pr-3 py-1.5 text-xs text-zinc-800 font-bold rounded-lg focus:outline-none focus:border-[#8B0000]"
-                />
-              </div>
-            </div>
+                {/* Slider 2 */}
+                <div className="space-y-2 bg-[#FAF8F5] p-3 border border-zinc-100 rounded-xl">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-[#8B0000] uppercase tracking-wide flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-[#B48C4D] rounded-full" />
+                      Simulação 2
+                    </span>
+                    <span className="font-mono font-bold bg-[#FAF8F5] border border-[#D5CBB3] text-[#8B0000] px-2 py-0.5 rounded-md">
+                      {percentSim2}% / {formatCurrency((desiredNet * percentSim2) / 100)}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="95"
+                    step="5"
+                    value={percentSim2}
+                    onChange={(e) => setPercentSim2(parseInt(e.target.value))}
+                    className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-[#8B0000]"
+                  />
+                </div>
 
-          </div>
+                {/* Slider 3: Specific monetary offer */}
+                <div className="space-y-2 bg-[#FAF8F5] p-3 border border-zinc-100 rounded-xl">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-[#8B0000] uppercase tracking-wide flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-[#B48C4D] rounded-full" />
+                      Entrada da Oferta do Paciente
+                    </span>
+                    <span className="font-mono font-bold bg-[#FAF8F5] border border-[#D5CBB3] text-[#8B0000] px-2 py-0.5 rounded-md">
+                      {desiredNet > 0 ? `${Math.round((patientOfferInput / desiredNet) * 100)}%` : '0%'}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xs text-zinc-400">R$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max={desiredNet}
+                      value={patientOfferInput}
+                      onChange={(e) => setPatientOfferInput(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-white border border-[#D5CBB3] pl-8 pr-3 py-1.5 text-xs text-zinc-800 font-bold rounded-lg focus:outline-none focus:border-[#8B0000]"
+                    />
+                  </div>
+                </div>
+
+              </div>
+            </>
+          )}
         </div>
 
       </div>

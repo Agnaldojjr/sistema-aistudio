@@ -30,6 +30,9 @@ export interface ToothMarker {
     dentist: string;
     faces?: string[];
     observation?: string;
+    paid?: boolean;
+    paymentMethod?: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito';
+    paymentDate?: string;
   }[];
   // --- Integração 3D ---
   condition?: ToothCondition;
