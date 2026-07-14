@@ -169,6 +169,8 @@ export default function NegotiationTab({
     setActiveSections, 
     pagamentosList, 
     setPagamentosList, 
+    clinicalHistory,
+    setClinicalHistory,
     saveContextToSupabase 
   } = usePatientContext();
   const patientName = selectedPatient ? selectedPatient.name : (proposal.patientName || '');
@@ -556,8 +558,33 @@ export default function NegotiationTab({
     fields: { status?: 'A realizar' | 'Realizado' | 'Em andamento' | 'Cancelado'; paid?: boolean; paymentMethod?: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito' }
   ) => {
     const nowStr = new Date().toLocaleString('pt-BR');
-    let targetPrice = 0;
+    
+    // Find procedure info
+    const proc = procedures.find(p => p.id === procId);
+    const targetPrice = proc?.price || 0;
+    const targetName = proc?.name || 'Procedimento';
 
+    // Find current state from activeSections
+    let toothNumber = 'Geral';
+    let wasPaid = false;
+    let currentMethod = 'PIX';
+    let currentExecStatus = 'A realizar';
+
+    activeSections.forEach(s => {
+      s.markers.forEach(m => {
+        if (m.id === markerId) {
+          toothNumber = m.toothNumber ? `D${m.toothNumber}` : 'Geral';
+          const inst = m.procedureInstances?.find(i => i.procedureId === procId);
+          if (inst) {
+            wasPaid = !!inst.paid;
+            currentMethod = inst.paymentMethod || 'PIX';
+            currentExecStatus = inst.status || 'A realizar';
+          }
+        }
+      });
+    });
+
+    // 1. Update activeSections
     setActiveSections(prevSections => {
       return prevSections.map(sec => {
         if (sec.id !== sectionId) return sec;
@@ -572,8 +599,6 @@ export default function NegotiationTab({
             
             if (existingInstIndex !== -1) {
               const prevInst = updatedInstances[existingInstIndex];
-              targetPrice = prevInst.price;
-              
               const newFields: any = { ...fields };
               if (fields.status) {
                 newFields.date = nowStr;
@@ -585,21 +610,21 @@ export default function NegotiationTab({
 
               updatedInstances[existingInstIndex] = {
                 ...prevInst,
-                ...newFields
+                ...newFields,
+                paid: fields.paid !== undefined ? fields.paid : prevInst.paid,
+                paymentMethod: fields.paymentMethod !== undefined ? fields.paymentMethod : prevInst.paymentMethod,
+                paymentDate: fields.paid === true ? nowStr : (fields.paid === false ? undefined : prevInst.paymentDate)
               };
             } else {
-              const proc = procedures.find(p => p.id === procId);
-              targetPrice = proc?.price || 0;
-
               const newInst = {
                 id: `${marker.id}-${procId}`,
                 procedureId: procId,
-                name: proc?.name || 'Procedimento',
+                name: targetName,
                 price: targetPrice,
                 includeFinancial: true,
                 status: fields.status || 'A realizar',
                 paid: fields.paid || false,
-                paymentMethod: fields.paymentMethod,
+                paymentMethod: fields.paymentMethod || 'PIX',
                 paymentDate: fields.paid ? nowStr : undefined,
                 date: nowStr,
                 updatedAt: nowStr,
@@ -617,38 +642,82 @@ export default function NegotiationTab({
       });
     });
 
-    if (fields.paid !== undefined) {
+    // 2. PIX discount confirmation check
+    let finalPrice = targetPrice;
+    let method = fields.paymentMethod || currentMethod;
+    let isPix = method === 'PIX';
+    let descSuffix = '';
+
+    const isNewlyPaid = (fields.paid === true && !wasPaid);
+    const isMethodChangedToPix = (fields.paid !== false && (fields.paid === true || wasPaid) && fields.paymentMethod === 'PIX' && currentMethod !== 'PIX');
+
+    if (isNewlyPaid || isMethodChangedToPix) {
+      if (isPix) {
+        const discountPct = proposal.discountPercent || 5;
+        const discounted = targetPrice * (1 - discountPct / 100);
+        const confirmDiscount = window.confirm(
+          `Deseja aplicar o desconto de PIX (${discountPct}%) para este procedimento?\n\n` +
+          `Valor Integral: R$ ${targetPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+          `Valor com Desconto: R$ ${discounted.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        );
+        if (confirmDiscount) {
+          finalPrice = discounted;
+          descSuffix = ` (c/ desc. PIX ${discountPct}%)`;
+        }
+      }
+    } else if (wasPaid && fields.paid !== false) {
+      const payId = `pay-proc-${sectionId}-${markerId}-${procId}`;
+      const existingPayment = pagamentosList.find(p => p.id === payId);
+      if (existingPayment) {
+        finalPrice = existingPayment.amount || existingPayment.value || targetPrice;
+        if (existingPayment.description && existingPayment.description.includes('desc. PIX')) {
+          descSuffix = ` (c/ desc. PIX ${proposal.discountPercent || 5}%)`;
+        }
+      }
+    }
+
+    // 3. Sync with financial module (pagamentosList)
+    if (fields.paid !== undefined || fields.paymentMethod !== undefined) {
       const payId = `pay-proc-${sectionId}-${markerId}-${procId}`;
       const filtered = pagamentosList.filter((p: any) => p.id !== payId);
       
-      if (fields.paid) {
+      const isCurrentlyPaid = fields.paid !== undefined ? fields.paid : wasPaid;
+      
+      if (isCurrentlyPaid) {
         const newPayment = {
           id: payId,
+          patientId: selectedPatient?.id || '',
           patientName: patientName,
           date: new Date().toISOString(),
-          amount: targetPrice || procedures.find(p => p.id === procId)?.price || 0,
-          paymentMethod: fields.paymentMethod || 'PIX',
+          amount: finalPrice,
+          paymentMethod: method,
+          value: finalPrice,
+          method: method,
+          description: `${targetName} - ${toothNumber}${descSuffix}`,
           status: 'Pago' as const
         };
         setPagamentosList([...filtered, newPayment]);
       } else {
         setPagamentosList(filtered);
       }
-      
+
       // Sync localstorage for financial view compatibility
       setTimeout(() => {
         const storedFin = localStorage.getItem('agnaldo_dent_financeiro');
         let payments = storedFin ? JSON.parse(storedFin) : [];
-        const payId = `pay-proc-${sectionId}-${markerId}-${procId}`;
         payments = payments.filter((p: any) => p.id !== payId);
         
-        if (fields.paid) {
+        if (isCurrentlyPaid) {
           payments.push({
             id: payId,
+            patientId: selectedPatient?.id || '',
             patientName: patientName,
             date: new Date().toISOString(),
-            amount: targetPrice || procedures.find(p => p.id === procId)?.price || 0,
-            paymentMethod: fields.paymentMethod || 'PIX',
+            amount: finalPrice,
+            paymentMethod: method,
+            value: finalPrice,
+            method: method,
+            description: `${targetName} - ${toothNumber}${descSuffix}`,
             status: 'Pago'
           });
         }
@@ -656,7 +725,28 @@ export default function NegotiationTab({
         window.dispatchEvent(new Event('local-storage'));
       }, 50);
     }
-  }, [setActiveSections, setPagamentosList, procedures, clinicSettings, patientName]);
+
+    // 4. Sync with clinical history log (unified timeline)
+    if (fields.status !== undefined) {
+      const histId = `hist-proc-${sectionId}-${markerId}-${procId}`;
+      const filteredHist = clinicalHistory.filter((h: any) => h.id !== histId);
+      
+      const newStatus = fields.status;
+      if (newStatus === 'Realizado' || newStatus === 'Em andamento') {
+        const newHist = {
+          id: histId,
+          patientId: selectedPatient?.id || '',
+          date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+          proceduresPerformed: targetName,
+          treatmentEvolution: `Procedimento ${newStatus === 'Realizado' ? 'Realizado' : 'Em andamento'} no dente ${toothNumber}.`,
+          observations: `Baixa dada via painel de acompanhamento de orçamento.`
+        };
+        setClinicalHistory([...filteredHist, newHist]);
+      } else {
+        setClinicalHistory(filteredHist);
+      }
+    }
+  }, [setActiveSections, setPagamentosList, setClinicalHistory, activeSections, pagamentosList, clinicalHistory, procedures, clinicSettings, patientName, selectedPatient, proposal.discountPercent]);
 
   // --- ESTADOS DA INTEGRACAO DO WHATSAPP DE ENVIAR PDF ---
   const [whatsappApiUrl, setWhatsappApiUrl] = useState<string>(() => {
@@ -1446,7 +1536,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
         {/* Right Side: Configure Simulation Sliders / Procedure Tracking */}
         <div className="lg:col-span-7 bg-white border border-[#E6DEC9] p-5 rounded-2xl shadow-sm space-y-6">
-          {proposal.status === 'Em Andamento' ? (
+          { (proposal.status === 'Em Andamento' || proposal.status === 'Aprovado (paciente pagou)') ? (
             // Acompanhamento por procedimento
             <>
               <h3 className="font-serif font-bold text-[#8B0000] text-sm tracking-wide uppercase flex items-center gap-2 border-b border-zinc-100 pb-3">
@@ -1458,7 +1548,12 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                 <div className="bg-[#FAF8F5] border border-[#E6DEC9] text-zinc-600 text-[11px] px-3.5 py-2.5 rounded-lg flex items-start gap-2 max-w-full">
                   <AlertCircle className="w-4.5 h-4.5 flex-shrink-0 mt-0.5 text-[#C09553]" />
                   <div>
-                    <span className="font-bold text-zinc-800">Orçamento em Andamento:</span> O paciente optou por pagar individualmente à medida que realiza cada procedimento. Marque as baixas de execução e pagamento abaixo para manter o prontuário organizado.
+                    <span className="font-bold text-zinc-800">
+                      {proposal.status === 'Em Andamento' ? 'Orçamento em Andamento:' : 'Orçamento Aprovado:'}
+                    </span>{' '}
+                    {proposal.status === 'Em Andamento'
+                      ? 'O paciente optou por pagar individualmente à medida que realiza cada procedimento. Marque as baixas de execução e pagamento abaixo para manter o prontuário organizado.'
+                      : 'O orçamento foi aprovado em sua totalidade. Registre a execução clínica dos procedimentos abaixo para o histórico clínico do paciente.'}
                   </div>
                 </div>
 
