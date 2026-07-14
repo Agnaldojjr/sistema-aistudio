@@ -414,14 +414,52 @@ export default function DashboardView({
   }, [realPatients]);
 
   // Quick WhatsApp templates for action triggers
+  const updateAppointmentStatus = async (apptId: string, patientId: string | undefined, newStatus: Appointment['status']) => {
+    // 1. Update React state first (for responsiveness)
+    setAppointments(prev => prev.map(a => a.id === apptId ? { ...a, status: newStatus } : a));
+
+    // 2. Only save to Supabase if it is linked to a patient
+    if (!patientId) return;
+
+    try {
+      const crmData = await getSupabaseCRMDatabase();
+      if (!crmData.appointments) crmData.appointments = [];
+
+      const apptIdx = crmData.appointments.findIndex((a: any) => a.id === apptId);
+      if (apptIdx > -1) {
+        crmData.appointments[apptIdx].status = newStatus;
+        crmData.appointments[apptIdx].updatedAt = new Date().toISOString();
+      } else {
+        // If not found in crmData.appointments (which is rare for a patient event, but possible), create it
+        const currentAppt = appointments.find(a => a.id === apptId);
+        if (currentAppt) {
+          crmData.appointments.push({
+            id: apptId,
+            patientId: patientId,
+            patientName: currentAppt.patientName,
+            date: format(selectedAgendaDate, 'yyyy-MM-dd'),
+            time: currentAppt.time,
+            status: newStatus,
+            observations: currentAppt.service,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+      }
+      await saveSupabaseCRMDatabase(crmData);
+    } catch (error) {
+      console.error("Erro ao salvar status de comparecimento no Supabase:", error);
+    }
+  };
+
   const sendWhatsAppConfirmation = (appt: Appointment) => {
     const message = `Olá, ${appt.patientName}! Gostaríamos de confirmar a sua consulta de *${appt.service}* agendada para hoje às *${appt.time}* com o *${clinicSettings.doctorName}*.\n\n📍 Endereço: ${clinicSettings.address}\n(Ref: ${clinicSettings.referencePoint})\n\nPor favor, responda confirmando sua presença. Ficamos no aguardo!`;
     const cleanPhone = appt.phone.replace(/\D/g, '');
     const url = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
     
-    // Mark appointment as confirmed on click
-    setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: 'Confirmado' } : a));
+    // Mark appointment as confirmed on click and save
+    updateAppointmentStatus(appt.id, appt.patientId, 'Confirmado');
   };
 
   const sendWhatsAppRecall = (ret: ReturnControl) => {
@@ -433,28 +471,26 @@ export default function DashboardView({
     setReturns(prev => prev.map(r => r.id === ret.id ? { ...r, status: 'Lembrete Enviado' } : r));
   };
 
-  const toggleAppointmentStatus = (id: string) => {
-    setAppointments(prev => prev.map(a => {
-      if (a.id !== id) return a;
-      const nextStatusMap: Record<Appointment['status'], Appointment['status']> = {
-        'Confirmado': 'Falta',
-        'Falta': 'Pendente',
-        'Pendente': 'Confirmado',
-        'Cancelado': 'Pendente',
-        'Reagendado': 'Pendente'
-      };
-      return { ...a, status: nextStatusMap[a.status] };
-    }));
+  const toggleAppointmentStatus = (appt: Appointment) => {
+    const nextStatusMap: Record<Appointment['status'], Appointment['status']> = {
+      'Confirmado': 'Falta',
+      'Falta': 'Pendente',
+      'Pendente': 'Confirmado',
+      'Cancelado': 'Pendente',
+      'Reagendado': 'Pendente'
+    };
+    const nextStatus = nextStatusMap[appt.status] || 'Confirmado';
+    updateAppointmentStatus(appt.id, appt.patientId, nextStatus);
   };
 
   const handleRescheduleAppointment = (appt: Appointment) => {
     // Muda o status para reagendado e abre o calendário para escolher a nova data
-    setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: 'Reagendado' } : a));
+    updateAppointmentStatus(appt.id, appt.patientId, 'Reagendado');
     onOpenCalendar();
   };
 
   const handleCancelAppointmentStatus = (appt: Appointment) => {
-    setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: 'Cancelado' } : a));
+    updateAppointmentStatus(appt.id, appt.patientId, 'Cancelado');
   };
 
   const handleDeleteAppointment = async (id: string, name: string) => {
@@ -890,7 +926,7 @@ export default function DashboardView({
                         {/* Comparecimento state toggle */}
                         <td className="py-3.5 text-center">
                           <button
-                            onClick={() => toggleAppointmentStatus(appt.id)}
+                            onClick={() => toggleAppointmentStatus(appt)}
                             className={`inline-block px-2.5 py-1 rounded-full text-[9px] font-bold border cursor-pointer transition-colors shadow-2xs ${
                               appt.status === 'Confirmado'
                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
