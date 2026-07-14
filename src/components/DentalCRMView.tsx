@@ -963,6 +963,8 @@ export default function DentalCRMView({
     const nowStr = new Date().toLocaleString('pt-BR');
 
     let found = false;
+    let targetInst: any = null;
+
     updatedData.sections = updatedData.sections.map((sec: any) => {
       if (sec.id !== sectionId) return sec;
       sec.markers = sec.markers.map((marker: any) => {
@@ -977,6 +979,7 @@ export default function DentalCRMView({
           inst.status = newStatus === 'executado' ? 'Realizado' : newStatus === 'em andamento' ? 'Em andamento' : 'A realizar';
           inst.updatedAt = nowStr;
           inst.date = nowStr;
+          targetInst = { ...inst, toothNumber: marker.toothNumber };
           found = true;
         } else {
           const parts = instanceId.split('-');
@@ -994,6 +997,7 @@ export default function DentalCRMView({
             dentist: clinicSettings?.doctorName || 'Dentista'
           };
           marker.procedureInstances.push(newInst);
+          targetInst = { ...newInst, toothNumber: marker.toothNumber };
           found = true;
         }
         return marker;
@@ -1001,7 +1005,7 @@ export default function DentalCRMView({
       return sec;
     });
 
-    if (!found) return;
+    if (!found || !targetInst) return;
 
     // Update local state immediately
     setSelectedProposalData(updatedData);
@@ -1009,8 +1013,72 @@ export default function DentalCRMView({
       setActiveTreatmentPlan(updatedData);
     }
 
+    // Sync financial records (Patient local and global)
+    const payId = `pay-${instanceId}`;
+    if (newStatus === 'executado') {
+      // 1. Add to local pagamentosList (for patient's individual financial tab)
+      const hasLocal = pagamentosList.some(p => p.id === payId);
+      if (!hasLocal) {
+        const newLocalPayment = {
+          id: payId,
+          patientId: selectedPatient!.id,
+          date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+          method: proposalData.proposal?.paymentMethod || 'PIX',
+          description: `${targetInst.name} (${targetInst.toothNumber ? `Dente ${targetInst.toothNumber}` : 'Geral'}) - Executado`,
+          value: targetInst.price || 0
+        };
+        setPagamentosList([...pagamentosList, newLocalPayment]);
+      }
+
+      // 2. Add to global agnaldo_dent_financeiro (for lateral financial tab)
+      const globalFinanceStr = localStorage.getItem('agnaldo_dent_financeiro');
+      let globalFinance: any[] = [];
+      if (globalFinanceStr) {
+        try {
+          globalFinance = JSON.parse(globalFinanceStr);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      const hasGlobal = globalFinance.some(p => p.id === payId);
+      if (!hasGlobal) {
+        const newGlobalPayment = {
+          id: payId,
+          patientId: selectedPatient!.id,
+          patientName: selectedPatient!.name,
+          date: new Date().toISOString(),
+          amount: targetInst.price || 0,
+          paymentMethod: proposalData.proposal?.paymentMethod || 'PIX',
+          status: 'Pago',
+          description: `${targetInst.name} (${targetInst.toothNumber ? `Dente ${targetInst.toothNumber}` : 'Geral'}) - Executado`
+        };
+        const updatedGlobal = [newGlobalPayment, ...globalFinance];
+        localStorage.setItem('agnaldo_dent_financeiro', JSON.stringify(updatedGlobal));
+        window.dispatchEvent(new Event('storage'));
+      }
+    } else {
+      // Remove payment records if unmarked from executado
+      setPagamentosList(pagamentosList.filter(p => p.id !== payId));
+
+      const globalFinanceStr = localStorage.getItem('agnaldo_dent_financeiro');
+      if (globalFinanceStr) {
+        try {
+          const globalFinance = JSON.parse(globalFinanceStr);
+          const updatedGlobal = globalFinance.filter((p: any) => p.id !== payId);
+          localStorage.setItem('agnaldo_dent_financeiro', JSON.stringify(updatedGlobal));
+          window.dispatchEvent(new Event('storage'));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+
     try {
       await uploadPatientFileToSupabase(selectedPatient!.name, new Blob([JSON.stringify(updatedData)], {type: "application/json"}), selectedProposalId);
+      // Wait a tiny bit for states to batch, then save context
+      setTimeout(() => {
+        saveContextToSupabase();
+      }, 200);
     } catch (err: any) {
       alert("Erro ao salvar alteração de status no Supabase: " + err.message);
     }
@@ -1117,14 +1185,26 @@ export default function DentalCRMView({
   };
 
   const renameSupabaseProposalFile = async (fileId: string, currentName: string) => {
-    const newName = window.prompt("Digite o novo nome para o arquivo (com extensão .json):", currentName);
-    if (!newName || newName.trim() === '' || newName === currentName) return;
+    const cleanCurrentName = currentName.replace('.json', '').replace('orcamento_salvo_', '').replace(/_/g, ' ');
+    const newNameInput = window.prompt("Digite o novo nome para o orçamento:", cleanCurrentName);
+    if (!newNameInput || newNameInput.trim() === '' || newNameInput.trim() === cleanCurrentName) return;
+    
+    // Format to safe filename
+    const safeBaseName = newNameInput.trim().toLowerCase().replace(/\s+/g, '_');
+    const newFilename = `orcamento_salvo_${safeBaseName}.json`;
+    
     try {
       setIsLoadingSupabaseProposals(true);
-      await renamePatientFileInSupabase(driveFolderId || selectedPatient?.name || "Unknown", fileId, newName.trim());
+      await renamePatientFileInSupabase(driveFolderId || selectedPatient?.name || "Unknown", currentName, newFilename);
       if (driveFolderId) {
         const proposals = await listPatientFilesFromSupabase(driveFolderId);
         setSupabaseProposals(filterSupabaseProposals(proposals));
+        
+        // Update selected proposal ID if it was renamed
+        const found = proposals.find(p => p.name === newFilename);
+        if (found) {
+          setSelectedProposalId(found.id);
+        }
       }
     } catch (err: any) {
       alert("Erro ao renomear orçamento: " + err.message);
@@ -4567,7 +4647,7 @@ export default function DentalCRMView({
                         <div className="space-y-4">
                           {driveProposals.map((prop) => {
                             // Compute progress from loaded data or cache
-                            const propData = selectedProposalId === prop.id ? selectedProposalData : null;
+                            const propData = prop.content || (selectedProposalId === prop.id ? selectedProposalData : null);
                             const instances = propData ? getProcedureInstancesFromProposal(propData) : [];
                             const total = instances.length;
                             const completed = instances.filter((i: any) => { const s = (i.status || '').toLowerCase().trim(); return s === 'executado' || s === 'realizado'; }).length;
@@ -4578,6 +4658,13 @@ export default function DentalCRMView({
                             const proposalStatus = propData?.proposal?.status || 'Aguardando Aprovação';
                             const createdDate = new Date(prop.createdTime || prop.modifiedTime).toLocaleDateString('pt-BR');
                             const totalValue = instances.reduce((sum: number, i: any) => sum + (i.price || 0), 0);
+                            const paidOrExecutedValue = instances
+                              .filter((i: any) => {
+                                const s = (i.status || '').toLowerCase().trim();
+                                return s === 'executado' || s === 'realizado' || i.paid === true;
+                              })
+                              .reduce((sum: number, i: any) => sum + (i.price || 0), 0);
+                            const openValue = totalValue - paidOrExecutedValue;
 
                             const statusConfig: Record<string, { emoji: string; bg: string; text: string; border: string }> = {
                               'Aberto (paciente não pagou)': { emoji: '🔴', bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-200' },
@@ -4595,14 +4682,26 @@ export default function DentalCRMView({
                                 <div className="p-5 space-y-3">
                                   <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3">
                                     <div className="space-y-1 flex-1 min-w-0">
-                                      <h5 className="font-serif font-bold text-sm text-[#8B0000] truncate">
-                                        {prop.name.replace('.json', '').replace('orcamento_salvo', 'Orçamento').replace(/_/g, ' ')}
-                                      </h5>
-                                      <div className="flex flex-wrap gap-3 text-[10px] text-zinc-500">
+                                      <div className="flex items-center gap-2">
+                                        <h5 className="font-serif font-bold text-sm text-[#8B0000] truncate">
+                                          {prop.name.replace('.json', '').replace('orcamento_salvo', 'Orçamento').replace(/_/g, ' ')}
+                                        </h5>
+                                        <button
+                                          type="button"
+                                          onClick={() => renameSupabaseProposalFile(prop.id, prop.name)}
+                                          className="text-zinc-400 hover:text-[#8B0000] p-1 transition-colors cursor-pointer"
+                                          title="Editar nome do orçamento"
+                                        >
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                      <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-zinc-500">
                                         <span>📅 Criado: <strong className="text-zinc-700">{createdDate}</strong></span>
                                         {lastCompleted && <span>⏱️ Última baixa: <strong className="text-zinc-700">{lastCompleted.updatedAt || '—'}</strong></span>}
                                         {total > 0 && <span>🦷 <strong className="text-zinc-700">{total}</strong> procedimentos</span>}
-                                        {totalValue > 0 && <span>💰 <strong className="text-zinc-700">{formatBRL(totalValue)}</strong></span>}
+                                        <span>💰 Total: <strong className="text-zinc-800">{formatBRL(totalValue)}</strong></span>
+                                        <span>🟢 Pago/Executado: <strong className="text-emerald-700">{formatBRL(paidOrExecutedValue)}</strong></span>
+                                        <span>🔴 Em aberto: <strong className="text-rose-750">{formatBRL(openValue)}</strong></span>
                                       </div>
                                     </div>
 
@@ -4610,18 +4709,23 @@ export default function DentalCRMView({
                                     <select
                                       value={proposalStatus}
                                       onChange={async (e) => {
-                                        if (!propData) {
-                                          // Load data first by selecting this proposal
+                                        const targetProposalData = prop.content || (selectedProposalId === prop.id ? selectedProposalData : null);
+                                        if (!targetProposalData) {
                                           setSelectedProposalId(prop.id);
                                           return;
                                         }
                                         const newStatus = e.target.value;
-                                        const updated = { ...propData, proposal: { ...propData.proposal, status: newStatus } };
+                                        const updated = { ...targetProposalData, proposal: { ...targetProposalData.proposal, status: newStatus } };
+                                        
+                                        // Update states
                                         setSelectedProposalData(updated);
                                         if (selectedProposalId === prop.id) {
                                           setActiveTreatmentPlan(updated);
                                         }
-                                        // Persist to Supabase
+                                        
+                                        // Persist updated JSON back to list
+                                        setSupabaseProposals(prev => prev.map(p => p.id === prop.id ? { ...p, content: updated } : p));
+
                                         try {
                                           const { uploadPatientFileToSupabase } = await import('../lib/supabaseStorage');
                                           if (driveFolderId) {
@@ -4645,7 +4749,7 @@ export default function DentalCRMView({
                                     <div className="space-y-1.5">
                                       <div className="flex justify-between text-[10px] font-semibold text-zinc-500">
                                         <span>Progresso</span>
-                                        <span className="font-mono text-[#8B0000]">{percent}% ({completed}/{total})</span>
+                                        <span className="font-mono text-[#8B0000]">{percent}% ({completed}/{total}) - Faltam {100 - percent}%</span>
                                       </div>
                                       <div className="w-full bg-zinc-100 h-2 rounded-full overflow-hidden">
                                         <div
@@ -4661,7 +4765,12 @@ export default function DentalCRMView({
                                 <div className="bg-[#FAF8F5] px-5 py-3 border-t border-[#E6DEC9]/50 flex items-center gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => setSelectedProposalId(prop.id)}
+                                    onClick={() => {
+                                      setSelectedProposalId(prop.id);
+                                      if (prop.content) {
+                                        setSelectedProposalData(prop.content);
+                                      }
+                                    }}
                                     className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-colors cursor-pointer ${selectedProposalId === prop.id ? 'bg-[#8B0000] text-white' : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50'}`}
                                   >
                                     {selectedProposalId === prop.id ? '✓ Selecionado' : 'Visualizar'}
@@ -4670,6 +4779,9 @@ export default function DentalCRMView({
                                     type="button"
                                     onClick={() => {
                                       setSelectedProposalId(prop.id);
+                                      if (prop.content) {
+                                        setSelectedProposalData(prop.content);
+                                      }
                                       setActiveDetailTab('plan_editor');
                                     }}
                                     className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-white border border-[#C09553]/30 text-[#8B0000] hover:border-[#C09553] transition-colors cursor-pointer"
@@ -4686,7 +4798,28 @@ export default function DentalCRMView({
                       {/* Expanded Proposal Detail (when selected) */}
                       {selectedProposalData && (
                         <div className="border-t border-zinc-200 pt-6 space-y-4">
-                          <h5 className="font-bold text-xs text-zinc-800 uppercase tracking-wider font-serif">Procedimentos do Orçamento Selecionado</h5>
+                          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                            <h5 className="font-bold text-xs text-zinc-800 uppercase tracking-wider font-serif">Procedimentos do Orçamento Selecionado</h5>
+                            {(() => {
+                              const instances = getProcedureInstancesFromProposal(selectedProposalData);
+                              const totalValue = instances.reduce((sum: number, i: any) => sum + (i.price || 0), 0);
+                              const paidOrExecutedValue = instances
+                                .filter((i: any) => {
+                                  const s = (i.status || '').toLowerCase().trim();
+                                  return s === 'executado' || s === 'realizado' || i.paid === true;
+                                })
+                                .reduce((sum: number, i: any) => sum + (i.price || 0), 0);
+                              const openValue = totalValue - paidOrExecutedValue;
+                              return (
+                                <div className="flex flex-wrap gap-3 text-[10px] bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-1.5 font-semibold text-zinc-650">
+                                  <span>Total: <strong className="text-zinc-800">{formatBRL(totalValue)}</strong></span>
+                                  <span>Pago/Executado: <strong className="text-emerald-700">{formatBRL(paidOrExecutedValue)}</strong></span>
+                                  <span>Em aberto: <strong className="text-rose-700">{formatBRL(openValue)}</strong></span>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                          
                           {(() => {
                             const instances = getProcedureInstancesFromProposal(selectedProposalData);
                             if (instances.length === 0) return <p className="text-xs text-zinc-400 italic">Nenhum procedimento assinalado.</p>;
@@ -4706,10 +4839,30 @@ export default function DentalCRMView({
                                         </div>
                                         {item.updatedAt && <p className="text-[9px] text-zinc-400 mt-0.5">Atualizado: {item.updatedAt}</p>}
                                       </div>
-                                      <span className="text-xs font-mono font-bold text-zinc-600 shrink-0">{formatBRL(item.price)}</span>
-                                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase shrink-0 ${isDone ? 'bg-emerald-100 text-emerald-700' : isInProgress ? 'bg-amber-100 text-amber-700' : 'bg-zinc-100 text-zinc-500'}`}>
-                                        {isDone ? 'Executado' : isInProgress ? 'Em andamento' : 'Pendente'}
-                                      </span>
+                                      <span className="text-xs font-mono font-bold text-zinc-600 shrink-0 mr-4">{formatBRL(item.price)}</span>
+                                      
+                                      {/* Interactive Status Selector Dropdown */}
+                                      <select
+                                        value={isDone ? 'executado' : isInProgress ? 'em andamento' : 'não realizado'}
+                                        onChange={(e) => handleUpdateProcedureStatus(
+                                          selectedProposalData,
+                                          item.sectionId,
+                                          item.markerId,
+                                          item.instanceId,
+                                          e.target.value as any
+                                        )}
+                                        className={`text-[9px] font-bold px-3 py-1 rounded-full uppercase cursor-pointer border outline-none ${
+                                          isDone 
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-250' 
+                                            : isInProgress 
+                                              ? 'bg-amber-50 text-amber-700 border-amber-250' 
+                                              : 'bg-zinc-50 text-zinc-500 border-zinc-250'
+                                        }`}
+                                      >
+                                        <option value="não realizado">Pendente</option>
+                                        <option value="em andamento">Em andamento</option>
+                                        <option value="executado">Executado</option>
+                                      </select>
                                     </div>
                                   );
                                 })}
