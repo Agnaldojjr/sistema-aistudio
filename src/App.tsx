@@ -366,6 +366,29 @@ export default function App() {
   };
   const urlMode = getQueryParam('mode');
 
+  // --- SPA ROUTING HELPERS ---
+  const getInitialRoute = () => {
+    if (typeof window === 'undefined') return { view: 'dashboard' as AppView, tab: 'registration' };
+    const pathname = window.location.pathname;
+    const segments = pathname.split('/').filter(Boolean);
+    const primaryView = segments[0] as AppView;
+    const validViews: AppView[] = ['dashboard', 'calendar', 'crm', 'settings', '3d-planning', 'financeiro', 'agent-center'];
+    
+    if (validViews.includes(primaryView)) {
+      let tab = 'registration';
+      if (primaryView === 'crm' && segments[1]) {
+        const validTabs = ['registration', 'editor', 'negotiation', 'documents'];
+        if (validTabs.includes(segments[1])) {
+          tab = segments[1];
+        }
+      }
+      return { view: primaryView, tab };
+    }
+    return { view: 'dashboard' as AppView, tab: 'registration' };
+  };
+
+  const initialRoute = getInitialRoute();
+
   // --- APP STATE ---
   const [procedures, setProcedures] = useState<Procedure[]>(() => {
     const cached = localStorage.getItem('agnaldo_dent_procedures');
@@ -378,9 +401,9 @@ export default function App() {
     return cached ? JSON.parse(cached) : DEFAULT_CLINIC_SETTINGS;
   });
 
-  const [activeTab, setActiveTab] = useState<'registration' | 'editor' | 'negotiation' | 'documents'>('registration');
+  const [activeTab, setActiveTab] = useState<'registration' | 'editor' | 'negotiation' | 'documents'>(initialRoute.tab as any);
   const [showPatientsModal, setShowPatientsModal] = useState(false);
-  const [currentAppView, setCurrentAppView] = useState<AppView>('dashboard');
+  const [currentAppView, setCurrentAppView] = useState<AppView>(initialRoute.view);
   const [appointmentPatientName, setAppointmentPatientName] = useState<string | undefined>();
   const [initialNewPatientData, setInitialNewPatientData] = useState<{name: string, phone: string, email: string} | undefined>();
   const [crmPatientName, setCrmPatientName] = useState<string | undefined>();
@@ -445,6 +468,58 @@ export default function App() {
       }
     };
   }, [currentAppView]);
+
+  // Sincronizar estado do app com a URL
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let targetPath = `/${currentAppView}`;
+    if (currentAppView === 'crm') {
+      targetPath += `/${activeTab}`;
+    }
+
+    const currentPath = window.location.pathname;
+    const search = window.location.search;
+    const hash = window.location.hash;
+    const targetUrl = `${targetPath}${search}${hash}`;
+
+    if (currentPath !== targetPath) {
+      window.history.pushState({ view: currentAppView, tab: activeTab }, '', targetUrl);
+    }
+  }, [currentAppView, activeTab]);
+
+  // Escutar eventos de voltar/avançar no navegador (popstate)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state && event.state.view) {
+        setCurrentAppView(event.state.view);
+        if (event.state.tab) {
+          setActiveTab(event.state.tab);
+        }
+      } else {
+        const route = getInitialRoute();
+        setCurrentAppView(route.view);
+        setActiveTab(route.tab as any);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    // Salvar estado inicial no histórico para que popstate funcione corretamente desde a primeira rota
+    let initialPath = `/${currentAppView}`;
+    if (currentAppView === 'crm') {
+      initialPath += `/${activeTab}`;
+    }
+    const search = window.location.search;
+    const hash = window.location.hash;
+    window.history.replaceState({ view: currentAppView, tab: activeTab }, '', `${initialPath}${search}${hash}`);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   // --- ACTIONS ---
   const handleLogin = async () => {

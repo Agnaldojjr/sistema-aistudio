@@ -159,9 +159,11 @@ export interface TreatmentProposal {
 
 export interface PaymentRecord {
   id: string;
+  patientId?: string;
   patientName: string;
   date: string;
   amount: number;
   paymentMethod: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito';
   status: 'Pago' | 'Pendente';
+  description?: string;
 }
