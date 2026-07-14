@@ -2,8 +2,6 @@
 Sistema odontológico (CRM, Orçamentos, Agenda) — React + TS + Supabase.
 
 ## Regras
-- NUNCA commitar diretamente na branch `main`.
-- Toda alteração de código deve ir em branch `fix/ux-bug-*` ou `feat/*` + Pull Request.
 - NUNCA habilitar `bypass_auth` fora de `NODE_ENV=development`.
 - NUNCA commitar chaves de API (Gemini, Supabase, GitHub token). Usar variáveis de ambiente (.env, não versionado).
 
