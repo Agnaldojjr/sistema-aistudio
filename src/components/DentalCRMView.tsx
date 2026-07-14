@@ -670,8 +670,15 @@ export default function DentalCRMView({
   useEffect(() => {
     if (initialPatientName && patients.length > 0) {
       const patient = patients.find(p => p.name.toLowerCase() === initialPatientName.toLowerCase());
-      if (patient && (!selectedPatient || selectedPatient.id !== patient.id)) {
-        setSelectedPatient(patient);
+      if (patient) {
+        if (!selectedPatient || selectedPatient.id !== patient.id) {
+          setSelectedPatient(patient);
+        }
+        const targetTab = localStorage.getItem('ag_crm_initial_tab');
+        if (targetTab) {
+          setActiveDetailTab(targetTab as any);
+          localStorage.removeItem('ag_crm_initial_tab');
+        }
         if (onClearInitialPatient) {
           onClearInitialPatient();
         }

@@ -3,7 +3,11 @@ import { useReactiveLocalStorage } from '../hooks/useReactiveLocalStorage';
 import { PaymentRecord } from '../types';
 import { DollarSign, FileText, CheckCircle, Clock, Search, Filter } from 'lucide-react';
 
-export default function FinancialView() {
+interface FinancialViewProps {
+  onOpenPatient?: (patientName: string) => void;
+}
+
+export default function FinancialView({ onOpenPatient }: FinancialViewProps) {
   const [payments, setPayments] = useReactiveLocalStorage<PaymentRecord[]>('agnaldo_dent_financeiro', []);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMethod, setFilterMethod] = useState<string>('Todos');
@@ -105,6 +109,7 @@ export default function FinancialView() {
               <tr>
                 <th className="px-6 py-4">Data</th>
                 <th className="px-6 py-4">Paciente</th>
+                <th className="px-6 py-4">Procedimento</th>
                 <th className="px-6 py-4">Forma de Pagamento</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Valor</th>
@@ -113,7 +118,7 @@ export default function FinancialView() {
             <tbody className="divide-y divide-zinc-100">
               {filteredPayments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-zinc-400">
+                  <td colSpan={6} className="px-6 py-8 text-center text-zinc-400">
                     Nenhum registro encontrado.
                   </td>
                 </tr>
@@ -124,7 +129,21 @@ export default function FinancialView() {
                       {new Date(payment.date).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-6 py-4 font-medium text-zinc-800">
-                      {payment.patientName}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onOpenPatient) {
+                            localStorage.setItem('ag_crm_initial_tab', 'plan_negotiation');
+                            onOpenPatient(payment.patientName);
+                          }
+                        }}
+                        className="text-[#8B0000] hover:text-[#A97E3B] hover:underline font-bold text-left cursor-pointer transition-colors font-sans"
+                      >
+                        {payment.patientName}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 text-zinc-700 font-semibold max-w-xs truncate">
+                      {payment.description || 'Orçamento Aprovado'}
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-800">
@@ -139,7 +158,7 @@ export default function FinancialView() {
                         {payment.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right font-bold text-zinc-800">
+                    <td className="px-6 py-4 text-right font-bold text-zinc-800 font-mono">
                       {formatCurrency(payment.amount)}
                     </td>
                   </tr>

@@ -757,7 +757,10 @@ export default function App() {
         {/* ── Financeiro ───────────────────────────────────────── */}
         {currentAppView === 'financeiro' && (
           <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 w-full animate-fade-in-up">
-            <FinancialView />
+            <FinancialView onOpenPatient={(patientName) => {
+              setCrmPatientName(patientName);
+              setCurrentAppView('crm');
+            }} />
           </main>
         )}
 
