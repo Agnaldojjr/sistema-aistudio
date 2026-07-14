@@ -32,7 +32,7 @@ import {
 import { motion } from 'motion/react';
 import { ClinicSettings, TreatmentProposal } from '../types';
 import { listCalendarEvents, deleteCalendarEvent } from '../lib/calendar';
-import { getSupabaseCRMDatabase } from '../lib/supabaseCrm';
+import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
 import { addDays, subDays, format, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -51,7 +51,9 @@ interface DashboardViewProps {
 // Beautiful simulated mock list of appointments today representing a fully-populated workspace
 interface Appointment {
   id: string;
+  patientId?: string;
   patientName: string;
+  originalSummary: string;
   time: string;
   service: string;
   status: 'Confirmado' | 'Pendente' | 'Cancelado' | 'Falta' | 'Reagendado';
@@ -66,6 +68,42 @@ interface ReturnControl {
   nextRecallDate: string;
   status: 'Agendado' | 'Lembrete Enviado' | 'Confirmado' | 'Falta Registrada';
   phone: string;
+}
+
+// Helper to extract phone number from event description
+function extractPhone(text: string): string {
+  if (!text) return '';
+  // Match patterns like "WhatsApp: 31 98888-8888" or "WhatsApp do Paciente: 31988888888"
+  const waRegex = /(?:whatsapp|whats|tel|telefone|celular|fone|contato)(?:\s+do\s+paciente)?\s*:\s*([\d\s\-()]+)/i;
+  const match = text.match(waRegex);
+  if (match && match[1]) {
+    const clean = match[1].replace(/\D/g, '');
+    if (clean.length >= 8) return match[1].trim();
+  }
+  // Fallback: look for a sequence of 8-11 digits (possibly with formatting)
+  const phoneRegex = /(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?\d{4,5}\s*[-.]?\s*\d{4}/g;
+  const matches = text.match(phoneRegex);
+  if (matches && matches.length > 0) {
+    return matches[0].trim();
+  }
+  return '';
+}
+
+// Heuristic to filter out non-patient calendar events (e.g. Lunch, Meetings)
+function isPatientAppointment(summary: string, description: string): boolean {
+  const lowerSummary = (summary || '').toLowerCase();
+  
+  // Normalized blocked words (removing accents)
+  const normalizedSummary = lowerSummary.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  
+  const blockedKeywords = ['reuniao', 'almoco', 'particular', 'bloqueio', 'compromisso', 'ferias', 'folga', 'curso', 'palestra', 'personal', 'maintenance', 'manutencao'];
+  
+  for (const kw of blockedKeywords) {
+    if (normalizedSummary.includes(kw)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export default function DashboardView({
@@ -96,6 +134,11 @@ export default function DashboardView({
   const [selectedAgendaDate, setSelectedAgendaDate] = useState<Date>(new Date());
   const [loadingAgenda, setLoadingAgenda] = useState(false);
 
+  // States for manually changing patient association
+  const [isChangePatientOpen, setIsChangePatientOpen] = useState(false);
+  const [appointmentToChange, setAppointmentToChange] = useState<Appointment | null>(null);
+  const [patientSearchQuery, setPatientSearchQuery] = useState('');
+
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -106,38 +149,42 @@ export default function DashboardView({
     return realPatients.filter((p: any) => p.name?.toLowerCase().includes(q) || p.appProperties?.phone?.includes(q));
   }, [searchQuery, realPatients]);
 
+  const enrichPatients = async (patientsList: any[]) => {
+    try {
+      const { getPatientFileUrlFromSupabase } = await import('../lib/supabaseStorage');
+      const enriched = await Promise.all((patientsList || []).map(async (p: any) => {
+        let totalVal = parseFloat(p.appProperties?.total || "0");
+        if (isNaN(totalVal) || totalVal === 0) {
+          try {
+            const data = await (async () => {
+              const url = await getPatientFileUrlFromSupabase(p.id, "orcamento.json");
+              if (!url) return null;
+              const r = await fetch(url);
+              if (!r.ok) return null;
+              return await r.json();
+            })();
+            if (data?.simulations?.length > 0) {
+              totalVal = data.simulations[data.selectedPlanIndex || 0]?.custoTotal || data.simulations[0]?.custoTotal || 0;
+            }
+          } catch (e) {
+            // Ignore
+          }
+        }
+        return { ...p, extractedTotal: totalVal };
+      }));
+      return enriched;
+    } catch (e) {
+      console.warn('Error enriching patients:', e);
+      return patientsList;
+    }
+  };
+
   useEffect(() => {
     const loadRealDashboardData = async () => {
       setLoadingRealData(true);
-      
       try {
-        // Fetch patients folders list from Supabase
         const drivePatients = await (async () => { const db = await getSupabaseCRMDatabase(); return db.patients || []; })();
-        
-        const { getPatientFileUrlFromSupabase } = await import('../lib/supabaseStorage');
-        const enriched = await Promise.all((drivePatients || []).map(async (p: any) => {
-          let totalVal = parseFloat(p.appProperties?.total || "0");
-          
-          if (isNaN(totalVal) || totalVal === 0) {
-            try {
-                const data = await (async () => {
-    const url = await getPatientFileUrlFromSupabase(p.id, "orcamento.json");
-    if (!url) return null;
-    const r = await fetch(url);
-    if (!r.ok) return null;
-    return await r.json();
-  })();
-                if (data?.simulations?.length > 0) {
-                  totalVal = data.simulations[data.selectedPlanIndex || 0]?.custoTotal || data.simulations[0]?.custoTotal || 0;
-                }
-            } catch(e) {
-                // Ignore if doesn't resolve
-            }
-          }
-          
-          return { ...p, extractedTotal: totalVal };
-        }));
-        
+        const enriched = await enrichPatients(drivePatients);
         setRealPatients(enriched);
       } catch (err) {
         console.warn('Dashboard Patient folders load skipped:', err);
@@ -154,7 +201,6 @@ export default function DashboardView({
     const fetchAgenda = async () => {
       setLoadingAgenda(true);
       try {
-        // Fetch appointments for selected date from Google Calendar
         const startOfDay = new Date(selectedAgendaDate);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(selectedAgendaDate);
@@ -162,15 +208,24 @@ export default function DashboardView({
 
         const calData = await listCalendarEvents(startOfDay, endOfDay);
         if (calData && calData.items) {
-          const appts: Appointment[] = calData.items.map((item: any, idx: number) => {
+          const crmData = await getSupabaseCRMDatabase();
+          if (!crmData.patients) crmData.patients = [];
+          if (!crmData.appointments) crmData.appointments = [];
+
+          let dbChanged = false;
+          const appts: Appointment[] = [];
+
+          for (const item of calData.items) {
+            if (item.status === 'cancelled') continue;
+            if (!item.start?.dateTime && !item.start?.date) continue;
+
             const startDateTime = item.start.dateTime || item.start.date;
             let timeStr = 'Dia Todo';
             if (item.start.dateTime) {
               const dt = new Date(startDateTime);
               timeStr = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             }
-            
-            // Clean up messy WhatsApp bot descriptions
+
             let rawDesc = item.description || 'Consulta Clínica';
             let cleanDesc = rawDesc;
             if (rawDesc.includes('Notas:')) {
@@ -180,15 +235,124 @@ export default function DashboardView({
               cleanDesc = 'Agendamento via WhatsApp';
             }
 
-            return {
-              id: item.id || `c-${idx}`,
-              patientName: item.summary || 'Consulta Sem Nome',
+            const eventId = item.id;
+            const eventSummary = (item.summary || 'Consulta Sem Nome').trim();
+
+            if (!isPatientAppointment(eventSummary, rawDesc)) {
+              appts.push({
+                id: eventId,
+                patientName: eventSummary,
+                originalSummary: eventSummary,
+                time: timeStr,
+                service: cleanDesc,
+                status: 'Confirmado',
+                phone: ''
+              });
+              continue;
+            }
+
+            let associatedAppt = crmData.appointments.find((a: any) => a.id === eventId);
+            let patient = null;
+
+            if (associatedAppt) {
+              patient = crmData.patients.find((p: any) => p.id === associatedAppt.patientId);
+            }
+
+            if (!patient) {
+              const extractedPhone = extractPhone(rawDesc);
+              const normalizedExtractedPhone = extractedPhone.replace(/\D/g, '');
+
+              if (normalizedExtractedPhone) {
+                patient = crmData.patients.find((p: any) => {
+                  const pPhone = (p.mobile || p.phone || '').replace(/\D/g, '');
+                  return pPhone && pPhone === normalizedExtractedPhone;
+                });
+              }
+
+              if (!patient) {
+                const cleanEventSummary = eventSummary.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                patient = crmData.patients.find((p: any) => {
+                  const pNameClean = (p.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                  return pNameClean === cleanEventSummary || 
+                         pNameClean.includes(cleanEventSummary) || 
+                         cleanEventSummary.includes(pNameClean);
+                });
+              }
+
+              if (patient) {
+                const newApptLink = {
+                  id: eventId,
+                  patientId: patient.id,
+                  patientName: patient.name,
+                  date: format(selectedAgendaDate, 'yyyy-MM-dd'),
+                  time: timeStr,
+                  status: 'Confirmado',
+                  observations: cleanDesc,
+                  createdAt: new Date().toISOString()
+                };
+
+                if (associatedAppt) {
+                  const idx = crmData.appointments.findIndex((a: any) => a.id === eventId);
+                  crmData.appointments[idx] = { ...associatedAppt, ...newApptLink };
+                } else {
+                  crmData.appointments.push(newApptLink);
+                }
+                dbChanged = true;
+              } else {
+                const newPatId = `pat_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                const extractedPhone = extractPhone(rawDesc);
+                const formattedPhone = extractedPhone || '';
+
+                const newPatient = {
+                  id: newPatId,
+                  name: eventSummary.toUpperCase(),
+                  codigo_paciente: `COD-${Math.floor(1000 + Math.random() * 9000)}`,
+                  phone: formattedPhone,
+                  mobile: formattedPhone,
+                  healthInsurance: 'PARTICULAR',
+                  medicalRecord: '',
+                  observations: 'Cadastrado automaticamente via Google Calendar',
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                };
+
+                crmData.patients.push(newPatient);
+
+                const newApptLink = {
+                  id: eventId,
+                  patientId: newPatId,
+                  patientName: newPatient.name,
+                  date: format(selectedAgendaDate, 'yyyy-MM-dd'),
+                  time: timeStr,
+                  status: 'Confirmado',
+                  observations: cleanDesc,
+                  createdAt: new Date().toISOString()
+                };
+
+                crmData.appointments.push(newApptLink);
+                patient = newPatient;
+                dbChanged = true;
+              }
+            }
+
+            appts.push({
+              id: eventId,
+              patientId: patient?.id,
+              patientName: patient?.name || eventSummary,
+              originalSummary: eventSummary,
               time: timeStr,
               service: cleanDesc,
-              status: 'Confirmado',
-              phone: ''
-            };
-          });
+              status: associatedAppt?.status || 'Confirmado',
+              phone: patient?.mobile || patient?.phone || extractPhone(rawDesc)
+            });
+          }
+
+          if (dbChanged) {
+            await saveSupabaseCRMDatabase(crmData);
+            const enriched = await enrichPatients(crmData.patients);
+            setRealPatients(enriched);
+          }
+
           setAppointments(appts);
         } else {
           setAppointments([]);
@@ -292,6 +456,91 @@ export default function DashboardView({
       }
     }
   };
+
+  const handleOpenChangePatient = (appt: Appointment) => {
+    setAppointmentToChange(appt);
+    setPatientSearchQuery('');
+    setIsChangePatientOpen(true);
+  };
+
+  const handleAssociatePatient = async (selectedPatient: any) => {
+    if (!appointmentToChange) return;
+    try {
+      const crmData = await getSupabaseCRMDatabase();
+      if (!crmData.patients) crmData.patients = [];
+      if (!crmData.appointments) crmData.appointments = [];
+
+      const apptId = appointmentToChange.id;
+      const oldPatientId = appointmentToChange.patientId;
+
+      // Update or create the association in crmData.appointments
+      const existingApptIdx = crmData.appointments.findIndex((a: any) => a.id === apptId);
+      const apptData = {
+        id: apptId,
+        patientId: selectedPatient.id,
+        patientName: selectedPatient.name,
+        date: format(selectedAgendaDate, 'yyyy-MM-dd'),
+        time: appointmentToChange.time,
+        status: appointmentToChange.status,
+        observations: appointmentToChange.service,
+        createdAt: new Date().toISOString()
+      };
+
+      if (existingApptIdx >= 0) {
+        crmData.appointments[existingApptIdx] = { ...crmData.appointments[existingApptIdx], ...apptData };
+      } else {
+        crmData.appointments.push(apptData);
+      }
+
+      // Cleanup old auto-created patient if they have no other history
+      if (oldPatientId && oldPatientId !== selectedPatient.id) {
+        const oldPatient = crmData.patients.find((p: any) => p.id === oldPatientId);
+        if (oldPatient && oldPatient.observations === 'Cadastrado automaticamente via Google Calendar') {
+          const hasOtherAppointments = crmData.appointments.some((a: any) => a.id !== apptId && a.patientId === oldPatientId);
+          const hasClinicalHistory = (crmData.clinical_history || []).some((h: any) => h.patientId === oldPatientId);
+          const hasPayments = (crmData.pagamentos || []).some((p: any) => p.patientId === oldPatientId);
+          const hasTreatments = (crmData.tratamentos || []).some((t: any) => t.patientId === oldPatientId);
+          
+          if (!hasOtherAppointments && !hasClinicalHistory && !hasPayments && !hasTreatments) {
+            crmData.patients = crmData.patients.filter((p: any) => p.id !== oldPatientId);
+          }
+        }
+      }
+
+      await saveSupabaseCRMDatabase(crmData);
+
+      // Refresh patients list in dashboard
+      const enriched = await enrichPatients(crmData.patients);
+      setRealPatients(enriched);
+      
+      // Update appointments list locally
+      setAppointments(prev => prev.map(a => {
+        if (a.id === apptId) {
+          return {
+            ...a,
+            patientId: selectedPatient.id,
+            patientName: selectedPatient.name,
+            phone: selectedPatient.mobile || selectedPatient.phone || ''
+          };
+        }
+        return a;
+      }));
+
+      setIsChangePatientOpen(false);
+      setAppointmentToChange(null);
+    } catch (err: any) {
+      alert('Erro ao associar paciente: ' + err.message);
+    }
+  };
+
+  const filteredPatientsForChange = useMemo(() => {
+    if (!patientSearchQuery.trim()) return realPatients;
+    const q = patientSearchQuery.toLowerCase();
+    return realPatients.filter((p: any) => 
+      (p.name || '').toLowerCase().includes(q) || 
+      (p.mobile || p.phone || '').includes(q)
+    );
+  }, [patientSearchQuery, realPatients]);
 
   return (
     <div className="space-y-8 font-sans print:hidden">
@@ -610,6 +859,11 @@ export default function DashboardView({
                           >
                             {appt.patientName}
                           </div>
+                          {appt.originalSummary && appt.originalSummary.toUpperCase() !== appt.patientName.toUpperCase() && (
+                            <div className="text-[9px] text-[#C09553] font-medium mt-0.5 truncate max-w-[180px]" title={`Título original na Agenda: ${appt.originalSummary}`}>
+                              Agenda: {appt.originalSummary}
+                            </div>
+                          )}
                           <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{appt.phone}</div>
                         </td>
                         
@@ -655,6 +909,13 @@ export default function DashboardView({
                               title="Abrir Planejamento de Tratamento"
                             >
                               Atender
+                            </button>
+                            <button
+                              onClick={() => handleOpenChangePatient(appt)}
+                              className="p-1 px-1.5 bg-zinc-50 text-zinc-600 hover:bg-zinc-100 rounded-lg border border-zinc-200 hover:border-zinc-300 transition-colors flex items-center justify-center"
+                              title="Alterar / Associar Paciente"
+                            >
+                              <UserPlus className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleRescheduleAppointment(appt)}
@@ -886,7 +1147,76 @@ export default function DashboardView({
           </div>
         </div>
 
-      </div>
+    </div>
+
+      {/* Change Patient Association Modal */}
+      {isChangePatientOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl border border-zinc-200 flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-zinc-100 flex items-center justify-between bg-gradient-to-r from-[#8B0000] to-[#5C0000] text-white">
+              <div>
+                <h3 className="font-serif font-bold text-lg">Associar / Alterar Paciente</h3>
+                <p className="text-xs text-white/80 mt-1">
+                  Agendamento: <span className="font-semibold">{appointmentToChange?.originalSummary}</span>
+                </p>
+              </div>
+              <button 
+                onClick={() => { setIsChangePatientOpen(false); setAppointmentToChange(null); }}
+                className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 border-b border-zinc-100 bg-zinc-50">
+              <div className="relative flex items-center">
+                <Search className="w-4 h-4 absolute left-3 text-zinc-400" />
+                <input 
+                  type="text"
+                  placeholder="Pesquisar por nome ou WhatsApp..."
+                  value={patientSearchQuery}
+                  onChange={(e) => setPatientSearchQuery(e.target.value)}
+                  className="w-full bg-white border border-zinc-200 text-zinc-800 placeholder-zinc-400 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C09553] focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {filteredPatientsForChange.length > 0 ? (
+                filteredPatientsForChange.map((p: any) => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleAssociatePatient(p)}
+                    className="w-full text-left p-3 hover:bg-zinc-50 rounded-xl flex items-center gap-3 transition-colors border border-transparent hover:border-zinc-100"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-[#8B0000]/10 flex items-center justify-center text-[#8B0000] font-bold shrink-0">
+                      {p.name ? p.name.charAt(0).toUpperCase() : '?'}
+                    </div>
+                    <div className="truncate flex-1">
+                      <p className="text-sm font-bold text-zinc-800 truncate">{p.name}</p>
+                      <p className="text-xs text-zinc-500 truncate">{p.mobile || p.phone || 'Sem telefone'}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-400" />
+                  </button>
+                ))
+              ) : (
+                <div className="py-8 text-center text-sm text-zinc-500 font-medium">
+                  Nenhum paciente encontrado
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-zinc-100 bg-zinc-50 flex justify-end">
+              <button
+                onClick={() => { setIsChangePatientOpen(false); setAppointmentToChange(null); }}
+                className="px-4 py-2 border border-zinc-200 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-100 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

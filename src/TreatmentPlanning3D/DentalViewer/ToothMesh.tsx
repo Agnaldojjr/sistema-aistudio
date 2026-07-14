@@ -72,7 +72,7 @@ const sharedAnteriorBox = new THREE.BoxGeometry(0.78, 0.83, 0.32);
 const sharedSphereGeometry = new THREE.SphereGeometry(0.08, 16, 16);
 
 export function ToothMesh({ toothNumber, position, rotation = [0, 0, 0], geometries }: ToothMeshProps) {
-  const { viewerState, selectTooth, getToothState, getSurfaceCondition } = usePlanning3D();
+  const { viewerState, selectTooth, getToothState, getSurfaceCondition, getToothProcedures } = usePlanning3D();
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
 
