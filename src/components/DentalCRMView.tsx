@@ -290,6 +290,110 @@ export default function DentalCRMView({
   const [selectedProposalData, setSelectedProposalData] = useState<any | null>(null);
   const [isLoadingPlanData, setIsLoadingPlanData] = useState(false);
 
+  // Timeline & Before/After Photo states & helpers
+  const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false);
+  const [isUploadingTimelinePhoto, setIsUploadingTimelinePhoto] = useState(false);
+  const [timelineSignedUrls, setTimelineSignedUrls] = useState<Record<string, string>>({});
+
+  const resolveTimelineSignedUrls = async (instances: any[]) => {
+    if (!driveFolderId) return;
+    const pendingUrls = { ...timelineSignedUrls };
+    let updated = false;
+    for (const inst of instances) {
+      if (inst.photoAntesUrl && !pendingUrls[inst.photoAntesUrl]) {
+        try {
+          const url = await getPatientFileUrlFromSupabase(driveFolderId, inst.photoAntesUrl);
+          if (url) {
+            pendingUrls[inst.photoAntesUrl] = url;
+            updated = true;
+          }
+        } catch (e) {
+          console.warn("Failed to get signed URL for " + inst.photoAntesUrl, e);
+        }
+      }
+      if (inst.photoDepoisUrl && !pendingUrls[inst.photoDepoisUrl]) {
+        try {
+          const url = await getPatientFileUrlFromSupabase(driveFolderId, inst.photoDepoisUrl);
+          if (url) {
+            pendingUrls[inst.photoDepoisUrl] = url;
+            updated = true;
+          }
+        } catch (e) {
+          console.warn("Failed to get signed URL for " + inst.photoDepoisUrl, e);
+        }
+      }
+    }
+    if (updated) {
+      setTimelineSignedUrls(pendingUrls);
+    }
+  };
+
+  const handleUploadTimelinePhoto = async (
+    proposalName: string,
+    instanceId: string,
+    type: 'antes' | 'depois',
+    file: File
+  ) => {
+    if (!driveFolderId) return;
+    setIsUploadingTimelinePhoto(true);
+    try {
+      const extension = file.name.split('.').pop() || 'jpg';
+      const storageFilename = `timeline_${instanceId}_${type}_${Date.now()}.${extension}`;
+      await uploadPatientFileToSupabase(driveFolderId, file, storageFilename);
+
+      const url = await getPatientFileUrlFromSupabase(driveFolderId, proposalName);
+      if (!url) throw new Error("Não foi possível carregar a URL do orçamento.");
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Erro ao baixar o orçamento do Supabase.");
+      const proposalData = await response.json();
+
+      let found = false;
+      proposalData.sections?.forEach((sec: any) => {
+        sec.markers?.forEach((marker: any) => {
+          marker.procedureInstances?.forEach((inst: any) => {
+            if (inst.id === instanceId) {
+              if (type === 'antes') {
+                inst.photoAntesUrl = storageFilename;
+              } else {
+                inst.photoDepoisUrl = storageFilename;
+              }
+              inst.updatedAt = new Date().toLocaleDateString('pt-BR');
+              found = true;
+            }
+          });
+        });
+      });
+
+      if (!found) throw new Error("Procedimento não encontrado no orçamento.");
+
+      await uploadPatientFileToSupabase(driveFolderId, new Blob([JSON.stringify(proposalData)], { type: 'application/json' }), proposalName);
+
+      const proposals = await listPatientFilesFromSupabase(driveFolderId);
+      const filtered = filterSupabaseProposals(proposals);
+      setSupabaseProposals(filtered);
+
+      const matchedProp = proposals.find(p => p.name === proposalName);
+      if (selectedProposalData && matchedProp && selectedProposalId === matchedProp.id) {
+        setSelectedProposalData(proposalData);
+      }
+
+      const signedUrl = await getPatientFileUrlFromSupabase(driveFolderId, storageFilename);
+      if (signedUrl) {
+        setTimelineSignedUrls(prev => ({
+          ...prev,
+          [storageFilename]: signedUrl
+        }));
+      }
+
+      alert("Foto salva com sucesso no Supabase!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Erro ao salvar foto: " + err.message);
+    } finally {
+      setIsUploadingTimelinePhoto(false);
+    }
+  };
+
   // HTML5 Webcam and snapshot states
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
@@ -773,7 +877,7 @@ export default function DentalCRMView({
   }, [selectedProposalId, driveFolderId]);
 
   // Helper to extract procedure instances from a saved proposal JSON
-  const getProcedureInstancesFromProposal = (proposalData: any) => {
+  const getProcedureInstancesFromProposal = (proposalData: any, proposalId: string = '', proposalName: string = '') => {
     if (!proposalData || !proposalData.sections) return [];
     const instances: {
       sectionId: string;
@@ -787,6 +891,10 @@ export default function DentalCRMView({
       status: string;
       updatedAt?: string;
       date?: string;
+      photoAntesUrl?: string;
+      photoDepoisUrl?: string;
+      proposalId?: string;
+      proposalName?: string;
     }[] = [];
 
     proposalData.sections.forEach((sec: any) => {
@@ -805,7 +913,11 @@ export default function DentalCRMView({
               price: inst.price,
               status: inst.status || 'não realizado',
               updatedAt: inst.updatedAt || inst.date || '',
-              date: inst.date
+              date: inst.date,
+              photoAntesUrl: inst.photoAntesUrl || '',
+              photoDepoisUrl: inst.photoDepoisUrl || '',
+              proposalId,
+              proposalName
             });
           });
         } else if (marker.procedures && marker.procedures.length > 0) {
@@ -822,7 +934,11 @@ export default function DentalCRMView({
               price: procDetails?.price || 0,
               status: 'não realizado',
               updatedAt: '',
-              date: ''
+              date: '',
+              photoAntesUrl: '',
+              photoDepoisUrl: '',
+              proposalId,
+              proposalName
             });
           });
         }
@@ -2626,21 +2742,44 @@ export default function DentalCRMView({
 
   // Dashboard calculations for active treatment plan
   const getTreatmentProgress = () => {
-    if (!activeTreatmentPlan) return null;
-    const instances = getProcedureInstancesFromProposal(activeTreatmentPlan);
-    if (instances.length === 0) return null;
+    // Gather all proposals that are in open or in progress states
+    // Eligible statuses: anything other than "Concluído", "Arquivado"
+    const openProposals = driveProposals.filter(prop => {
+      const status = prop.content?.proposal?.status || prop.appProperties?.status || 'Aguardando Aprovação';
+      return status !== 'Concluído' && status !== 'Arquivado';
+    });
 
-    const total = instances.length;
-    const completed = instances.filter(i => {
+    if (openProposals.length === 0) {
+      if (!activeTreatmentPlan) return null;
+      openProposals.push({
+        id: selectedProposalId || 'active',
+        name: 'orcamento_salvo_ativo.json',
+        content: activeTreatmentPlan
+      });
+    }
+
+    // Accumulate all procedure instances
+    const allInstances: any[] = [];
+    openProposals.forEach(prop => {
+      const data = prop.content;
+      if (!data) return;
+      const instances = getProcedureInstancesFromProposal(data, prop.id, prop.name);
+      allInstances.push(...instances);
+    });
+
+    if (allInstances.length === 0) return null;
+
+    const total = allInstances.length;
+    const completed = allInstances.filter(i => {
       const st = (i.status || '').toLowerCase().trim();
       return st === 'executado' || st === 'realizado';
     }).length;
-    const inProgress = instances.filter(i => (i.status || '').toLowerCase().trim() === 'em andamento').length;
+    const inProgress = allInstances.filter(i => (i.status || '').toLowerCase().trim() === 'em andamento').length;
     const percent = Math.round((completed / total) * 100);
 
-    let nextStep = instances.find(i => (i.status || '').toLowerCase().trim() === 'em andamento');
+    let nextStep = allInstances.find(i => (i.status || '').toLowerCase().trim() === 'em andamento');
     if (!nextStep) {
-      nextStep = instances.find(i => {
+      nextStep = allInstances.find(i => {
         const st = (i.status || '').toLowerCase().trim();
         return st === 'não realizado' || st === 'a realizar' || !st;
       });
@@ -2655,7 +2794,8 @@ export default function DentalCRMView({
         name: nextStep.name,
         toothNumber: nextStep.toothNumber,
         status: nextStep.status
-      } : null
+      } : null,
+      allInstances
     };
   };
 
@@ -3577,30 +3717,19 @@ export default function DentalCRMView({
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    🛠️ Planos Antigos
+                    📋 Orçamentos ({driveProposals.length})
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setActiveDetailTab('plan_editor')}
+                    onClick={() => setActiveDetailTab(activeDetailTab === 'plan_negotiation' ? 'plan_negotiation' : 'plan_editor')}
                     className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
-                      activeDetailTab === 'plan_editor'
+                      activeDetailTab === 'plan_editor' || activeDetailTab === 'plan_negotiation'
                         ? 'bg-amber-100 text-amber-900 shadow-inner'
                         : 'text-zinc-600 hover:bg-amber-50 hover:text-amber-800'
                     }`}
                   >
-                    ✨ Mapeamento Clínico
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveDetailTab('plan_negotiation')}
-                    className={`px-2 py-3 text-[9px] sm:text-[10px] md:text-[11px] font-bold uppercase tracking-wider focus:outline-none cursor-pointer transition-all border-r border-b border-zinc-200 flex items-center justify-center text-center ${
-                      activeDetailTab === 'plan_negotiation'
-                        ? 'bg-amber-100 text-amber-900 shadow-inner'
-                        : 'text-zinc-600 hover:bg-amber-50 hover:text-amber-800'
-                    }`}
-                  >
-                    💰 Emissão Orçamento
+                    🦷 Planejamento
                   </button>
                   <button
                     type="button"
@@ -3735,7 +3864,23 @@ export default function DentalCRMView({
                               )}
                             </div>
                           </div>
+                          
+                          <div className="flex justify-end pt-2 border-t border-white/10">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsTimelineModalOpen(true);
+                                if (treatmentProgress?.allInstances) {
+                                  resolveTimelineSignedUrls(treatmentProgress.allInstances);
+                                }
+                              }}
+                              className="px-4 py-2 bg-white/15 hover:bg-white/25 text-[#FAF8F5] text-[11px] font-bold uppercase rounded-xl border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                            >
+                              📸 Detalhes & Timeline Antes/Depois
+                            </button>
+                          </div>
                         </div>
+
                       ) : (
                         <div className="bg-[#FAF8F5] p-4 rounded-xl border border-dashed border-[#E6DEC9] text-center text-xs text-zinc-500">
                           ℹ️ Nenhum orçamento ou plano de tratamento ativo localizado para esta paciente no Supabase. 
@@ -4392,249 +4537,221 @@ export default function DentalCRMView({
                     </div>
                   )}
 
-                  {/* Panel: Treatment Plan Progress & Status Editor */}
+                  {/* Panel: Orçamentos — Card-based budget management */}
                   {activeDetailTab === 'treatment_plan' && (
                     <div className="space-y-6 animate-fade-in-up">
-                      {driveProposals.length > 0 ? (
-                        <>
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 pb-4">
-                            <div>
-                              <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">PLANO DE TRATAMENTO ATIVO</span>
-                              <h4 className="font-serif font-bold text-lg text-[#8B0000] mt-0.5">Mapeamento Clínico e Evolução de Procedimentos</h4>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-zinc-650">Orçamento:</span>
-                              <select
-                                value={selectedProposalId}
-                                onChange={(e) => setSelectedProposalId(e.target.value)}
-                                className="text-xs font-semibold bg-[#FAF8F5] border border-[#E6DEC9] rounded-lg p-2 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#8B0000] cursor-pointer"
-                              >
-                                {driveProposals.map((prop) => (
-                                  <option key={prop.id} value={prop.id}>
-                                    {prop.name.replace('.json', '')} ({new Date(prop.modifiedTime || prop.createdTime).toLocaleDateString('pt-BR')})
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 pb-4">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider font-mono">GESTÃO DE ORÇAMENTOS</span>
+                          <h4 className="font-serif font-bold text-lg text-[#8B0000] mt-0.5">Orçamentos do Paciente</h4>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (onNewProposal) {
+                              onNewProposal(selectedPatient.name);
+                              setActiveDetailTab('plan_editor');
+                            }
+                          }}
+                          className="px-4 py-2 bg-[#8B0000] hover:bg-[#a32c3d] text-[#FAF8F5] text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Novo Orçamento
+                        </button>
+                      </div>
 
-                          {isLoadingPlanData ? (
-                            <div className="flex flex-col items-center justify-center p-20 space-y-2">
-                              <Loader2 className="w-8 h-8 animate-spin text-[#8B0000]" />
-                              <span className="text-xs text-zinc-555 font-medium animate-pulse">Carregando plano de tratamento...</span>
-                            </div>
-                          ) : selectedProposalData ? (
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                              {/* Left Column: Photos (5 cols) */}
-                              <div className="lg:col-span-5 space-y-6">
-                                <div className="border-b border-zinc-155 pb-2">
-                                  <h5 className="font-bold text-xs text-zinc-800 uppercase tracking-wider font-serif">Imagens Mapeadas</h5>
-                                  <p className="text-[10px] text-zinc-500 mt-0.5">Fotos clínicas com marcação de dentes e procedimentos associados.</p>
-                                </div>
-
-                                {(() => {
-                                  const mappingSections = selectedProposalData.sections?.filter((sec: any) => sec.image && sec.markers?.length > 0) || [];
-                                  if (mappingSections.length === 0) {
-                                    return (
-                                      <div className="p-6 bg-[#FAF8F5] border border-dashed rounded-xl border-zinc-200 text-center text-xs text-zinc-500">
-                                        Nenhuma imagem mapeada neste orçamento.
-                                      </div>
-                                    );
-                                  }
-
-                                  return (
-                                    <div className="space-y-4">
-                                      {mappingSections.map((sec: any) => (
-                                        <div key={sec.id} className="bg-white border rounded-xl p-3 border-[#E6DEC9]/60 shadow-2xs space-y-2">
-                                          <span className="text-[10px] font-bold text-[#8B0000] uppercase tracking-wider block font-sans">
-                                            {sec.title}
-                                          </span>
-                                          
-                                          <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden shadow-xs border border-zinc-200 bg-zinc-950">
-                                            <img
-                                              src={sec.image}
-                                              alt={sec.title}
-                                              className="w-full h-full object-cover"
-                                              referrerPolicy="no-referrer"
-                                            />
-
-                                            {/* Markers Overlays */}
-                                            {sec.markers.map((marker: any) => {
-                                              const size = selectedProposalData.proposal?.markerSize || 26;
-                                              return (
-                                                <div
-                                                  key={marker.id}
-                                                  style={{
-                                                    left: `${marker.x}%`,
-                                                    top: `${marker.y}%`,
-                                                    width: `${size}px`,
-                                                    height: `${size}px`,
-                                                    fontSize: `${Math.max(9, Math.round(size * 0.42))}px`,
-                                                    transform: 'translate(-50%, -50%)',
-                                                  }}
-                                                  className="absolute rounded-full border border-zinc-200 bg-white shadow-md flex items-center justify-center font-bold text-zinc-950 select-none z-10"
-                                                  title={`Dente ${marker.toothNumber}`}
-                                                >
-                                                  <span>{marker.toothNumber}</span>
-
-                                                  {/* Little color dot badges right on the edge */}
-                                                  {marker.procedures && marker.procedures.length > 0 && (
-                                                    <div 
-                                                      className="absolute flex gap-0.5 justify-end"
-                                                      style={{
-                                                        bottom: `-${Math.round(size * 0.1)}px`,
-                                                        right: `-${Math.round(size * 0.1)}px`,
-                                                        maxWidth: `${size * 1.5}px`,
-                                                      }}
-                                                    >
-                                                      {marker.procedures.map((procId: string, idx: number) => {
-                                                        const proc = selectedProposalData.procedures?.find((p: any) => p.id === procId);
-                                                        if (!proc) return null;
-                                                        const dotSize = Math.max(5, Math.round(size * 0.3));
-                                                        return (
-                                                          <span
-                                                            key={`${procId}-${idx}`}
-                                                            className="rounded-full border border-white block"
-                                                            style={{ 
-                                                              backgroundColor: proc.color,
-                                                              width: `${dotSize}px`,
-                                                              height: `${dotSize}px`,
-                                                            }}
-                                                          />
-                                                        );
-                                                      })}
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-
-                              {/* Right Column: Procedure List with Actions (7 cols) */}
-                              <div className="lg:col-span-7 space-y-6">
-                                <div className="border-b border-zinc-150 pb-2 flex justify-between items-center">
-                                  <div>
-                                    <h5 className="font-bold text-xs text-zinc-800 uppercase tracking-wider font-serif">Procedimentos Selecionados</h5>
-                                    <p className="text-[10px] text-zinc-500 mt-0.5">Controle de evolução de cada procedimento planejado.</p>
-                                  </div>
-                                  <span className="text-[9px] font-bold bg-[#8B0000]/5 text-[#8B0000] border border-[#8B0000]/20 px-2 py-0.5 rounded-full font-mono uppercase">
-                                    {getProcedureInstancesFromProposal(selectedProposalData).length} Itens
-                                  </span>
-                                </div>
-
-                                {(() => {
-                                  const instances = getProcedureInstancesFromProposal(selectedProposalData);
-                                  if (instances.length === 0) {
-                                    return (
-                                      <div className="p-8 bg-[#FAF8F5] border border-dashed rounded-xl border-zinc-200 text-center text-xs text-zinc-500">
-                                        Nenhum procedimento assinalado neste orçamento.
-                                      </div>
-                                    );
-                                  }
-
-                                  return (
-                                    <div className="divide-y divide-zinc-150 border rounded-xl overflow-hidden bg-white shadow-2xs">
-                                      {instances.map((item) => {
-                                        const cleanStatus = (item.status || '').toLowerCase().trim();
-                                        return (
-                                          <div key={item.instanceId} className="p-4 hover:bg-[#FAF8F5]/40 transition-colors flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                                            <div className="space-y-1 max-w-md">
-                                              <div className="flex items-center gap-2">
-                                                <span className="bg-[#8B0000] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
-                                                  {item.toothNumber ? `Dente ${item.toothNumber}` : 'Geral'}
-                                                </span>
-                                                <h6 className="text-xs font-bold text-zinc-800 truncate" title={item.name}>
-                                                  {item.name}
-                                                </h6>
-                                              </div>
-                                              <p className="text-[10px] text-zinc-500">
-                                                Foto: {item.sectionTitle} • Valor: {formatBRL(item.price)}
-                                              </p>
-                                              {item.updatedAt && (
-                                                <p className="text-[9px] text-[#C09553] font-semibold flex items-center gap-1">
-                                                  ⏱️ Atualizado: {item.updatedAt}
-                                                </p>
-                                              )}
-                                            </div>
-
-                                            {/* Status Actions Group */}
-                                            <div className="flex flex-wrap gap-1.5 shrink-0">
-                                              {[
-                                                { label: 'Não realizado', val: 'não realizado', color: 'hover:bg-rose-50 hover:text-rose-700 hover:border-rose-350 active:bg-rose-100 text-zinc-500 border-zinc-200 bg-white' },
-                                                { label: 'Em andamento', val: 'em andamento', color: 'hover:bg-amber-50 hover:text-amber-700 hover:border-amber-350 active:bg-amber-100 text-zinc-500 border-zinc-200 bg-white' },
-                                                { label: 'Executado', val: 'executado', color: 'hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-350 active:bg-emerald-100 text-zinc-500 border-zinc-200 bg-white' },
-                                              ].map((btn) => {
-                                                const isSelected = cleanStatus === btn.val || 
-                                                  (btn.val === 'não realizado' && (cleanStatus === 'a realizar' || cleanStatus === '')) ||
-                                                  (btn.val === 'executado' && cleanStatus === 'realizado');
-
-                                                let activeClass = '';
-                                                if (isSelected) {
-                                                  if (btn.val === 'não realizado') activeClass = 'bg-rose-100 text-rose-800 border-rose-450 font-bold';
-                                                  if (btn.val === 'em andamento') activeClass = 'bg-amber-100 text-amber-800 border-amber-450 font-bold';
-                                                  if (btn.val === 'executado') activeClass = 'bg-emerald-100 text-emerald-800 border-emerald-450 font-bold';
-                                                }
-
-                                                return (
-                                                  <button
-                                                    key={btn.val}
-                                                    type="button"
-                                                    onClick={() => handleUpdateProcedureStatus(
-                                                      selectedProposalData,
-                                                      item.sectionId,
-                                                      item.markerId,
-                                                      item.instanceId,
-                                                      btn.val as any
-                                                    )}
-                                                    className={`p-1 px-2.5 rounded-lg border text-[10px] transition-all cursor-pointer ${isSelected ? activeClass : btn.color}`}
-                                                  >
-                                                    {btn.label}
-                                                  </button>
-                                                );
-                                              })}
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="p-8 text-center bg-[#FAF8F5] border border-dashed rounded-xl border-zinc-200 text-xs text-zinc-500">
-                              Selecione um orçamento para carregar o plano de evolução de tratamento.
-                            </div>
-                          )}
-                        </>
-                      ) : (
+                      {driveProposals.length === 0 ? (
                         <div className="p-8 text-center bg-[#FAF8F5] border border-dashed rounded-2xl border-zinc-200">
-                          <p className="text-xs text-zinc-555 italic">Nenhum plano ou orçamento ativo localizado no Supabase para esta paciente.</p>
-                          <p className="text-[10px] text-zinc-400 mt-1 max-w-sm mx-auto">Para gerar o plano de evolução, crie um orçamento clicando no botão abaixo ou abra o Planejador 3D.</p>
-                          <button
-                            onClick={() => {
-                              if (onNewProposal) {
-                                onNewProposal(selectedPatient.name);
-                                setActiveDetailTab('plan_editor');
-                              }
-                            }}
-                            className="mt-4 px-4 py-2 bg-[#8B0000] hover:bg-[#a32c3d] text-[#FAF8F5] text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer"
-                          >
-                            + Criar Novo Orçamento
-                          </button>
+                          <p className="text-xs text-zinc-555 italic">Nenhum orçamento localizado para esta paciente.</p>
+                          <p className="text-[10px] text-zinc-400 mt-1">Crie um novo orçamento pelo botão acima ou pela aba Planejamento.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {driveProposals.map((prop) => {
+                            // Compute progress from loaded data or cache
+                            const propData = selectedProposalId === prop.id ? selectedProposalData : null;
+                            const instances = propData ? getProcedureInstancesFromProposal(propData) : [];
+                            const total = instances.length;
+                            const completed = instances.filter((i: any) => { const s = (i.status || '').toLowerCase().trim(); return s === 'executado' || s === 'realizado'; }).length;
+                            const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+                            const lastCompleted = instances
+                              .filter((i: any) => { const s = (i.status || '').toLowerCase().trim(); return s === 'executado' || s === 'realizado'; })
+                              .sort((a: any, b: any) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))[0];
+                            const proposalStatus = propData?.proposal?.status || 'Aguardando Aprovação';
+                            const createdDate = new Date(prop.createdTime || prop.modifiedTime).toLocaleDateString('pt-BR');
+                            const totalValue = instances.reduce((sum: number, i: any) => sum + (i.price || 0), 0);
+
+                            const statusConfig: Record<string, { emoji: string; bg: string; text: string; border: string }> = {
+                              'Aberto (paciente não pagou)': { emoji: '🔴', bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-200' },
+                              'Aprovado (paciente pagou)': { emoji: '🟢', bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200' },
+                              'Aguardando Aprovação': { emoji: '⏳', bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200' },
+                              'Em Andamento': { emoji: '🔄', bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-blue-200' },
+                              'Concluído': { emoji: '✅', bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200' },
+                              'Arquivado': { emoji: '📁', bg: 'bg-zinc-50', text: 'text-zinc-600', border: 'border-zinc-200' },
+                            };
+                            const sc = statusConfig[proposalStatus] || statusConfig['Aguardando Aprovação'];
+
+                            return (
+                              <div key={prop.id} className={`bg-white border rounded-2xl shadow-sm overflow-hidden transition-all hover:shadow-md ${selectedProposalId === prop.id ? 'ring-2 ring-[#8B0000]/30' : 'border-[#E6DEC9]'}`}>
+                                {/* Card Header */}
+                                <div className="p-5 space-y-3">
+                                  <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3">
+                                    <div className="space-y-1 flex-1 min-w-0">
+                                      <h5 className="font-serif font-bold text-sm text-[#8B0000] truncate">
+                                        {prop.name.replace('.json', '').replace('orcamento_salvo', 'Orçamento').replace(/_/g, ' ')}
+                                      </h5>
+                                      <div className="flex flex-wrap gap-3 text-[10px] text-zinc-500">
+                                        <span>📅 Criado: <strong className="text-zinc-700">{createdDate}</strong></span>
+                                        {lastCompleted && <span>⏱️ Última baixa: <strong className="text-zinc-700">{lastCompleted.updatedAt || '—'}</strong></span>}
+                                        {total > 0 && <span>🦷 <strong className="text-zinc-700">{total}</strong> procedimentos</span>}
+                                        {totalValue > 0 && <span>💰 <strong className="text-zinc-700">{formatBRL(totalValue)}</strong></span>}
+                                      </div>
+                                    </div>
+
+                                    {/* Status Selector */}
+                                    <select
+                                      value={proposalStatus}
+                                      onChange={async (e) => {
+                                        if (!propData) {
+                                          // Load data first by selecting this proposal
+                                          setSelectedProposalId(prop.id);
+                                          return;
+                                        }
+                                        const newStatus = e.target.value;
+                                        const updated = { ...propData, proposal: { ...propData.proposal, status: newStatus } };
+                                        setSelectedProposalData(updated);
+                                        if (selectedProposalId === prop.id) {
+                                          setActiveTreatmentPlan(updated);
+                                        }
+                                        // Persist to Supabase
+                                        try {
+                                          const { uploadPatientFileToSupabase } = await import('../lib/supabaseStorage');
+                                          if (driveFolderId) {
+                                            await uploadPatientFileToSupabase(driveFolderId, prop.name, JSON.stringify(updated));
+                                          }
+                                        } catch (err) { console.error('Error saving status:', err); }
+                                      }}
+                                      className={`text-[10px] font-bold px-3 py-1.5 rounded-full border cursor-pointer focus:outline-none transition-colors ${sc.bg} ${sc.text} ${sc.border}`}
+                                    >
+                                      <option value="Aberto (paciente não pagou)">🔴 Aberto</option>
+                                      <option value="Aprovado (paciente pagou)">🟢 Aprovado</option>
+                                      <option value="Aguardando Aprovação">⏳ Aguardando</option>
+                                      <option value="Em Andamento">🔄 Em Andamento</option>
+                                      <option value="Concluído">✅ Concluído</option>
+                                      <option value="Arquivado">📁 Arquivado</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Progress Bar */}
+                                  {total > 0 && (
+                                    <div className="space-y-1.5">
+                                      <div className="flex justify-between text-[10px] font-semibold text-zinc-500">
+                                        <span>Progresso</span>
+                                        <span className="font-mono text-[#8B0000]">{percent}% ({completed}/{total})</span>
+                                      </div>
+                                      <div className="w-full bg-zinc-100 h-2 rounded-full overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full transition-all duration-500 ${percent === 100 ? 'bg-emerald-500' : percent > 50 ? 'bg-[#C09553]' : 'bg-[#8B0000]'}`}
+                                          style={{ width: `${percent}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Card Actions Footer */}
+                                <div className="bg-[#FAF8F5] px-5 py-3 border-t border-[#E6DEC9]/50 flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedProposalId(prop.id)}
+                                    className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-colors cursor-pointer ${selectedProposalId === prop.id ? 'bg-[#8B0000] text-white' : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50'}`}
+                                  >
+                                    {selectedProposalId === prop.id ? '✓ Selecionado' : 'Visualizar'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedProposalId(prop.id);
+                                      setActiveDetailTab('plan_editor');
+                                    }}
+                                    className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-white border border-[#C09553]/30 text-[#8B0000] hover:border-[#C09553] transition-colors cursor-pointer"
+                                  >
+                                    Abrir no Planejador
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Expanded Proposal Detail (when selected) */}
+                      {selectedProposalData && (
+                        <div className="border-t border-zinc-200 pt-6 space-y-4">
+                          <h5 className="font-bold text-xs text-zinc-800 uppercase tracking-wider font-serif">Procedimentos do Orçamento Selecionado</h5>
+                          {(() => {
+                            const instances = getProcedureInstancesFromProposal(selectedProposalData);
+                            if (instances.length === 0) return <p className="text-xs text-zinc-400 italic">Nenhum procedimento assinalado.</p>;
+                            return (
+                              <div className="divide-y divide-zinc-100 border rounded-xl overflow-hidden bg-white shadow-2xs">
+                                {instances.map((item) => {
+                                  const cleanStatus = (item.status || '').toLowerCase().trim();
+                                  const isDone = cleanStatus === 'executado' || cleanStatus === 'realizado';
+                                  const isInProgress = cleanStatus === 'em andamento';
+                                  return (
+                                    <div key={item.instanceId} className="p-3.5 flex items-center gap-3">
+                                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isDone ? 'bg-emerald-500' : isInProgress ? 'bg-amber-400' : 'bg-zinc-300'}`} />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className="bg-[#8B0000] text-white text-[8px] font-bold px-1.5 py-0.5 rounded">{item.toothNumber ? `D${item.toothNumber}` : 'Geral'}</span>
+                                          <span className="text-xs font-bold text-zinc-800 truncate">{item.name}</span>
+                                        </div>
+                                        {item.updatedAt && <p className="text-[9px] text-zinc-400 mt-0.5">Atualizado: {item.updatedAt}</p>}
+                                      </div>
+                                      <span className="text-xs font-mono font-bold text-zinc-600 shrink-0">{formatBRL(item.price)}</span>
+                                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase shrink-0 ${isDone ? 'bg-emerald-100 text-emerald-700' : isInProgress ? 'bg-amber-100 text-amber-700' : 'bg-zinc-100 text-zinc-500'}`}>
+                                        {isDone ? 'Executado' : isInProgress ? 'Em andamento' : 'Pendente'}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Panel: Mapeamento Clínico (PhotoEditor) */}
-                  {activeDetailTab === 'plan_editor' && (
+                  {/* Panel: Planejamento Unificado (Mapeamento + Orçamento) */}
+                  {(activeDetailTab === 'plan_editor' || activeDetailTab === 'plan_negotiation') && (
+                    <div className="space-y-4">
+                      {/* Sub-tab navigation */}
+                      <div className="flex gap-0 border-b border-zinc-200">
+                        <button
+                          type="button"
+                          onClick={() => setActiveDetailTab('plan_editor')}
+                          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-b-2 ${
+                            activeDetailTab === 'plan_editor'
+                              ? 'text-[#8B0000] border-[#8B0000] bg-[#FAF8F5]'
+                              : 'text-zinc-500 border-transparent hover:text-zinc-700 hover:border-zinc-300'
+                          }`}
+                        >
+                          ✨ Mapeamento Clínico
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveDetailTab('plan_negotiation')}
+                          className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-b-2 ${
+                            activeDetailTab === 'plan_negotiation'
+                              ? 'text-[#8B0000] border-[#8B0000] bg-[#FAF8F5]'
+                              : 'text-zinc-500 border-transparent hover:text-zinc-700 hover:border-zinc-300'
+                          }`}
+                        >
+                          💰 Emissão de Orçamento
+                        </button>
+                      </div>
+
+                      {/* Sub-panel: Mapeamento Clínico */}
+                      {activeDetailTab === 'plan_editor' && (
                     <div className="space-y-4">
                       {activeSections && activeSections.length > 0 ? (
                         <div className="space-y-6">
@@ -4749,10 +4866,10 @@ export default function DentalCRMView({
                         </div>
                       )}
                     </div>
-                  )}
+                   )}
 
-                  {/* Panel: Emissão de Orçamento (NegotiationTab) */}
-                  {activeDetailTab === 'plan_negotiation' && (
+                      {/* Sub-panel: Emissão de Orçamento */}
+                      {activeDetailTab === 'plan_negotiation' && (
                     <div>
                       <NegotiationTab
                         sections={activeSections || []}
@@ -4763,6 +4880,8 @@ export default function DentalCRMView({
                         currentFileId={currentFileId}
                         setCurrentFileId={setCurrentFileId}
                       />
+                    </div>
+                      )}
                     </div>
                   )}
 
@@ -5639,6 +5758,210 @@ export default function DentalCRMView({
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Timeline Modal Overlay */}
+      {isTimelineModalOpen && (
+        <div className="fixed inset-0 z-[140] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl border border-zinc-200 text-zinc-800 animate-fade-in-up">
+            {/* Header */}
+            <div className="bg-[#8B0000] text-white p-5 flex justify-between items-center shrink-0">
+              <div>
+                <span className="text-[10px] uppercase font-extrabold text-[#C09553] tracking-widest font-mono">TIMELINE DE EVOLUÇÃO CLÍNICA</span>
+                <h4 className="font-serif font-bold text-lg">{selectedPatient?.name}</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTimelineModalOpen(false)}
+                className="text-white/85 hover:text-white text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+
+            {/* Progress metrics */}
+            <div className="p-5 bg-zinc-50 border-b border-zinc-150 grid grid-cols-2 sm:grid-cols-4 gap-4 shrink-0">
+              <div className="text-center">
+                <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono">Concluído</span>
+                <p className="text-lg font-bold text-emerald-600 font-mono">{treatmentProgress?.percent}%</p>
+              </div>
+              <div className="text-center">
+                <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono">Faltam</span>
+                <p className="text-lg font-bold text-[#8B0000] font-mono">{100 - (treatmentProgress?.percent || 0)}%</p>
+              </div>
+              <div className="text-center">
+                <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono">Executados</span>
+                <p className="text-lg font-bold text-zinc-850 font-mono">{treatmentProgress?.completed} de {treatmentProgress?.total}</p>
+              </div>
+              <div className="text-center">
+                <span className="text-[9px] uppercase font-bold text-zinc-400 font-mono">Em Andamento</span>
+                <p className="text-lg font-bold text-zinc-850 font-mono">{treatmentProgress?.inProgress}</p>
+              </div>
+            </div>
+
+            {/* Modal Body / Timeline */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              {(() => {
+                const baixas = (treatmentProgress?.allInstances || []).filter(i => {
+                  const st = (i.status || '').toLowerCase().trim();
+                  return st === 'executado' || st === 'realizado';
+                });
+
+                if (baixas.length === 0) {
+                  return (
+                    <div className="p-12 text-center bg-[#FAF8F5] border border-dashed rounded-2xl border-[#E6DEC9] text-zinc-500">
+                      <p className="text-sm font-semibold">Nenhum procedimento com baixa (executado) localizado.</p>
+                      <p className="text-xs text-zinc-400 mt-1">Quando você marcar um procedimento como "Executado" na aba Orçamentos ou Planejamento, ele aparecerá aqui para você adicionar as fotos Antes / Depois.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="relative border-l-2 border-zinc-200 ml-4 pl-6 space-y-8">
+                    {baixas.map((item) => {
+                      return (
+                        <div key={item.instanceId} className="relative">
+                          {/* Timeline dot node */}
+                          <span className="absolute -left-[31px] top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-4 ring-white">
+                            <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                          </span>
+
+                          <div className="bg-[#FAF8F5]/60 border border-[#E6DEC9]/45 rounded-2xl p-4 space-y-4">
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-zinc-200/50 pb-2">
+                              <div>
+                                <span className="bg-[#8B0000] text-white text-[8px] font-bold px-1.5 py-0.5 rounded mr-2">
+                                  {item.toothNumber ? `Dente ${item.toothNumber}` : 'Geral'}
+                                </span>
+                                <span className="text-xs font-bold text-zinc-800">{item.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-semibold">
+                                <span>📅 {item.updatedAt || 'Sem data'}</span>
+                                <span className="text-emerald-750 bg-emerald-100 px-2 py-0.5 rounded-full uppercase text-[8px] font-bold">Executado</span>
+                              </div>
+                            </div>
+
+                            {/* Before/After Photo Upload slots */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {/* Foto Antes */}
+                              <div className="space-y-1.5">
+                                <span className="text-[10px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Foto Antes</span>
+                                {item.photoAntesUrl && timelineSignedUrls[item.photoAntesUrl] ? (
+                                  <div className="relative group aspect-video rounded-xl overflow-hidden border border-zinc-200 bg-zinc-100">
+                                    <img
+                                      src={timelineSignedUrls[item.photoAntesUrl]}
+                                      alt="Foto Antes"
+                                      className="w-full h-full object-cover"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                      <a
+                                        href={timelineSignedUrls[item.photoAntesUrl]}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="bg-white hover:bg-zinc-100 text-zinc-850 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                                      >
+                                        Ampliar
+                                      </a>
+                                      <label className="bg-white hover:bg-zinc-100 text-[#8B0000] text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer">
+                                        Substituir
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file && item.proposalName) {
+                                              handleUploadTimelinePhoto(item.proposalName, item.instanceId, 'antes', file);
+                                            }
+                                          }}
+                                        />
+                                      </label>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <label className="border-2 border-dashed border-zinc-200 hover:border-[#8B0000] rounded-xl aspect-video flex flex-col items-center justify-center cursor-pointer transition-colors text-center p-3 bg-white">
+                                    <span className="text-xl">📷</span>
+                                    <span className="text-[9px] font-bold text-zinc-400 mt-1 uppercase">Enviar Foto Antes</span>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file && item.proposalName) {
+                                          handleUploadTimelinePhoto(item.proposalName, item.instanceId, 'antes', file);
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                )}
+                              </div>
+
+                              {/* Foto Depois */}
+                              <div className="space-y-1.5">
+                                <span className="text-[10px] uppercase font-bold text-zinc-400 font-mono tracking-wider">Foto Depois</span>
+                                {item.photoDepoisUrl && timelineSignedUrls[item.photoDepoisUrl] ? (
+                                  <div className="relative group aspect-video rounded-xl overflow-hidden border border-zinc-200 bg-zinc-100">
+                                    <img
+                                      src={timelineSignedUrls[item.photoDepoisUrl]}
+                                      alt="Foto Depois"
+                                      className="w-full h-full object-cover"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                      <a
+                                        href={timelineSignedUrls[item.photoDepoisUrl]}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="bg-white hover:bg-zinc-100 text-zinc-850 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                                      >
+                                        Ampliar
+                                      </a>
+                                      <label className="bg-white hover:bg-zinc-100 text-[#8B0000] text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer">
+                                        Substituir
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file && item.proposalName) {
+                                              handleUploadTimelinePhoto(item.proposalName, item.instanceId, 'depois', file);
+                                            }
+                                          }}
+                                        />
+                                      </label>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <label className="border-2 border-dashed border-zinc-200 hover:border-[#8B0000] rounded-xl aspect-video flex flex-col items-center justify-center cursor-pointer transition-colors text-center p-3 bg-white">
+                                    <span className="text-xl">📷</span>
+                                    <span className="text-[9px] font-bold text-zinc-400 mt-1 uppercase">Enviar Foto Depois</span>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file && item.proposalName) {
+                                          handleUploadTimelinePhoto(item.proposalName, item.instanceId, 'depois', file);
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
         </div>
       )}
     </div>

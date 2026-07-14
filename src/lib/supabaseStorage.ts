@@ -111,7 +111,8 @@ export async function listPatientFilesFromSupabase(patientName: string) {
                 appProperties: {
                   status: fileData.proposal?.status || 'Aberto',
                   total: total
-                }
+                },
+                content: fileData
               };
             }
           } catch (e) {

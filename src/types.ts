@@ -33,6 +33,8 @@ export interface ToothMarker {
     paid?: boolean;
     paymentMethod?: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito';
     paymentDate?: string;
+    photoAntesUrl?: string;
+    photoDepoisUrl?: string;
   }[];
   // --- Integração 3D ---
   condition?: ToothCondition;
