@@ -1002,6 +1002,89 @@ Você DEVE responder em formato JSON estrito correspondente a esta estrutura:
     }
   });
 
+  // Helper para chamar a LLM (NVIDIA, OpenRouter ou Gemini)
+  async function callLLM(prompt: string, jsonMode: boolean = false): Promise<string> {
+    const nvidiaKey = process.env.NVIDIA_API_KEY;
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const modelName = process.env.LLM_MODEL || "minimaxai/minimax-m3";
+
+    if (nvidiaKey) {
+      console.log(`[LLM API] Chamando NVIDIA com o modelo ${modelName}...`);
+      try {
+        const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${nvidiaKey}`
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [{ role: "user", content: prompt }],
+            response_format: jsonMode ? { type: "json_object" } : undefined
+          })
+        });
+        if (response.ok) {
+          const data: any = await response.json();
+          return data.choices?.[0]?.message?.content || "";
+        }
+        console.error(`[LLM API] Erro NVIDIA: ${response.status} ${response.statusText}`);
+      } catch (err) {
+        console.error("[LLM API] Erro ao chamar NVIDIA:", err);
+      }
+    }
+
+    if (openrouterKey) {
+      console.log(`[LLM API] Chamando OpenRouter com o modelo ${modelName}...`);
+      try {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${openrouterKey}`,
+            "HTTP-Referer": "https://github.com/Agnaldojjr/sistema-aistudio",
+            "X-Title": "Hermes Chat Agent"
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [{ role: "user", content: prompt }],
+            response_format: jsonMode ? { type: "json_object" } : undefined
+          })
+        });
+        if (response.ok) {
+          const data: any = await response.json();
+          return data.choices?.[0]?.message?.content || "";
+        }
+        console.error(`[LLM API] Erro OpenRouter: ${response.status} ${response.statusText}`);
+      } catch (err) {
+        console.error("[LLM API] Erro ao chamar OpenRouter:", err);
+      }
+    }
+
+    if (geminiKey) {
+      console.log("[LLM API] Chamando Gemini (gemini-2.5-flash)...");
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: jsonMode ? { responseMimeType: "application/json" } : undefined
+          })
+        });
+        if (response.ok) {
+          const data: any = await response.json();
+          return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        }
+        console.error(`[LLM API] Erro Gemini: ${response.status} ${response.statusText}`);
+      } catch (err) {
+        console.error("[LLM API] Erro ao chamar Gemini:", err);
+      }
+    }
+
+    throw new Error("Nenhuma chave de API de LLM configurada (NVIDIA_API_KEY, OPENROUTER_API_KEY ou GEMINI_API_KEY).");
+  }
+
   // ==========================================
   // CHAT COM O COPILOTO HERMES
   // ==========================================
@@ -1040,7 +1123,22 @@ Você DEVE responder em formato JSON estrito correspondente a esta estrutura:
       }
 
       // Se a mensagem for sobre testar o site
-      if (message.toLowerCase().includes("varredura completa") || message.toLowerCase().includes("testar abas")) {
+      const lowercaseMsg = message.toLowerCase();
+      const isTestRequest = 
+        lowercaseMsg.includes("varredura") || 
+        lowercaseMsg.includes("testar o site") ||
+        lowercaseMsg.includes("testar as abas") ||
+        lowercaseMsg.includes("testar abas") ||
+        lowercaseMsg.includes("teste o site") ||
+        lowercaseMsg.includes("rodar testes") ||
+        lowercaseMsg.includes("executar testes") ||
+        lowercaseMsg.includes("rodar playwright") ||
+        lowercaseMsg.includes("executar playwright") ||
+        lowercaseMsg.includes("playwright") ||
+        (lowercaseMsg.includes("teste") && lowercaseMsg.includes("site")) ||
+        (lowercaseMsg.includes("teste") && lowercaseMsg.includes("aba"));
+
+      if (isTestRequest) {
         const { execSync } = await import("child_process");
         try {
           const testBaseUrl = "https://sistema-aistudio.vercel.app/?bypass_auth=true";
@@ -1065,12 +1163,9 @@ Se todos os testes passaram, diga que o site está 100% íntegro e funcionando.
 Se houve algum erro de teste ou erro crítico no console de alguma aba, aponte detalhadamente qual foi o erro para que o desenvolvedor possa corrigir.
 Responda de forma objetiva, profissional e em português.`;
 
-          const geminiResponse = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: promptTest
-          });
+          const replyText = await callLLM(promptTest);
 
-          return res.json({ reply: geminiResponse.text || "Testes executados, mas sem resposta detalhada." });
+          return res.json({ reply: replyText || "Testes executados, mas sem resposta detalhada." });
         } catch (testErr: any) {
           return res.json({ reply: `Ocorreu um erro ao tentar executar a varredura automática: ${testErr.message}` });
         }
@@ -1086,7 +1181,10 @@ Responda de forma objetiva, profissional e em português.`;
       const prompt = `Você é o Hermes, o Agente Copiloto IA do Consultório Odontológico do Dr. Agnaldo Ferreira.
 O Dr. Agnaldo está conversando com você pelo painel de controle do CRM.
 
-Seu papel principal é atuar como assistente clínico e de gestão. Você pode ajudar com:
+URL Oficial do Sistema: https://sistema-aistudio.vercel.app
+URL Alternativa: https://dragnaldoferreira.netlify.app
+
+Seu papel é principal é atuar como assistente clínico e de gestão. Você pode ajudar com:
 - Geração de orientações pós-operatórias para pacientes particulares (ex: cuidados pós-cirurgia ou clareamento).
 - Resumos de prontuários com base nos dados.
 - Relatórios rápidos de faturamento e agenda (utilize as métricas abaixo).
@@ -1100,12 +1198,7 @@ ${historyText}
 Responda de forma amigável, clara e objetiva à nova mensagem em português:
 Mensagem do Dr. Agnaldo: "${message}"`;
 
-      const geminiResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt
-      });
-
-      const reply = geminiResponse.text || "Desculpe, Dr. Agnaldo. Não consegui processar a resposta agora.";
+      const reply = await callLLM(prompt);
       res.json({ reply });
     } catch (err: any) {
       console.error("Erro no endpoint de chat do agente:", err);

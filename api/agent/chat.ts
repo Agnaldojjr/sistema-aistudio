@@ -31,6 +31,39 @@ export default async (req: Request) => {
       });
     }
 
+    const lowercaseMsg = message.toLowerCase();
+    const isTestRequest = 
+      lowercaseMsg.includes("varredura") || 
+      lowercaseMsg.includes("testar o site") ||
+      lowercaseMsg.includes("testar as abas") ||
+      lowercaseMsg.includes("testar abas") ||
+      lowercaseMsg.includes("teste o site") ||
+      lowercaseMsg.includes("rodar testes") ||
+      lowercaseMsg.includes("executar testes") ||
+      lowercaseMsg.includes("rodar playwright") ||
+      lowercaseMsg.includes("executar playwright") ||
+      lowercaseMsg.includes("playwright") ||
+      (lowercaseMsg.includes("teste") && lowercaseMsg.includes("site")) ||
+      (lowercaseMsg.includes("teste") && lowercaseMsg.includes("aba"));
+
+    if (isTestRequest) {
+      const reply = `Olá, Dr. Agnaldo! Entendi que você deseja realizar uma varredura ou teste completo das abas do site.
+
+Como esta versão hospedada no Vercel roda em um ambiente *Serverless*, eu não consigo executar o Playwright com navegadores Chromium em tempo real devido a limitações de ambiente e tempo limite de execução.
+
+No entanto, o **Sentinel Agent** está configurado e ativo na sua **VPS Oracle**, realizando essa auditoria completa de forma automática a cada **3 horas** e sincronizando os relatórios diretamente aqui no painel.
+
+Caso precise rodar a varredura manualmente agora, você pode:
+1. Acessar a VPS Oracle via SSH e executar o script:
+   \`python scripts/vps_agent_loop.py\`
+2. Rodar o servidor do projeto localmente (onde o terminal possui suporte total) e enviar este mesmo comando no chat.`;
+
+      return new Response(JSON.stringify({ reply }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "GEMINI_API_KEY não configurada." }), {
@@ -70,13 +103,12 @@ export default async (req: Request) => {
       reportsSummary = "Não foi possível carregar o histórico de relatórios.";
     }
 
-    const ai = new GoogleGenAI({
-      apiKey,
-      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-    });
-
     const prompt = `Você é o Agente IA DevOps e de Qualidade de Software do Consultório Odontológico do Dr. Agnaldo Ferreira.
 O Dr. Agnaldo está conversando com você pela Central IA do sistema.
+
+URL Oficial do Sistema: https://sistema-aistudio.vercel.app
+URL Alternativa: https://dragnaldoferreira.netlify.app
+
 Seu papel é responder com palavras simples, claras e fáceis de entender ("palavras de leigo", sem jargões de programação excessivos) sobre o status do sistema, o que você andou analisando, corrigindo ou melhorando.
 
 Aqui está o histórico das suas atividades de auditoria recentes (Sentinel Reports) na VPS Oracle para seu contexto:
@@ -85,13 +117,7 @@ ${reportsSummary}
 Responda à mensagem abaixo de forma amigável, prestativa e muito clara (seja conciso e direto):
 Mensagem do Dr. Agnaldo: "${message}"`;
 
-    const geminiResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: { temperature: 0.7 }
-    });
-
-    const reply = geminiResponse.text || "Desculpe, Dr. Agnaldo. Não consegui processar a resposta agora.";
+    const reply = await callLLM(prompt);
 
     return new Response(JSON.stringify({ reply }), {
       status: 200,
@@ -110,3 +136,86 @@ Mensagem do Dr. Agnaldo: "${message}"`;
     });
   }
 };
+
+// Helper para chamar a LLM (NVIDIA, OpenRouter ou Gemini)
+async function callLLM(prompt: string, jsonMode: boolean = false): Promise<string> {
+  const nvidiaKey = process.env.NVIDIA_API_KEY;
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const modelName = process.env.LLM_MODEL || "minimaxai/minimax-m3";
+
+  if (nvidiaKey) {
+    console.log(`[LLM API] Chamando NVIDIA com o modelo ${modelName}...`);
+    try {
+      const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${nvidiaKey}`
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [{ role: "user", content: prompt }],
+          response_format: jsonMode ? { type: "json_object" } : undefined
+        })
+      });
+      if (response.ok) {
+        const data: any = await response.json();
+        return data.choices?.[0]?.message?.content || "";
+      }
+      console.error(`[LLM API] Erro NVIDIA: ${response.status} ${response.statusText}`);
+    } catch (err) {
+      console.error("[LLM API] Erro ao chamar NVIDIA:", err);
+    }
+  }
+
+  if (openrouterKey) {
+    console.log(`[LLM API] Chamando OpenRouter com o modelo ${modelName}...`);
+    try {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${openrouterKey}`,
+          "HTTP-Referer": "https://github.com/Agnaldojjr/sistema-aistudio",
+          "X-Title": "Hermes Chat Agent"
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [{ role: "user", content: prompt }],
+          response_format: jsonMode ? { type: "json_object" } : undefined
+        })
+      });
+      if (response.ok) {
+        const data: any = await response.json();
+        return data.choices?.[0]?.message?.content || "";
+      }
+      console.error(`[LLM API] Erro OpenRouter: ${response.status} ${response.statusText}`);
+    } catch (err) {
+      console.error("[LLM API] Erro ao chamar OpenRouter:", err);
+    }
+  }
+
+  if (geminiKey) {
+    console.log("[LLM API] Chamando Gemini (gemini-2.5-flash)...");
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: jsonMode ? { responseMimeType: "application/json" } : undefined
+        })
+      });
+      if (response.ok) {
+        const data: any = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      }
+      console.error(`[LLM API] Erro Gemini: ${response.status} ${response.statusText}`);
+    } catch (err) {
+      console.error("[LLM API] Erro ao chamar Gemini:", err);
+    }
+  }
+
+  throw new Error("Nenhuma chave de API de LLM configurada (NVIDIA_API_KEY, OPENROUTER_API_KEY ou GEMINI_API_KEY).");
+}

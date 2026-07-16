@@ -36,40 +36,83 @@ def check_server_up():
         time.sleep(2)
     return False
 
-def call_gemini_api(prompt):
-    """Chama a API do Gemini via REST puro para evitar dependência de pacotes"""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        log("ERRO: Variável de ambiente GEMINI_API_KEY ausente.")
-        return None
-        
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-    headers = {"Content-Type": "application/json"}
+def call_llm_api(prompt):
+    """Chama o LLM configurado (NVIDIA, OpenRouter ou Gemini) via REST puro"""
+    nvidia_key = os.environ.get("NVIDIA_API_KEY")
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+    gemini_key = os.environ.get("GEMINI_API_KEY")
     
-    payload = {
-        "contents": [{
-            "parts": [{
-                "text": prompt
-            }]
-        }],
-        "generationConfig": {
-            "responseMimeType": "application/json"
+    # Modelo padrão solicitado pelo usuário
+    model_name = os.environ.get("LLM_MODEL") or "minimaxai/minimax-m3"
+
+    if nvidia_key:
+        log(f"Usando API da NVIDIA com o modelo {model_name}...")
+        url = "https://integrate.api.nvidia.com/v1/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {nvidia_key}"
         }
-    }
-    
+        payload = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"}
+        }
+        return _call_openai_compatible_api(url, headers, payload)
+        
+    elif openrouter_key:
+        log(f"Usando API do OpenRouter com o modelo {model_name}...")
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {openrouter_key}",
+            "HTTP-Referer": "https://github.com/Agnaldojjr/sistema-aistudio",
+            "X-Title": "Hermes Sentinel Agent"
+        }
+        payload = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"}
+        }
+        return _call_openai_compatible_api(url, headers, payload)
+        
+    elif gemini_key:
+        log("Usando API do Gemini (gemini-2.5-flash)...")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"}
+        }
+        try:
+            req = urllib.request.Request(
+                url, 
+                data=json.dumps(payload).encode("utf-8"), 
+                headers=headers, 
+                method="POST"
+            )
+            with urllib.request.urlopen(req) as res:
+                res_data = json.loads(res.read().decode("utf-8"))
+                return res_data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as e:
+            log(f"Falha ao chamar API do Gemini: {e}")
+            return None
+    else:
+        log("ERRO: Nenhuma chave de API de LLM configurada (NVIDIA_API_KEY, OPENROUTER_API_KEY ou GEMINI_API_KEY).")
+        return None
+
+def _call_openai_compatible_api(url, headers, payload):
     try:
         req = urllib.request.Request(
-            url, 
-            data=json.dumps(payload).encode("utf-8"), 
-            headers=headers, 
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
             method="POST"
         )
         with urllib.request.urlopen(req) as res:
             res_data = json.loads(res.read().decode("utf-8"))
-            text_response = res_data["candidates"][0]["content"]["parts"][0]["text"]
-            return text_response
+            return res_data["choices"][0]["message"]["content"]
     except Exception as e:
-        log(f"Falha ao chamar API do Gemini: {e}")
+        log(f"Falha ao chamar API compatível com OpenAI ({url}): {e}")
         return None
 
 def open_github_pull_request(branch_name, title, body):
@@ -318,14 +361,14 @@ Você DEVE responder rigorosamente no formato JSON com esta estrutura:
   "filePatch": "Código completo corrigido do arquivo, sem omissões"
 }}"""
         
-        log("Consultando o Gemini AI para diagnóstico e patch de correção...")
-        gemini_res = call_gemini_api(prompt)
-        if not gemini_res:
+        log("Consultando o LLM configurado para diagnóstico e patch de correção...")
+        llm_res = call_llm_api(prompt)
+        if not llm_res:
             log("Não foi possível obter resposta de correção da IA.")
             sys.exit(1)
             
         try:
-            parsed = json.loads(gemini_res)
+            parsed = json.loads(llm_res)
             explanation = parsed.get("explanation", "")
             proposed_fix = parsed.get("filePatch", "")
             
