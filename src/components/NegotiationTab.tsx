@@ -2505,21 +2505,21 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       </div>
 
       {/* ================= AI SALES SCRIPT GENERATOR ================= */}
-      <div className="mt-8 bg-purple-50 border border-purple-200 rounded-2xl p-5 sm:p-6 shadow-sm max-w-4xl mx-auto print:hidden space-y-4">
-        <div className="flex items-center gap-3 border-b border-purple-200/50 pb-3">
-          <div className="p-2 bg-purple-100 text-purple-700 rounded-lg">
+      <div className="mt-8 bg-teal-50 border border-teal-200 rounded-2xl p-5 sm:p-6 shadow-sm max-w-4xl mx-auto print:hidden space-y-4">
+        <div className="flex items-center gap-3 border-b border-teal-200/50 pb-3">
+          <div className="p-2 bg-teal-100 text-teal-700 rounded-lg">
             <Zap className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-bold text-purple-900 text-sm">Gerar Argumentação de Venda (IA)</h4>
-            <p className="text-[11px] text-purple-700 mt-0.5">Crie um script personalizado para enviar junto ao orçamento no WhatsApp.</p>
+            <h4 className="font-bold text-teal-900 text-sm">Gerar Argumentação de Venda (IA)</h4>
+            <p className="text-[11px] text-teal-700 mt-0.5">Crie um script personalizado para enviar junto ao orçamento no WhatsApp.</p>
           </div>
         </div>
 
         <button
           onClick={handleGenerateSalesScriptWithAI}
           disabled={isGeneratingScript}
-          className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl transition-colors flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer"
+          className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl transition-colors flex justify-center items-center gap-2 disabled:opacity-50 cursor-pointer"
         >
           {isGeneratingScript ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
           Gerar Argumentação
@@ -2527,11 +2527,11 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
         {aiSalesScript && (
           <div className="space-y-3 pt-3 animate-fade-in">
-            <label className="text-xs font-bold text-purple-900">Script Gerado:</label>
+            <label className="text-xs font-bold text-teal-900">Script Gerado:</label>
             <textarea
               value={aiSalesScript}
               onChange={(e) => setAiSalesScript(e.target.value)}
-              className="w-full p-3 rounded-xl border border-purple-200 focus:border-purple-500 focus:ring focus:ring-purple-500/20 text-xs min-h-[120px] resize-y"
+              className="w-full p-3 rounded-xl border border-teal-200 focus:border-teal-500 focus:ring focus:ring-teal-500/20 text-xs min-h-[120px] resize-y"
             />
             <div className="flex justify-end">
               <button

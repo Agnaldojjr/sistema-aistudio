@@ -4450,8 +4450,8 @@ export default function DentalCRMView({
                               <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider">Assinatura Eletrônica do Paciente:</span>
                               <div className="bg-white border border-[#E6DEC9] p-3 rounded-lg flex flex-col items-center justify-center">
                                 <img 
+                                  alt="Assinatura Eletrônica"
                                   src={(groupedAnamnese[selectedAnamnesisDate] || []).find(a => a.signature)?.signature || ''} 
-                                  alt="Assinatura Eletrônica" 
                                   className="max-h-24 bg-white select-none pointer-events-none" 
                                 />
                                 <span className="text-[10px] text-zinc-500 mt-2 font-mono">
@@ -4535,7 +4535,7 @@ export default function DentalCRMView({
                               if (event.type === 'odontograma') { Icon = Plus; iconBg = 'bg-[#8B0000] text-white'; }
                               if (event.type === 'tratamento') { Icon = Activity; iconBg = 'bg-emerald-100 text-emerald-600'; }
                               if (event.type === 'anamnese') { Icon = FileText; iconBg = 'bg-amber-100 text-amber-600'; }
-                              if (event.type === 'galeria') { Icon = ImageIcon; iconBg = 'bg-purple-100 text-purple-600'; }
+                              if (event.type === 'galeria') { Icon = ImageIcon; iconBg = 'bg-teal-100 text-teal-600'; }
 
                               return (
                                 <div key={`tl-${index}`} className="relative">

@@ -164,6 +164,7 @@ export default function PhotoLightboxWithEditor({
           <img 
             ref={imageRef}
             src={activePhoto.url} 
+            alt={activePhoto.title || "Foto clínica do paciente"}
             className="max-w-full max-h-full object-contain transition-transform duration-75"
             crossOrigin="anonymous"
             style={{ 
@@ -198,6 +199,7 @@ export default function PhotoLightboxWithEditor({
             value={zoomLevel} 
             onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
             className="w-24 md:w-32 accent-[#C09553]"
+            aria-label="Controle de Zoom"
           />
           <span className="text-white/50 text-xs font-mono">+</span>
         </div>

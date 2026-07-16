@@ -858,7 +858,7 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                           type="button"
                           onClick={handleGenerateMessageWithAI}
                           disabled={isGeneratingMessage}
-                          className="w-full sm:w-auto px-6 py-2.5 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 cursor-pointer text-xs disabled:opacity-50"
+                          className="w-full sm:w-auto px-6 py-2.5 bg-teal-600 text-white font-bold rounded-xl hover:bg-teal-700 transition-colors flex items-center justify-center gap-2 cursor-pointer text-xs disabled:opacity-50"
                         >
                           {isGeneratingMessage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                           Gerar Mensagem de Retorno com IA

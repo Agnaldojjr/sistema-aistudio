@@ -19,7 +19,7 @@ interface ProcedureManagerProps {
 // Beautiful clinical color choices for dental procedures
 const PRESET_COLORS = [
   '#22C55E', // Green
-  '#A855F7', // Purple
+  '#14B8A6', // Teal
   '#EC4899', // Pink
   '#3B82F6', // Blue
   '#F97316', // Orange

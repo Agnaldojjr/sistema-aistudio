@@ -70,7 +70,7 @@ export default function PhotoEditor({
   const [inlineProcName, setInlineProcName] = useState('');
   const [inlineProcPrice, setInlineProcPrice] = useState<number | string>('');
 
-  const INLINE_COLORS = ['#22C55E', '#A855F7', '#EC4899', '#3B82F6', '#F97316', '#EAB308', '#06B6D4', '#EF4444'];
+  const INLINE_COLORS = ['#22C55E', '#14B8A6', '#EC4899', '#3B82F6', '#F97316', '#EAB308', '#06B6D4', '#EF4444'];
 
   const handleInlineAddProcedure = () => {
     if (!inlineProcName.trim() || !onAddProcedure) return;

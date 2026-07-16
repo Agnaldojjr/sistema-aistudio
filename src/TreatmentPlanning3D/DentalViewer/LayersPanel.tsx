@@ -67,6 +67,7 @@ export function LayersPanel() {
                     value={config.opacity}
                     onChange={(e) => setLayerOpacity(layer.key, parseFloat(e.target.value))}
                     className="flex-1 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-brand-gold"
+                    aria-label={`Opacidade da camada ${layer.label}`}
                   />
                   <span className="text-[10px] text-slate-400 font-mono w-8 text-right">
                     {Math.round(config.opacity * 100)}%

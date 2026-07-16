@@ -237,7 +237,7 @@ export default function PatientGallery({
                 <div className="flex-1 bg-zinc-800 aspect-square md:aspect-[4/3] rounded overflow-hidden relative group">
                   {compareLeft ? (
                     <>
-                      <img src={compareLeft.url} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                      <img src={compareLeft.url} alt="Foto Antes" className="w-full h-full object-cover" crossOrigin="anonymous" />
                       <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-[10px] font-bold text-white">ANTES</div>
                       <button onClick={() => setCompareLeft(null)} className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
                         <X className="w-3 h-3" />
@@ -250,7 +250,7 @@ export default function PatientGallery({
                 <div className="flex-1 bg-zinc-800 aspect-square md:aspect-[4/3] rounded overflow-hidden relative group">
                   {compareRight ? (
                     <>
-                      <img src={compareRight.url} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                      <img src={compareRight.url} alt="Foto Depois" className="w-full h-full object-cover" crossOrigin="anonymous" />
                       <div className="absolute top-2 right-2 bg-black/60 px-2 py-1 rounded text-[10px] font-bold text-white">DEPOIS</div>
                       <button onClick={() => setCompareRight(null)} className="absolute top-2 right-2 mt-8 p-1.5 bg-black/50 hover:bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
                         <X className="w-3 h-3" />
