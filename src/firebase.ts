@@ -35,6 +35,10 @@ export const initAuth = (
       if (session.provider_token) {
         cachedAccessToken = session.provider_token;
         localStorage.setItem('provider_token', session.provider_token);
+        localStorage.setItem('provider_token_saved_at', Date.now().toString());
+      }
+      if (session.provider_refresh_token) {
+        localStorage.setItem('provider_refresh_token', session.provider_refresh_token);
       }
       if (onAuthSuccess) onAuthSuccess(session.user, cachedAccessToken || '');
     } else {
@@ -48,11 +52,17 @@ export const initAuth = (
         if (session.provider_token) {
           cachedAccessToken = session.provider_token;
           localStorage.setItem('provider_token', session.provider_token);
+          localStorage.setItem('provider_token_saved_at', Date.now().toString());
+        }
+        if (session.provider_refresh_token) {
+          localStorage.setItem('provider_refresh_token', session.provider_refresh_token);
         }
         if (onAuthSuccess) onAuthSuccess(session.user, cachedAccessToken || '');
       } else {
         cachedAccessToken = null;
         localStorage.removeItem('provider_token');
+        localStorage.removeItem('provider_token_saved_at');
+        localStorage.removeItem('provider_refresh_token');
         if (onAuthFailure) onAuthFailure();
       }
     }
@@ -85,13 +95,55 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
-  return cachedAccessToken;
+  const token = localStorage.getItem('provider_token');
+  const refreshToken = localStorage.getItem('provider_refresh_token');
+  const savedAtStr = localStorage.getItem('provider_token_saved_at');
+
+  if (!token) return null;
+
+  if (refreshToken && savedAtStr) {
+    const savedAt = parseInt(savedAtStr, 10);
+    const isExpired = Date.now() - savedAt > 50 * 60 * 1000; // 50 minutos (token do Google dura 60 minutos)
+
+    if (isExpired) {
+      console.log('Google Access Token expirado ou prestes a expirar. Tentando renovar...');
+      try {
+        const response = await fetch('/api/auth/google/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.access_token) {
+            cachedAccessToken = data.access_token;
+            localStorage.setItem('provider_token', data.access_token);
+            localStorage.setItem('provider_token_saved_at', Date.now().toString());
+            if (data.refresh_token) {
+              localStorage.setItem('provider_refresh_token', data.refresh_token);
+            }
+            console.log('Google Access Token renovado com sucesso!');
+            return data.access_token;
+          }
+        } else {
+          console.warn('Erro ao renovar token com o backend:', await response.text());
+        }
+      } catch (err) {
+        console.error('Falha na requisição de refresh do token:', err);
+      }
+    }
+  }
+
+  return token || cachedAccessToken;
 };
 
 export const logout = async () => {
   await supabase.auth.signOut();
   cachedAccessToken = null;
   localStorage.removeItem('provider_token');
+  localStorage.removeItem('provider_token_saved_at');
+  localStorage.removeItem('provider_refresh_token');
   localStorage.removeItem('bypass_auth');
 };
 

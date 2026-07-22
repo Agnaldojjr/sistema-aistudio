@@ -560,6 +560,7 @@ export default function App() {
     setSections(INITIAL_SECTIONS);
     setProposal({ ...INITIAL_PROPOSAL, patientName });
     setCurrentFileId('NEW_FILE');
+    setCrmPatientName(patientName);
     setCurrentAppView('crm');
     setActiveTab('registration');
     setShowPatientsModal(false);
@@ -574,7 +575,12 @@ export default function App() {
       });
       setSections(merged);
     }
-    if (data.proposal) setProposal(data.proposal);
+    if (data.proposal) {
+      setProposal(data.proposal);
+      if (data.proposal.patientName) {
+        setCrmPatientName(data.proposal.patientName);
+      }
+    }
     if (data.__fileId) setCurrentFileId(data.__fileId);
     if (data.selectedPlanIndex !== undefined) {
       localStorage.setItem('ag_neg_selected_plan', data.selectedPlanIndex.toString());
@@ -736,6 +742,7 @@ export default function App() {
               onNavigateToPlanning={(patientName, status) => {
                 if (patientName) {
                   setProposal((prev) => ({ ...prev, patientName, status: (status || 'Em Andamento') as any }));
+                  setCrmPatientName(patientName);
                 }
                 setCurrentAppView('crm');
               }}

@@ -312,6 +312,53 @@ async function startServer() {
   setupReminderScheduler();
 
   // ==========================================
+  // GOOGLE OAUTH TOKEN REFRESH
+  // ==========================================
+  app.post("/api/auth/google/refresh", async (req, res) => {
+    try {
+      const { refresh_token } = req.body;
+      if (!refresh_token) {
+        return res.status(400).json({ error: "Refresh token é obrigatório." });
+      }
+
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+      if (!clientId || !clientSecret) {
+        console.error("[Google OAuth] GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET não configurados no servidor.");
+        return res.status(500).json({ error: "Configuração de OAuth do Google ausente no servidor." });
+      }
+
+      const response = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          grant_type: "refresh_token",
+          refresh_token: refresh_token,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("[Google OAuth] Erro ao renovar token com o Google:", errText);
+        return res.status(response.status).json({ error: "Erro ao renovar o token com o Google." });
+      }
+
+      const data = await response.json() as any;
+      res.json({
+        access_token: data.access_token,
+        expires_in: data.expires_in,
+        refresh_token: data.refresh_token || refresh_token
+      });
+    } catch (err: any) {
+      console.error("[Google OAuth] Erro interno na rota de refresh:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ==========================================
   // WHATSAPP WEBHOOK (META)
   // ==========================================
   app.get("/api/webhook", (req, res) => {

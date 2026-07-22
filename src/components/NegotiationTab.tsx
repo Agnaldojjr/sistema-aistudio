@@ -1209,22 +1209,52 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
       // Integracao com o financeiro
       if (proposal.status === 'Aprovado (paciente pagou)') {
+        const fileKey = currentFileId || 'orcamento_salvo.json';
+        const budgetPayId = 'pay-budget-' + fileKey.replace(/[^a-zA-Z0-9-]/g, '_');
+        const amount = simulations[selectedPlanIndex]?.custoTotal || 0;
+        const description = `Orçamento: ${fileKey.split('/').pop()?.replace('.json', '').replace('orcamento_salvo', 'Orçamento').replace(/_/g, ' ') || 'Orçamento'} - Aprovado e Pago`;
+
+        // 1. Add to patient's individual pagamentosList if not already present
+        const hasLocal = pagamentosList.some((p: any) => p.id === budgetPayId);
+        let updatedLocalList = [...pagamentosList];
+        if (!hasLocal) {
+          const newLocalPayment = {
+            id: budgetPayId,
+            patientId: selectedPatient?.id || 'unknown',
+            date: new Date().toISOString().split('T')[0],
+            method: proposal.paymentMethod || 'PIX',
+            description: description,
+            value: amount
+          };
+          updatedLocalList.push(newLocalPayment);
+          setPagamentosList(updatedLocalList);
+        }
+
+        // 2. Add to global agnaldo_dent_financeiro in LocalStorage
         const storedFin = localStorage.getItem('agnaldo_dent_financeiro');
         const payments = storedFin ? JSON.parse(storedFin) : [];
-        const newPayment = {
-          id: Date.now().toString(),
-          patientName: patientName,
-          date: new Date().toISOString(),
-          amount: simulations[selectedPlanIndex]?.custoTotal || 0,
-          paymentMethod: proposal.paymentMethod || 'PIX',
-          status: 'Pago'
-        };
-        const existing = payments.find((p: any) => p.patientName === patientName && p.amount === newPayment.amount && new Date(p.date).toDateString() === new Date().toDateString());
-        if (!existing) {
-          payments.push(newPayment);
+        const hasGlobal = payments.some((p: any) => p.id === budgetPayId);
+        if (!hasGlobal) {
+          const newGlobalPayment = {
+            id: budgetPayId,
+            patientId: selectedPatient?.id || 'unknown',
+            patientName: patientName,
+            date: new Date().toISOString(),
+            amount: amount,
+            paymentMethod: proposal.paymentMethod || 'PIX',
+            status: 'Pago',
+            description: description
+          };
+          payments.unshift(newGlobalPayment);
           localStorage.setItem('agnaldo_dent_financeiro', JSON.stringify(payments));
           window.dispatchEvent(new Event('local-storage'));
+          window.dispatchEvent(new Event('storage'));
         }
+
+        // Save patient sub-modules context to Supabase database CRM record
+        setTimeout(() => {
+          saveContextToSupabase();
+        }, 300);
       }
 
       setSaveSuccessMsg('Salvo no Supabase!');
