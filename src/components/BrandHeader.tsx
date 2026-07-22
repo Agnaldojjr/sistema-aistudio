@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Sparkles, Calendar, User, FileText, Trash2, Heart, Calendar as CalendarIcon, ClipboardEdit, LogOut, LayoutDashboard } from 'lucide-react';
+import { Sparkles, Calendar, User, FileText, Trash2, Heart, Calendar as CalendarIcon, ClipboardEdit, LogOut, LayoutDashboard, DollarSign } from 'lucide-react';
 import { TreatmentProposal, ClinicSettings } from '../types';
 
 interface BrandHeaderProps {
@@ -21,6 +21,7 @@ interface BrandHeaderProps {
   isMobileOptimized?: boolean;
   setIsMobileOptimized?: (val: boolean) => void;
   activeTab?: 'registration' | 'editor' | 'negotiation' | 'documents';
+  dailyScheduledRevenue?: number;
 }
 
 export default function BrandHeader({
@@ -36,7 +37,8 @@ export default function BrandHeader({
   clinicSettings,
   isMobileOptimized,
   setIsMobileOptimized,
-  activeTab
+  activeTab,
+  dailyScheduledRevenue
 }: BrandHeaderProps) {
   return (
     <header className="overflow-hidden bg-[#FAF8F5] border-b border-[#E6DEC9] shadow-sm print:hidden">
@@ -87,7 +89,13 @@ export default function BrandHeader({
              </button>
         </div>
 
-        <div className="flex items-center gap-4 text-xs font-mono text-[#EAE4D9]/80 hidden md:flex">
+        <div className="flex items-center gap-3 text-xs font-mono text-[#EAE4D9]/80 hidden md:flex">
+          {dailyScheduledRevenue !== undefined && (
+            <div className="flex items-center gap-1.5 bg-[#C09553]/25 text-[#FAF8F5] border border-[#C09553]/50 px-3 py-1 rounded-full font-bold shadow-2xs">
+              <DollarSign className="w-3.5 h-3.5 text-[#E1CDAC]" />
+              <span>Fat. Programado: R$ {dailyScheduledRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+          )}
           <span>{new Date().toLocaleDateString('pt-BR')}</span>
           <span className="hidden sm:inline">| {clinicSettings.doctorName}</span>
         </div>

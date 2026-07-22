@@ -115,12 +115,17 @@ export interface CRMAppointment {
   patientName: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
-  dentist: string;
-  specialty: string;
-  status: 'Agendado' | 'Confirmado' | 'Atendido' | 'Faltou' | 'Cancelado';
+  dentist?: string;
+  specialty?: string;
+  status: 'Agendado' | 'Confirmado' | 'Atendido' | 'Faltou' | 'Cancelado' | 'Pendente' | 'Reagendado' | 'Falta';
   room?: string;
   clinic?: string;
   observations?: string;
+  estimatedValue?: number;
+  linkedProcedureId?: string;
+  linkedProcedureName?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CRMClinicalHistory {
