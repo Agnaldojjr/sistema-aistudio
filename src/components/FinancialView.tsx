@@ -36,27 +36,51 @@ export default function FinancialView({ onOpenPatient }: FinancialViewProps) {
     return new Date();
   };
 
+  const deduplicatedPayments = useMemo(() => {
+    const map = new Map<string, PaymentRecord>();
+    payments.forEach(p => {
+      const procId = p.procedureId && p.procedureId !== 'custom' ? p.procedureId : null;
+      const apptId = p.appointmentId && p.appointmentId !== 'custom' ? p.appointmentId : null;
+      
+      const rawDate = (p.date || '').trim();
+      const datePart = rawDate ? (rawDate.includes('T') ? rawDate.split('T')[0] : rawDate.split(',')[0].trim()) : '';
+      const namePart = (p.patientName || p.patientId || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      const descPart = (p.description || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      
+      const key = procId
+        ? `proc:${procId}`
+        : apptId
+        ? `appt:${apptId}`
+        : `${p.id || ''}_${namePart}_${descPart}_${p.amount}_${datePart}`;
+
+      if (!map.has(key) || p.status === 'Pago') {
+        map.set(key, p);
+      }
+    });
+    return Array.from(map.values());
+  }, [payments]);
+
   const totalRevenue = useMemo(() => {
-    return payments
+    return deduplicatedPayments
       .filter(p => p.status === 'Pago')
       .reduce((sum, p) => sum + p.amount, 0);
-  }, [payments]);
+  }, [deduplicatedPayments]);
 
   const closedBudgetsCount = useMemo(() => {
-    return payments.filter(p => p.status === 'Pago').length;
-  }, [payments]);
+    return deduplicatedPayments.filter(p => p.status === 'Pago').length;
+  }, [deduplicatedPayments]);
 
   const openBudgetsCount = useMemo(() => {
-    return payments.filter(p => p.status === 'Pendente').length;
-  }, [payments]);
+    return deduplicatedPayments.filter(p => p.status === 'Pendente').length;
+  }, [deduplicatedPayments]);
 
   const filteredPayments = useMemo(() => {
-    return payments.filter(p => {
+    return deduplicatedPayments.filter(p => {
       const matchSearch = p.patientName.toLowerCase().includes(searchTerm.toLowerCase());
       const matchMethod = filterMethod === 'Todos' || p.paymentMethod === filterMethod;
       return matchSearch && matchMethod;
     }).sort((a, b) => parseSafeDate(b.date).getTime() - parseSafeDate(a.date).getTime());
-  }, [payments, searchTerm, filterMethod]);
+  }, [deduplicatedPayments, searchTerm, filterMethod]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);

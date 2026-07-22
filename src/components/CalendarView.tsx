@@ -88,8 +88,10 @@ export default function CalendarView({ onNewPatient, initialPatientName, onClear
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('appointments-updated', handleRefresh);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('appointments-updated', handleRefresh);
     };
   }, []);
 

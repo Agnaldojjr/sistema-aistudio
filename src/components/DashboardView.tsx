@@ -64,13 +64,19 @@ interface Appointment {
   originalSummary: string;
   time: string;
   service: string;
-  status: 'Confirmado' | 'Pendente' | 'Cancelado' | 'Falta' | 'Reagendado' | 'Atendido';
+  status: 'Confirmado' | 'Pendente' | 'Cancelado' | 'Falta' | 'Faltou' | 'Agendado' | 'Reagendado' | 'Atendido' | 'Realizado' | 'Concluído' | string;
   phone: string;
   proposalTotal?: number;
   estimatedValue?: number;
   linkedProcedureId?: string;
   linkedProcedureName?: string;
 }
+
+export const parseCurrency = (v: any): number => {
+  if (typeof v === 'number') return isNaN(v) ? 0 : v;
+  if (!v) return 0;
+  return parseFloat(String(v).replace('R$', '').replace(/\./g, '').replace(',', '.')) || 0;
+};
 
 interface ReturnControl {
   id: string;
@@ -187,7 +193,7 @@ export default function DashboardView({
   const dailyScheduledRevenue = useMemo(() => {
     return appointments
       .filter(a => a.status !== 'Cancelado')
-      .reduce((sum, a) => sum + (a.estimatedValue || 0), 0);
+      .reduce((sum, a) => sum + parseCurrency(a.estimatedValue), 0);
   }, [appointments]);
 
   useEffect(() => {
@@ -451,6 +457,12 @@ export default function DashboardView({
 
   useEffect(() => {
     fetchAgenda();
+
+    const handleSync = () => fetchAgenda();
+    window.addEventListener('appointments-updated', handleSync);
+    return () => {
+      window.removeEventListener('appointments-updated', handleSync);
+    };
   }, [selectedAgendaDate]);
 
   // Helper to derive Active Treatment Status for row badges
@@ -580,21 +592,28 @@ export default function DashboardView({
     setIsProcessingPayment(true);
     try {
       const appt = paymentAppointment;
-      const paymentId = `pay_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const paymentId = appt.linkedProcedureId && appt.linkedProcedureId !== 'custom'
+        ? `pay-proc-${appt.linkedProcedureId}`
+        : `pay-appt-${appt.id}`;
       const pId = appt.patientId || `pat_${Date.now()}`;
 
+      const parsedAmount = parseCurrency(paymentAmount);
       const newPaymentRecord: PaymentRecord = {
         id: paymentId,
         patientId: pId,
         patientName: appt.patientName,
         date: paymentDate,
-        amount: Number(paymentAmount) || 0,
+        amount: parsedAmount,
+        value: parsedAmount,
         paymentMethod: paymentMethod,
+        method: paymentMethod,
         status: 'Pago',
-        description: paymentDescription
+        description: paymentDescription,
+        appointmentId: appt.id,
+        procedureId: appt.linkedProcedureId
       };
 
-      // 1) Save PaymentRecord in `agnaldo_dent_financeiro` local storage
+      // 1) Save PaymentRecord in `agnaldo_dent_financeiro` local storage with deduplication
       let localPayments: PaymentRecord[] = [];
       try {
         const storedStr = localStorage.getItem('agnaldo_dent_financeiro');
@@ -602,8 +621,14 @@ export default function DashboardView({
       } catch (e) {
         console.warn('Error reading local payments:', e);
       }
-      localPayments.push(newPaymentRecord);
+      const existingLocalIdx = localPayments.findIndex(p => p.id === paymentId || (appt.linkedProcedureId && p.procedureId === appt.linkedProcedureId) || (appt.id && p.appointmentId === appt.id));
+      if (existingLocalIdx >= 0) {
+        localPayments[existingLocalIdx] = { ...localPayments[existingLocalIdx], ...newPaymentRecord };
+      } else {
+        localPayments.push(newPaymentRecord);
+      }
       localStorage.setItem('agnaldo_dent_financeiro', JSON.stringify(localPayments));
+      window.dispatchEvent(new Event('local-storage'));
 
       // Load Supabase CRM Database
       const crmData = await getSupabaseCRMDatabase();
@@ -612,23 +637,38 @@ export default function DashboardView({
       if (!crmData.tratamentos) crmData.tratamentos = [];
       if (!crmData.appointments) crmData.appointments = [];
 
-      // 2) Save to Supabase crm_data.pagamentos
-      crmData.pagamentos.push(newPaymentRecord);
+      // 2) Save to Supabase crm_data.pagamentos with deduplication
+      const existingCrmIdx = crmData.pagamentos.findIndex((p: any) => p.id === paymentId || (appt.linkedProcedureId && p.procedureId === appt.linkedProcedureId) || (appt.id && p.appointmentId === appt.id));
+      if (existingCrmIdx >= 0) {
+        crmData.pagamentos[existingCrmIdx] = { ...crmData.pagamentos[existingCrmIdx], ...newPaymentRecord };
+      } else {
+        crmData.pagamentos.push(newPaymentRecord);
+      }
 
-      // 3) Update procedureInstances.paid = true with paymentMethod and paymentDate
+      // 3) Update procedureInstances.paid = true targeting linked procedure
       const patientOdonts = crmData.odontograma.filter((o: any) => o.patientId === pId);
       if (patientOdonts.length > 0) {
         const latestOdont = patientOdonts[patientOdonts.length - 1];
         if (latestOdont && latestOdont.sections) {
+          let targeted = false;
           latestOdont.sections.forEach((sec: any) => {
             sec.markers?.forEach((m: any) => {
               if (m.procedureInstances) {
                 m.procedureInstances.forEach((inst: any) => {
-                  if (!inst.paid) {
+                  if (appt.linkedProcedureId && appt.linkedProcedureId !== 'custom') {
+                    if (inst.id === appt.linkedProcedureId) {
+                      inst.paid = true;
+                      inst.paymentMethod = paymentMethod;
+                      inst.paymentDate = paymentDate;
+                      inst.status = 'Realizado';
+                      targeted = true;
+                    }
+                  } else if (!targeted && !inst.paid) {
                     inst.paid = true;
                     inst.paymentMethod = paymentMethod;
                     inst.paymentDate = paymentDate;
                     inst.status = 'Realizado';
+                    targeted = true;
                   }
                 });
               }
@@ -685,6 +725,7 @@ export default function DashboardView({
 
       // Local state update
       setAppointments(prev => prev.map(a => a.id === appt.id ? { ...a, status: 'Atendido' } : a));
+      window.dispatchEvent(new Event('appointments-updated'));
 
       setIsQuickPaymentOpen(false);
       setPaymentAppointment(null);
@@ -728,6 +769,7 @@ export default function DashboardView({
       }
       await saveSupabaseCRMDatabase(crmData);
       setCrmFullDb(crmData);
+      window.dispatchEvent(new Event('appointments-updated'));
     } catch (error) {
       console.error("Erro ao salvar status de comparecimento no Supabase:", error);
     }
@@ -745,7 +787,9 @@ export default function DashboardView({
     const nextStatusMap: Record<Appointment['status'], Appointment['status']> = {
       'Confirmado': 'Falta',
       'Falta': 'Pendente',
+      'Faltou': 'Pendente',
       'Pendente': 'Confirmado',
+      'Agendado': 'Confirmado',
       'Cancelado': 'Pendente',
       'Reagendado': 'Pendente',
       'Atendido': 'Confirmado'
@@ -769,7 +813,12 @@ export default function DashboardView({
         if (!id.startsWith('c-')) {
           await deleteCalendarEvent(id);
         }
+        const crmData = await getSupabaseCRMDatabase();
+        crmData.appointments = (crmData.appointments || []).filter((a: any) => a.id !== id);
+        await saveSupabaseCRMDatabase(crmData);
+        setCrmFullDb(crmData);
         setAppointments(prev => prev.filter(a => a.id !== id));
+        window.dispatchEvent(new Event('appointments-updated'));
       } catch (err) {
         console.error("Erro ao deletar agendamento:", err);
         alert("Falha ao apagar o agendamento. Verifique sua conexão ou se você tem permissão.");
@@ -832,6 +881,7 @@ export default function DashboardView({
 
       setIsChangePatientOpen(false);
       setAppointmentToChange(null);
+      window.dispatchEvent(new Event('appointments-updated'));
     } catch (err: any) {
       alert('Erro ao associar paciente: ' + err.message);
     }
@@ -1021,7 +1071,7 @@ export default function DashboardView({
           </div>
 
           {/* Status & Consultas Summary Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 pb-1">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 pb-1">
             <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-2 text-center">
               <span className="text-[9px] font-extrabold uppercase text-zinc-400 block">Total Consultas</span>
               <span className="text-sm font-bold text-zinc-800 font-mono">{appointments.length}</span>
@@ -1032,16 +1082,22 @@ export default function DashboardView({
                 {appointments.filter(a => a.status === 'Confirmado').length}
               </span>
             </div>
+            <div className="bg-blue-50/50 border border-blue-100/70 rounded-xl p-2 text-center">
+              <span className="text-[9px] font-extrabold uppercase text-blue-600 block">Atendidas</span>
+              <span className="text-sm font-bold text-blue-700 font-mono">
+                {appointments.filter(a => a.status === 'Atendido' || a.status === 'Realizado' || a.status === 'Concluído').length}
+              </span>
+            </div>
             <div className="bg-rose-50/50 border border-rose-100/70 rounded-xl p-2 text-center">
               <span className="text-[9px] font-extrabold uppercase text-rose-600 block">Faltas</span>
               <span className="text-sm font-bold text-rose-700 font-mono">
-                {appointments.filter(a => a.status === 'Falta').length}
+                {appointments.filter(a => a.status === 'Falta' || a.status === 'Faltou').length}
               </span>
             </div>
             <div className="bg-amber-50/50 border border-amber-100/70 rounded-xl p-2 text-center">
               <span className="text-[9px] font-extrabold uppercase text-amber-600 block">Pendentes</span>
               <span className="text-sm font-bold text-amber-700 font-mono">
-                {appointments.filter(a => a.status === 'Pendente').length}
+                {appointments.filter(a => a.status === 'Pendente' || a.status === 'Agendado' || a.status === 'Reagendado').length}
               </span>
             </div>
           </div>

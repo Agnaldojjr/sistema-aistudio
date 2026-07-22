@@ -170,7 +170,12 @@ export interface PaymentRecord {
   patientName: string;
   date: string;
   amount: number;
-  paymentMethod: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito';
-  status: 'Pago' | 'Pendente';
+  value?: number;
+  paymentMethod: string;
+  method?: string;
+  status: string;
   description?: string;
+  appointmentId?: string;
+  procedureId?: string;
+  budgetId?: string;
 }

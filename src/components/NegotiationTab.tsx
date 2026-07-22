@@ -1218,13 +1218,17 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         const hasLocal = pagamentosList.some((p: any) => p.id === budgetPayId);
         let updatedLocalList = [...pagamentosList];
         if (!hasLocal) {
+          const methodVal = proposal.paymentMethod || 'PIX';
           const newLocalPayment = {
             id: budgetPayId,
             patientId: selectedPatient?.id || 'unknown',
             date: new Date().toISOString().split('T')[0],
-            method: proposal.paymentMethod || 'PIX',
+            method: methodVal,
+            paymentMethod: methodVal,
             description: description,
-            value: amount
+            value: amount,
+            amount: amount,
+            status: 'Pago'
           };
           updatedLocalList.push(newLocalPayment);
           setPagamentosList(updatedLocalList);
@@ -1235,13 +1239,16 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         const payments = storedFin ? JSON.parse(storedFin) : [];
         const hasGlobal = payments.some((p: any) => p.id === budgetPayId);
         if (!hasGlobal) {
+          const methodVal = proposal.paymentMethod || 'PIX';
           const newGlobalPayment = {
             id: budgetPayId,
             patientId: selectedPatient?.id || 'unknown',
             patientName: patientName,
             date: new Date().toISOString(),
             amount: amount,
-            paymentMethod: proposal.paymentMethod || 'PIX',
+            value: amount,
+            paymentMethod: methodVal,
+            method: methodVal,
             status: 'Pago',
             description: description
           };

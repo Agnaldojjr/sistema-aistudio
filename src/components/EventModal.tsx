@@ -319,6 +319,7 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
       }
 
       await saveSupabaseCRMDatabase(crmData);
+      window.dispatchEvent(new Event('appointments-updated'));
 
       onSaved();
     } catch (err: any) {
@@ -334,6 +335,14 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
     try {
       setLoading(true);
       await deleteCalendarEvent(existingEvent.id);
+      try {
+        const crmData = await getSupabaseCRMDatabase();
+        crmData.appointments = (crmData.appointments || []).filter((a: any) => a.id !== existingEvent.id);
+        await saveSupabaseCRMDatabase(crmData);
+      } catch (err) {
+        console.error('Error deleting appointment from Supabase:', err);
+      }
+      window.dispatchEvent(new Event('appointments-updated'));
       if (onDeleted) onDeleted();
     } catch (err: any) {
       setError(err.message || 'Erro ao excluir');

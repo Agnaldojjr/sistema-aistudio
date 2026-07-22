@@ -162,7 +162,14 @@ export function PatientProvider({ children }: { children: ReactNode }) {
       setAvisosList((crmData.avisos || []).filter((a: any) => a.patientId === patientId));
       setDocumentosList((crmData.documentos || []).filter((d: any) => d.patientId === patientId));
       setGaleriaList((crmData.galeria || []).filter((g: any) => g.patientId === patientId));
-      setPagamentosList((crmData.pagamentos || []).filter((p: any) => p.patientId === patientId));
+      setPagamentosList((crmData.pagamentos || []).filter((p: any) => p.patientId === patientId).map((p: any) => ({
+        ...p,
+        amount: typeof p.amount === 'number' ? p.amount : Number(p.value) || 0,
+        value: typeof p.value === 'number' ? p.value : Number(p.amount) || 0,
+        paymentMethod: p.paymentMethod || p.method || 'Dinheiro',
+        method: p.method || p.paymentMethod || 'Dinheiro',
+        status: p.status || 'Pago'
+      })));
       setTratamentosList((crmData.tratamentos || []).filter((t: any) => t.patientId === patientId));
       setOdontogramaList((crmData.odontograma || []).filter((o: any) => o.patientId === patientId));
 
@@ -254,7 +261,14 @@ export function PatientProvider({ children }: { children: ReactNode }) {
       crmData.avisos = mergeLists(crmData.avisos, avisosList);
       crmData.documentos = mergeLists(crmData.documentos, documentosList);
       crmData.galeria = mergeLists(crmData.galeria, galeriaList);
-      crmData.pagamentos = mergeLists(crmData.pagamentos, pagamentosList);
+      crmData.pagamentos = mergeLists(crmData.pagamentos, pagamentosList.map((p: any) => ({
+        ...p,
+        amount: typeof p.amount === 'number' ? p.amount : Number(p.value) || 0,
+        value: typeof p.value === 'number' ? p.value : Number(p.amount) || 0,
+        paymentMethod: p.paymentMethod || p.method || 'Dinheiro',
+        method: p.method || p.paymentMethod || 'Dinheiro',
+        status: p.status || 'Pago'
+      })));
       
       // Upsert the current activeSections into odontogramaList
       const currentOdontogramaItem = {

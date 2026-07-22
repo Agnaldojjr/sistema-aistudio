@@ -365,9 +365,13 @@ export default function DentalCRMView({
       instances.forEach(inst => {
         const cleanStatus = (inst.status || '').toLowerCase().trim();
         const isDone = cleanStatus === 'executado' || cleanStatus === 'realizado';
-        const payId = `pay-${inst.instanceId}`;
+        const rawInstId = String(inst.instanceId || '');
+        const cleanProcId = rawInstId.replace(/^(pay-proc-|pay-|proc-)+/, '');
+        const payId = `pay-proc-${cleanProcId}`;
 
         if (isDone) {
+          const methodVal = data.proposal?.paymentMethod || 'PIX';
+          const priceVal = inst.price || 0;
           // Check local pagamentosList
           const hasLocal = localList.some(p => p.id === payId);
           if (!hasLocal) {
@@ -375,9 +379,12 @@ export default function DentalCRMView({
               id: payId,
               patientId: selectedPatient.id,
               date: inst.updatedAt || inst.date || new Date().toISOString().split('T')[0],
-              method: data.proposal?.paymentMethod || 'PIX',
+              method: methodVal,
+              paymentMethod: methodVal,
               description: `${inst.name} (${inst.toothNumber ? `Dente ${inst.toothNumber}` : 'Geral'}) - Executado`,
-              value: inst.price || 0
+              value: priceVal,
+              amount: priceVal,
+              status: 'Pago'
             });
             updatedLocal = true;
           }
@@ -390,8 +397,10 @@ export default function DentalCRMView({
               patientId: selectedPatient.id,
               patientName: selectedPatient.name,
               date: inst.date || new Date().toISOString(),
-              amount: inst.price || 0,
-              paymentMethod: data.proposal?.paymentMethod || 'PIX',
+              amount: priceVal,
+              value: priceVal,
+              paymentMethod: methodVal,
+              method: methodVal,
               status: 'Pago',
               description: `${inst.name} (${inst.toothNumber ? `Dente ${inst.toothNumber}` : 'Geral'}) - Executado`
             });
@@ -948,6 +957,19 @@ export default function DentalCRMView({
 
   // Synchronize the selected proposal ID when the patient's proposals list updates
   useEffect(() => {
+    const handleSync = () => {
+      loadPatientsFromFirestore();
+      if (selectedPatient) {
+        refreshPatientSubModules(selectedPatient.id);
+      }
+    };
+    window.addEventListener('appointments-updated', handleSync);
+    return () => {
+      window.removeEventListener('appointments-updated', handleSync);
+    };
+  }, [selectedPatient, refreshPatientSubModules]);
+
+  useEffect(() => {
     if (driveProposals.length > 0) {
       setSelectedProposalId(driveProposals[0].id);
     } else {
@@ -1123,7 +1145,11 @@ export default function DentalCRMView({
     }
 
     // Sync financial records (Patient local and global)
-    const payId = `pay-${instanceId}`;
+    const rawInstId = String(instanceId || '');
+    const cleanProcId = rawInstId.replace(/^(pay-proc-|pay-|proc-)+/, '');
+    const payId = `pay-proc-${cleanProcId}`;
+    const methodVal = proposalData.proposal?.paymentMethod || 'PIX';
+    const priceVal = targetInst.price || 0;
     if (newStatus === 'executado') {
       // 1. Add to local pagamentosList (for patient's individual financial tab)
       const hasLocal = pagamentosList.some(p => p.id === payId);
@@ -1132,9 +1158,12 @@ export default function DentalCRMView({
           id: payId,
           patientId: selectedPatient!.id,
           date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
-          method: proposalData.proposal?.paymentMethod || 'PIX',
+          method: methodVal,
+          paymentMethod: methodVal,
           description: `${targetInst.name} (${targetInst.toothNumber ? `Dente ${targetInst.toothNumber}` : 'Geral'}) - Executado`,
-          value: targetInst.price || 0
+          value: priceVal,
+          amount: priceVal,
+          status: 'Pago'
         };
         setPagamentosList([...pagamentosList, newLocalPayment]);
       }
@@ -1156,8 +1185,10 @@ export default function DentalCRMView({
           patientId: selectedPatient!.id,
           patientName: selectedPatient!.name,
           date: new Date().toISOString(),
-          amount: targetInst.price || 0,
-          paymentMethod: proposalData.proposal?.paymentMethod || 'PIX',
+          amount: priceVal,
+          value: priceVal,
+          paymentMethod: methodVal,
+          method: methodVal,
           status: 'Pago',
           description: `${targetInst.name} (${targetInst.toothNumber ? `Dente ${targetInst.toothNumber}` : 'Geral'}) - Executado`
         };
@@ -1959,6 +1990,7 @@ export default function DentalCRMView({
       setImportProgress(60);
       try {
         await saveSupabaseCRMDatabase(crmData);
+        window.dispatchEvent(new Event('appointments-updated'));
       } catch (err: any) {
         errors.push("Erro crítico: Falha ao salvar banco de dados do CRM no Supabase: " + err.message);
       }
@@ -2694,6 +2726,7 @@ export default function DentalCRMView({
 
     try {
       await saveSupabaseCRMDatabase(crmData);
+      window.dispatchEvent(new Event('appointments-updated'));
     } catch (err: any) {
       errors.push("Erro crítico: Falha ao salvar banco de dados do CRM no Supabase: " + err.message);
     }
@@ -2890,6 +2923,7 @@ export default function DentalCRMView({
       crmData.clinical_history = (crmData.clinical_history || []).filter((p: any) => p.patientId !== pId);
       crmData.communications = (crmData.communications || []).filter((p: any) => p.patientId !== pId);
       await saveSupabaseCRMDatabase(crmData);
+      window.dispatchEvent(new Event('appointments-updated'));
 
       setSelectedPatient(null);
       await loadPatientsFromFirestore();
@@ -4817,8 +4851,11 @@ export default function DentalCRMView({
                                               patientId: selectedPatient!.id,
                                               date: new Date().toISOString().split('T')[0],
                                               method: paymentMethodSelected,
+                                              paymentMethod: paymentMethodSelected,
                                               description: description,
-                                              value: totalAmount
+                                              value: totalAmount,
+                                              amount: totalAmount,
+                                              status: 'Pago'
                                             };
                                             updatedLocalList.push(newLocalPayment);
                                             setPagamentosList(updatedLocalList);
