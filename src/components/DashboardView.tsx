@@ -887,6 +887,22 @@ export default function DashboardView({
     }
   };
 
+  const handleRestoreData = async () => {
+    try {
+      if (window.confirm('Atenção: Isso irá sobreescrever os dados no Supabase com os 113 pacientes do backup! Deseja continuar?')) {
+        setLoadingRealData(true);
+        const data = await import('../data/bluedental_backup_parsed.json');
+        await saveSupabaseCRMDatabase(data.default || data);
+        alert('Backup restaurado com sucesso para o Supabase! Recarregue a página.');
+        window.location.reload();
+      }
+    } catch (err: any) {
+      alert('Erro ao restaurar backup: ' + err.message);
+      console.error(err);
+      setLoadingRealData(false);
+    }
+  };
+
   const filteredPatientsForChange = useMemo(() => {
     if (!patientSearchQuery.trim()) return realPatients;
     const q = patientSearchQuery.toLowerCase();
@@ -899,6 +915,17 @@ export default function DashboardView({
   return (
     <div className="space-y-8 font-sans print:hidden">
       
+      {/* ================= BOTÃO DE EMERGÊNCIA (RESTAURAR BACKUP) ================= */}
+      <div className="bg-red-900 text-white p-4 rounded-xl shadow flex justify-between items-center">
+        <div>
+          <h3 className="font-bold text-lg">⚠️ Restauração de Emergência</h3>
+          <p className="text-sm opacity-90">Clique aqui para enviar os 113 pacientes do backup para o Supabase e corrigir a perda de dados.</p>
+        </div>
+        <button onClick={handleRestoreData} className="px-4 py-2 bg-white text-red-900 font-bold rounded hover:bg-gray-100">
+          RESTAURAR 113 PACIENTES
+        </button>
+      </div>
+
       {/* ================= HERO GREETING BLOCK ================= */}
       <div className="relative bg-gradient-to-r from-[#8B0000] to-[#5C0000] border border-[#C09553]/40 rounded-3xl p-6 sm:p-8 text-[#FAF8F5] shadow-xl">
         <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
