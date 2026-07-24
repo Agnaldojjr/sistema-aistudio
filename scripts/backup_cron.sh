@@ -16,7 +16,7 @@ if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
     exit 1
 fi
 
-BACKUP_DIR="$(pwd)/backups"
+BACKUP_DIR="$HOME/.crm-backups"
 mkdir -p "$BACKUP_DIR"
 
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
