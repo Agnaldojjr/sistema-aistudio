@@ -887,36 +887,7 @@ export default function DashboardView({
     }
   };
 
-  const handleRestoreData = async () => {
-    try {
-      if (window.confirm('Atenção: Isso irá mesclar os dados atuais do Supabase com os 113 pacientes do backup (totalizando 124)! Deseja continuar?')) {
-        setLoadingRealData(true);
-        const backupModule = await import('../data/bluedental_backup_parsed.json');
-        const backupData = backupModule.default || backupModule;
-        
-        // Obter os dados atuais do Supabase (os 11 que sobraram)
-        const currentData = await getSupabaseCRMDatabase();
-        
-        // Mesclar pacientes (evitando duplicidade por ID ou nome)
-        const existingIds = new Set((currentData.patients || []).map((p: any) => p.id || p.name));
-        const backupPatients = backupData.patients || [];
-        const patientsToAdd = backupPatients.filter((p: any) => !existingIds.has(p.id || p.name));
-        
-        const mergedData = {
-          ...currentData,
-          patients: [...(currentData.patients || []), ...patientsToAdd]
-        };
-        
-        await saveSupabaseCRMDatabase(mergedData);
-        alert(`Sucesso! Os dados foram mesclados. Agora temos ${mergedData.patients.length} pacientes salvos no Supabase. Recarregue a página.`);
-        window.location.reload();
-      }
-    } catch (err: any) {
-      alert('Erro ao restaurar backup: ' + err.message);
-      console.error(err);
-      setLoadingRealData(false);
-    }
-  };
+
 
   const filteredPatientsForChange = useMemo(() => {
     if (!patientSearchQuery.trim()) return realPatients;
@@ -930,17 +901,6 @@ export default function DashboardView({
   return (
     <div className="space-y-8 font-sans print:hidden">
       
-      {/* ================= BOTÃO DE EMERGÊNCIA (RESTAURAR BACKUP) ================= */}
-      <div className="bg-red-900 text-white p-4 rounded-xl shadow flex justify-between items-center">
-        <div>
-          <h3 className="font-bold text-lg">⚠️ Restauração de Emergência</h3>
-          <p className="text-sm opacity-90">Clique aqui para enviar os 113 pacientes do backup para o Supabase e corrigir a perda de dados.</p>
-        </div>
-        <button onClick={handleRestoreData} className="px-4 py-2 bg-white text-red-900 font-bold rounded hover:bg-gray-100">
-          RESTAURAR 113 PACIENTES
-        </button>
-      </div>
-
       {/* ================= HERO GREETING BLOCK ================= */}
       <div className="relative bg-gradient-to-r from-[#8B0000] to-[#5C0000] border border-[#C09553]/40 rounded-3xl p-6 sm:p-8 text-[#FAF8F5] shadow-xl">
         <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
