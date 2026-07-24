@@ -889,11 +889,26 @@ export default function DashboardView({
 
   const handleRestoreData = async () => {
     try {
-      if (window.confirm('Atenção: Isso irá sobreescrever os dados no Supabase com os 113 pacientes do backup! Deseja continuar?')) {
+      if (window.confirm('Atenção: Isso irá mesclar os dados atuais do Supabase com os 113 pacientes do backup (totalizando 124)! Deseja continuar?')) {
         setLoadingRealData(true);
-        const data = await import('../data/bluedental_backup_parsed.json');
-        await saveSupabaseCRMDatabase(data.default || data);
-        alert('Backup restaurado com sucesso para o Supabase! Recarregue a página.');
+        const backupModule = await import('../data/bluedental_backup_parsed.json');
+        const backupData = backupModule.default || backupModule;
+        
+        // Obter os dados atuais do Supabase (os 11 que sobraram)
+        const currentData = await getSupabaseCRMDatabase();
+        
+        // Mesclar pacientes (evitando duplicidade por ID ou nome)
+        const existingIds = new Set((currentData.patients || []).map((p: any) => p.id || p.name));
+        const backupPatients = backupData.patients || [];
+        const patientsToAdd = backupPatients.filter((p: any) => !existingIds.has(p.id || p.name));
+        
+        const mergedData = {
+          ...currentData,
+          patients: [...(currentData.patients || []), ...patientsToAdd]
+        };
+        
+        await saveSupabaseCRMDatabase(mergedData);
+        alert(`Sucesso! Os dados foram mesclados. Agora temos ${mergedData.patients.length} pacientes salvos no Supabase. Recarregue a página.`);
         window.location.reload();
       }
     } catch (err: any) {
