@@ -1043,12 +1043,34 @@ export default function DashboardView({
                 >
                   <ChevronLeft className="w-4 h-4 text-zinc-500 hover:text-[#8B0000]" />
                 </button>
-                <button 
-                  onClick={() => setSelectedAgendaDate(new Date())}
-                  className="px-2.5 py-1 text-[10px] font-bold uppercase hover:bg-white text-zinc-600 rounded-lg transition-colors cursor-pointer"
-                >
-                  Hoje
-                </button>
+                <div className="relative flex items-center justify-center">
+                  <button 
+                    onClick={(e) => {
+                      const input = e.currentTarget.nextElementSibling as HTMLInputElement;
+                      if (input && input.showPicker) {
+                        try {
+                          input.showPicker();
+                        } catch (err) {
+                          // ignore fallback
+                        }
+                      }
+                    }}
+                    className="px-2.5 py-1 text-[10px] font-bold uppercase hover:bg-white text-zinc-600 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    {isToday(selectedAgendaDate) ? 'Hoje' : format(selectedAgendaDate, 'dd/MM/yyyy')}
+                  </button>
+                  <input
+                    type="date"
+                    className="absolute opacity-0 w-0 h-0 pointer-events-none"
+                    value={format(selectedAgendaDate, 'yyyy-MM-dd')}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const [year, month, day] = e.target.value.split('-').map(Number);
+                        setSelectedAgendaDate(new Date(year, month - 1, day));
+                      }
+                    }}
+                  />
+                </div>
                 <button 
                   onClick={() => setSelectedAgendaDate(addDays(selectedAgendaDate, 1))}
                   className="p-1 hover:bg-white rounded-lg transition-colors cursor-pointer"
