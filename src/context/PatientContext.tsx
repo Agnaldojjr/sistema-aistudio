@@ -290,8 +290,12 @@ export function PatientProvider({ children }: { children: ReactNode }) {
     const globalChannel = new BroadcastChannel('dental_crm_sync_global');
 
     const pushProposal = () => {
-      channel.postMessage({ type: 'PROPOSAL_UPDATE', payload: activeProposal });
-      globalChannel.postMessage({ type: 'PROPOSAL_UPDATE', payload: activeProposal });
+      const enrichedProposal = { 
+        ...activeProposal, 
+        patientName: activeProposal?.patientName || selectedPatient?.name || '' 
+      };
+      channel.postMessage({ type: 'PROPOSAL_UPDATE', payload: enrichedProposal });
+      globalChannel.postMessage({ type: 'PROPOSAL_UPDATE', payload: enrichedProposal });
     };
 
     pushProposal();
@@ -304,7 +308,11 @@ export function PatientProvider({ children }: { children: ReactNode }) {
     };
 
     try {
-      const serialized = JSON.stringify(activeProposal);
+      const enrichedProposal = { 
+        ...activeProposal, 
+        patientName: activeProposal?.patientName || selectedPatient?.name || '' 
+      };
+      const serialized = JSON.stringify(enrichedProposal);
       localStorage.setItem(`agnaldo_dent_proposal_${selectedPatient.id}`, serialized);
       localStorage.setItem('agnaldo_dent_proposal', serialized);
     } catch (e) {
