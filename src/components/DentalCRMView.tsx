@@ -55,7 +55,8 @@ import {
   uploadPatientFileToSupabase,
   deletePatientFileFromSupabase,
   renamePatientFileInSupabase,
-  getPatientFileUrlFromSupabase
+  getPatientFileUrlFromSupabase,
+  downloadFileAsDataUrlFromSupabase
 } from '../lib/supabaseStorage';
 import { compressFileToDataUrl } from '../lib/imageUtils';
 import ImageMarkupEditor from './ImageMarkupEditor';
@@ -269,6 +270,30 @@ export default function DentalCRMView({
   const [showAvulsoModal, setShowAvulsoModal] = useState(false);
   const [avulsoProcName, setAvulsoProcName] = useState('');
   const [avulsoProcPrice, setAvulsoProcPrice] = useState<number | string>('');
+
+  // Batch Photos State
+  const [showBatchPhotoModal, setShowBatchPhotoModal] = useState(false);
+  const [batchGalleryPhotos, setBatchGalleryPhotos] = useState<any[]>([]);
+  const [selectedBatchPhotos, setSelectedBatchPhotos] = useState<string[]>([]);
+  const [loadingBatchGallery, setLoadingBatchGallery] = useState(false);
+  const [processingBatchSelection, setProcessingBatchSelection] = useState(false);
+
+  const handleOpenBatchPhotos = async () => {
+    setShowBatchPhotoModal(true);
+    if (selectedPatient) {
+      setLoadingBatchGallery(true);
+      try {
+        const patientPath = driveFolderId || selectedPatient.name;
+        const files = await listPatientFilesFromSupabase(patientPath);
+        const photos = files.filter((f: any) => f.mimeType?.startsWith('image/') || f.name.match(/\.(jpg|jpeg|png|webp|heic)$/i));
+        setBatchGalleryPhotos(photos);
+      } catch (e) {
+        console.error("Erro ao carregar fotos da galeria:", e);
+      } finally {
+        setLoadingBatchGallery(false);
+      }
+    }
+  };
 
   const handleAddAvulsoProcedure = () => {
     if (!avulsoProcName.trim()) return;
@@ -5156,32 +5181,15 @@ export default function DentalCRMView({
                                 <Plus className="w-3.5 h-3.5" />
                                 Procedimento Avulso
                               </button>
-                              <label className="px-3 py-1 bg-[#FAF8F5] text-[#8B0000] text-xs font-bold rounded-lg transition-colors border-2 border-[#C09553]/30 hover:border-[#C09553] flex items-center gap-1.5 shadow-sm cursor-pointer select-none" title="Fazer upload de várias fotos de uma vez para mapeamento clínico">
+                              <button
+                                type="button"
+                                onClick={handleOpenBatchPhotos}
+                                className="px-3 py-1 bg-[#FAF8F5] text-[#8B0000] text-xs font-bold rounded-lg transition-colors border-2 border-[#C09553]/30 hover:border-[#C09553] flex items-center gap-1.5 shadow-sm cursor-pointer select-none"
+                                title="Fazer upload de várias fotos de uma vez ou escolher da galeria"
+                              >
                                 <Upload className="w-3.5 h-3.5" />
                                 + Fotos (Lote)
-                                <input 
-                                  type="file" 
-                                  multiple 
-                                  accept="image/*" 
-                                  className="hidden" 
-                                  onChange={async (e) => {
-                                    if (!e.target.files || e.target.files.length === 0) return;
-                                    const files = Array.from(e.target.files);
-                                    const newSections: any[] = [];
-                                    for (const file of files) {
-                                      const dataUrl = await compressFileToDataUrl(file, 1024, 0.7);
-                                      newSections.push({
-                                        id: `extra-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                                        title: `Quadrante Adicional`,
-                                        subtitle: file.name,
-                                        image: dataUrl,
-                                        markers: []
-                                      });
-                                    }
-                                    setActiveSections(prev => [...(prev || []), ...newSections]);
-                                  }} 
-                                />
-                              </label>
+                              </button>
                             </div>
                             <span className="text-[10px] text-zinc-400">{activeSections.filter(s => s.image).length} de {activeSections.length} fotos carregadas</span>
                           </div>
@@ -5228,6 +5236,114 @@ export default function DentalCRMView({
                                   <Plus className="w-4 h-4" />
                                   <span>Adicionar</span>
                                 </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {showBatchPhotoModal && (
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+                              <div className="bg-[#FAF8F5] rounded-xl w-full max-w-3xl shadow-2xl max-h-[90vh] flex flex-col">
+                                <div className="p-4 border-b border-[#E6DEC9] flex justify-between items-center bg-white rounded-t-xl">
+                                  <h2 className="text-lg font-bold text-[#4E1119]">Adicionar Fotos</h2>
+                                  <button onClick={() => setShowBatchPhotoModal(false)} className="text-zinc-400 hover:text-red-500 transition-colors"><X className="w-5 h-5"/></button>
+                                </div>
+                                <div className="p-6 overflow-y-auto flex-1">
+                                  <div className="mb-6 flex gap-4">
+                                    <label className="flex-1 border-2 border-dashed border-[#C09553] bg-amber-50/30 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-amber-50/50 transition-colors">
+                                      <Upload className="w-8 h-8 text-[#C09553] mb-2" />
+                                      <span className="font-bold text-[#8B0000]">Fazer upload do computador</span>
+                                      <span className="text-xs text-zinc-500 mt-1">Clique para selecionar múltiplos arquivos</span>
+                                      <input type="file" multiple accept="image/*" className="hidden" onChange={async (e) => {
+                                        if (!e.target.files || e.target.files.length === 0) return;
+                                        setProcessingBatchSelection(true);
+                                        try {
+                                          const files = Array.from(e.target.files);
+                                          const newSections: any[] = [];
+                                          for (const file of files) {
+                                            const dataUrl = await compressFileToDataUrl(file, 1024, 0.7);
+                                            newSections.push({
+                                              id: `extra-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                                              title: `Quadrante Adicional`,
+                                              subtitle: file.name,
+                                              image: dataUrl,
+                                              markers: []
+                                            });
+                                          }
+                                          setActiveSections(prev => [...(prev || []), ...newSections]);
+                                          setShowBatchPhotoModal(false);
+                                        } finally {
+                                          setProcessingBatchSelection(false);
+                                        }
+                                      }} />
+                                    </label>
+                                  </div>
+
+                                  <h3 className="font-bold text-zinc-700 mb-3 flex items-center gap-2"><ImageIcon className="w-4 h-4"/> Fotos da Galeria do Paciente</h3>
+                                  {loadingBatchGallery ? (
+                                    <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-[#C09553]" /></div>
+                                  ) : batchGalleryPhotos.length === 0 ? (
+                                    <div className="text-center p-8 text-zinc-400 bg-white border border-[#E6DEC9] rounded-xl">Nenhuma foto encontrada na galeria do paciente.</div>
+                                  ) : (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                      {batchGalleryPhotos.map(photo => {
+                                        const isSelected = selectedBatchPhotos.includes(photo.id);
+                                        return (
+                                          <div 
+                                            key={photo.id} 
+                                            className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${isSelected ? 'border-[#8B0000] ring-2 ring-[#8B0000]/30' : 'border-transparent hover:border-[#C09553]'}`}
+                                            onClick={() => {
+                                              setSelectedBatchPhotos(prev => 
+                                                prev.includes(photo.id) 
+                                                  ? prev.filter(id => id !== photo.id)
+                                                  : [...prev, photo.id]
+                                              );
+                                            }}
+                                          >
+                                            <img src={photo.thumbnailLink} alt={photo.name} className="w-full h-full object-cover" />
+                                            {isSelected && (
+                                              <div className="absolute top-2 right-2 bg-[#8B0000] text-white rounded-full p-1">
+                                                <Check className="w-3 h-3" />
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="p-4 border-t border-[#E6DEC9] bg-white rounded-b-xl flex justify-end gap-3 items-center">
+                                  <button onClick={() => setShowBatchPhotoModal(false)} className="px-4 py-2 text-zinc-600 font-medium hover:bg-zinc-100 rounded-lg transition-colors">Cancelar</button>
+                                  <button 
+                                    disabled={selectedBatchPhotos.length === 0 || processingBatchSelection}
+                                    onClick={async () => {
+                                      setProcessingBatchSelection(true);
+                                      try {
+                                        const newSections: any[] = [];
+                                        for (const fileId of selectedBatchPhotos) {
+                                          const dataUrl = await downloadFileAsDataUrlFromSupabase(fileId);
+                                          newSections.push({
+                                            id: `extra-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                                            title: `Quadrante Adicional`,
+                                            subtitle: 'Galeria',
+                                            image: dataUrl,
+                                            markers: []
+                                          });
+                                        }
+                                        setActiveSections(prev => [...(prev || []), ...newSections]);
+                                        setSelectedBatchPhotos([]);
+                                        setShowBatchPhotoModal(false);
+                                      } catch (e) {
+                                        console.error(e);
+                                      } finally {
+                                        setProcessingBatchSelection(false);
+                                      }
+                                    }}
+                                    className="px-6 py-2 bg-[#8B0000] text-white font-bold rounded-lg hover:bg-[#a32c3d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                                  >
+                                    {processingBatchSelection && <Loader2 className="w-4 h-4 animate-spin" />}
+                                    Adicionar {selectedBatchPhotos.length > 0 ? `(${selectedBatchPhotos.length})` : ''}
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           )}
