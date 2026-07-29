@@ -240,6 +240,26 @@ export function PatientProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isPresentation || !selectedPatient) return;
+
+    // Use BroadcastChannel to bypass localStorage 5MB limits for the pop-up screen
+    const channelName = `dental_crm_sync_${selectedPatient.id}`;
+    const channel = new BroadcastChannel(channelName);
+    const globalChannel = new BroadcastChannel('dental_crm_sync_global');
+    
+    const pushSections = () => {
+      channel.postMessage({ type: 'SECTIONS_UPDATE', payload: activeSections });
+      globalChannel.postMessage({ type: 'SECTIONS_UPDATE', payload: activeSections });
+    };
+
+    pushSections();
+
+    channel.onmessage = (e) => {
+      if (e.data.type === 'REQUEST_SYNC') pushSections();
+    };
+    globalChannel.onmessage = (e) => {
+      if (e.data.type === 'REQUEST_SYNC') pushSections();
+    };
+
     try {
       // Serialize activeSections safely to prevent main thread blocking or localStorage quota errors
       const sanitizedSections = activeSections.map(sec => {
@@ -255,18 +275,47 @@ export function PatientProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Não foi possível salvar activeSections no localStorage (limite excedido?)', e);
     }
+
+    return () => {
+      channel.close();
+      globalChannel.close();
+    };
   }, [activeSections, selectedPatient]);
 
   useEffect(() => {
     if (isPresentation || !selectedPatient) return;
+    
+    const channelName = `dental_crm_sync_${selectedPatient.id}`;
+    const channel = new BroadcastChannel(channelName);
+    const globalChannel = new BroadcastChannel('dental_crm_sync_global');
+
+    const pushProposal = () => {
+      channel.postMessage({ type: 'PROPOSAL_UPDATE', payload: activeProposal });
+      globalChannel.postMessage({ type: 'PROPOSAL_UPDATE', payload: activeProposal });
+    };
+
+    pushProposal();
+
+    channel.onmessage = (e) => {
+      if (e.data.type === 'REQUEST_SYNC') pushProposal();
+    };
+    globalChannel.onmessage = (e) => {
+      if (e.data.type === 'REQUEST_SYNC') pushProposal();
+    };
+
     try {
       const serialized = JSON.stringify(activeProposal);
       localStorage.setItem(`agnaldo_dent_proposal_${selectedPatient.id}`, serialized);
       localStorage.setItem('agnaldo_dent_proposal', serialized);
     } catch (e) {
-      console.warn('Não foi possível salvar activeProposal no localStorage (limite excedido?)', e);
+      console.warn('Não foi possível salvar activeProposal no localStorage', e);
     }
-  }, [activeProposal, selectedPatient]);
+
+    return () => {
+      channel.close();
+      globalChannel.close();
+    };
+  }, [activeProposal, selectedPatient, isPresentation]);
 
   const saveContextToSupabase = async () => {
     if (!selectedPatient) return;

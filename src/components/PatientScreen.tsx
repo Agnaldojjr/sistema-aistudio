@@ -35,6 +35,33 @@ function useReactiveLocalStorage<T>(key: string, defaultValue: T): T {
   });
 
   useEffect(() => {
+    const channelName = `dental_crm_sync_${key}`;
+    const globalChannelName = `dental_crm_sync_global`;
+    const channel = new BroadcastChannel(channelName);
+    const globalChannel = new BroadcastChannel(globalChannelName);
+    
+    // As chaves no PatientContext enviam com prefixo, mas podemos escutar pelas globais ou por ID
+    const urlParams = new URLSearchParams(window.location.search);
+    const patientId = urlParams.get('patientId');
+    const specificChannel = patientId ? new BroadcastChannel(`dental_crm_sync_${patientId}`) : null;
+
+    const handleSync = (e: MessageEvent) => {
+      if (e.data.type === 'SECTIONS_UPDATE' && key === 'agnaldo_dent_sections') {
+        setValue(e.data.payload);
+      }
+      if (e.data.type === 'PROPOSAL_UPDATE' && key === 'agnaldo_dent_proposal') {
+        setValue(e.data.payload);
+      }
+    };
+
+    channel.onmessage = handleSync;
+    globalChannel.onmessage = handleSync;
+    if (specificChannel) specificChannel.onmessage = handleSync;
+
+    // Pedir sincronização imediata
+    if (specificChannel) specificChannel.postMessage({ type: 'REQUEST_SYNC' });
+    else globalChannel.postMessage({ type: 'REQUEST_SYNC' });
+
     let activeKey = getResolvedKey(key);
     let lastRawValue = localStorage.getItem(activeKey) || localStorage.getItem(key);
 
@@ -76,6 +103,9 @@ function useReactiveLocalStorage<T>(key: string, defaultValue: T): T {
     return () => {
       window.removeEventListener('storage', handleStorage);
       clearInterval(pollInterval);
+      channel.close();
+      globalChannel.close();
+      if (specificChannel) specificChannel.close();
     };
   }, [key, defaultValue]);
 
