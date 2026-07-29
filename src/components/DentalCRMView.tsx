@@ -265,6 +265,57 @@ export default function DentalCRMView({
   const [isLoadingSupabaseImages, setIsLoadingSupabaseImages] = useState(false);
   const [isSupabaseUploading, setIsSupabaseUploading] = useState(false);
 
+  // Avulso Procedure State
+  const [showAvulsoModal, setShowAvulsoModal] = useState(false);
+  const [avulsoProcName, setAvulsoProcName] = useState('');
+  const [avulsoProcPrice, setAvulsoProcPrice] = useState<number | string>('');
+
+  const handleAddAvulsoProcedure = () => {
+    if (!avulsoProcName.trim()) return;
+    const parsedPrice = typeof avulsoProcPrice === 'number' ? avulsoProcPrice : parseFloat(String(avulsoProcPrice)) || 0;
+    
+    const newInstId = `inst-geral-${Date.now()}`;
+    const newInstance = {
+      id: newInstId,
+      procedureId: `custom-avulso-${Date.now()}`,
+      name: avulsoProcName,
+      price: parsedPrice,
+      includeFinancial: true,
+      status: 'A realizar' as const,
+      date: '',
+      dentist: '',
+      faces: [],
+      observation: '',
+    };
+    
+    let updatedSections = [...activeSections];
+    if (updatedSections.length === 0) {
+       updatedSections = [{ id: 'geral', title: 'Geral', subtitle: 'Procedimentos sem dente associado', image: null, markers: [] }];
+    }
+    
+    const targetSection = updatedSections[0];
+    let geralMarker = targetSection.markers.find(m => m.id === 'marker-geral');
+    if (!geralMarker) {
+      geralMarker = {
+        id: 'marker-geral',
+        toothNumber: undefined as any,
+        x: -100,
+        y: -100,
+        procedures: [],
+        procedureInstances: []
+      };
+      targetSection.markers.push(geralMarker);
+    }
+    
+    if (!geralMarker.procedureInstances) geralMarker.procedureInstances = [];
+    geralMarker.procedureInstances.push(newInstance);
+    
+    setActiveSections(updatedSections);
+    setShowAvulsoModal(false);
+    setAvulsoProcName('');
+    setAvulsoProcPrice('');
+  };
+
   // Helper functions for planning
   const getSectionsWithInstallments = () => {
     return activeSections.map(sec => ({
@@ -5097,10 +5148,10 @@ export default function DentalCRMView({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (onNewProposal) onNewProposal(selectedPatient.name);
+                                  setShowAvulsoModal(true);
                                 }}
                                 className="px-3 py-1 bg-[#8B0000] text-[#FAF8F5] text-xs font-bold rounded-lg transition-colors border-2 border-[#8B0000] hover:bg-[#a32c3d] flex items-center gap-1.5 shadow-sm cursor-pointer select-none"
-                                title="Criar orçamento avulso sem fotos"
+                                title="Criar orçamento avulso sem selecionar dente"
                               >
                                 <Plus className="w-3.5 h-3.5" />
                                 Procedimento Avulso
@@ -5134,6 +5185,53 @@ export default function DentalCRMView({
                             </div>
                             <span className="text-[10px] text-zinc-400">{activeSections.filter(s => s.image).length} de {activeSections.length} fotos carregadas</span>
                           </div>
+
+                          {showAvulsoModal && (
+                            <div className="bg-[#FAF8F5] border border-[#E6DEC9] rounded-lg p-3 space-y-2 animate-fadeIn mb-4">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-[#4E1119] uppercase tracking-wide">Novo Procedimento Avulso</span>
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowAvulsoModal(false); setAvulsoProcName(''); setAvulsoProcPrice(''); }}
+                                  className="text-zinc-400 hover:text-red-500 transition-colors"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                              <input
+                                type="text"
+                                placeholder="Nome do procedimento"
+                                value={avulsoProcName}
+                                onChange={(e) => setAvulsoProcName(e.target.value)}
+                                className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-md px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none transition-all"
+                                autoFocus
+                              />
+                              <div className="flex gap-2 mt-2">
+                                <div className="relative flex-1">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">R$</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    placeholder="Valor"
+                                    value={avulsoProcPrice}
+                                    onChange={(e) => setAvulsoProcPrice(e.target.value)}
+                                    className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-md pl-9 pr-3 py-2 text-sm font-mono text-zinc-800 placeholder-zinc-400 focus:outline-none transition-all"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={handleAddAvulsoProcedure}
+                                  disabled={!avulsoProcName.trim()}
+                                  className="px-4 py-2 bg-[#4E1119] hover:bg-[#6c1b26] text-white text-sm font-semibold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  <span>Adicionar</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
                           {activeSections.map((section, idx) => (
                             <PhotoEditor
                               key={section.id}

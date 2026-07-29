@@ -1,20 +1,14 @@
-## 2026-07-09T21:34:57Z
+## 2026-07-22T18:17:02Z
+You are Forensic Auditor. Your working directory is `c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\auditor_m4`.
 
-You are the Forensic Auditor agent (archetype: teamwork_preview_auditor).
-Working directory: c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\auditor_m4
+Your task is to conduct a forensic integrity audit on all changes made across the project:
+1. Inspect git diff / modified files (`git diff` or file inspection) in `src/components/DashboardView.tsx`, `src/components/CalendarView.tsx`, `src/components/DentalCRMView.tsx`, `src/components/EventModal.tsx`, `src/components/FinancialView.tsx`, `src/types.ts`, `tsconfig.json`, `package.json`.
+2. Perform integrity checks:
+   - Check for hardcoded test results, facade implementations, or mock shortcuts.
+   - Check if any functionality was cheated or bypassed.
+   - Check if build and typecheck run genuinely without suppressed errors or skipped files.
+3. Formulate an unambiguous final verdict: CLEAN or INTEGRITY VIOLATION.
 
-Your objective is to run integrity checks on the changes made for the "Financeiro" tab and payment integration.
-Specifically:
-1. Verify that no test results, expected outputs, or verification strings are hardcoded in the source code.
-2. Verify that there are no dummy or facade implementations (e.g. mock data that mimics success without real logic, or functions that pretend to do integration without actually updating state/database).
-3. Ensure no attestation artifacts or logs are fabricated.
-4. Perform static analysis on the modified and created files:
-   - src/types.ts
-   - src/components/NegotiationTab.tsx
-   - src/context/PatientContext.tsx
-   - src/App.tsx
-   - src/components/FinancialView.tsx
-5. Ensure the application compiles and builds successfully by checking the build command results.
-
-Write your verdict and findings in a report at c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\auditor_m4\audit.md. If there are any integrity violations, report them in full detail.
-Send a message back to the Project Orchestrator (conversation ID: 70480ba0-306a-4a61-ba6b-c51fc9e7287b) once done.
+Deliverables:
+- Write your complete audit report to `c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\auditor_m4\handoff.md`.
+- Send a summary message back to the parent agent when finished.

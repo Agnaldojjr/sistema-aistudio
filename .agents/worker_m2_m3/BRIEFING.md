@@ -1,50 +1,57 @@
-# BRIEFING — 2026-07-09T21:35:00Z
+# BRIEFING — 2026-07-22T15:12:27Z
 
 ## Mission
-Implement changes from Explorer's patch and FinancialView component, then verify and report.
+Implement fixes for Requirements R1, R2, R3, and R4 setup as diagnosed by Explorers 1, 2, and 3.
 
 ## 🔒 My Identity
-- Archetype: teamwork_preview_worker
+- Archetype: worker
 - Roles: implementer, qa, specialist
 - Working directory: c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\worker_m2_m3
-- Original parent: 70480ba0-306a-4a61-ba6b-c51fc9e7287b
-- Milestone: m2_m3
+- Original parent: 085a0765-5881-4f6d-ade5-e48e52be7b4c
+- Milestone: M2/M3 Bug Fixes and R4 Setup
 
 ## 🔒 Key Constraints
-- Apply changes cleanly and genuinely
-- No cheating, no dummy implementation
-- Handoff at c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\worker_m2_m3\handoff.md
-- Message parent (70480ba0-306a-4a61-ba6b-c51fc9e7287b)
+- Follow Rules: NUNCA habilitar `bypass_auth` fora de `NODE_ENV=development`. NUNCA commitar chaves de API.
+- Do NOT cheat or hardcode values.
+- Follow minimal-change principle.
+- Write implementation summary and handoff to handoff.md.
 
 ## Current Parent
-- Conversation ID: 70480ba0-306a-4a61-ba6b-c51fc9e7287b
-- Updated: 2026-07-09T21:35:00Z
+- Conversation ID: 085a0765-5881-4f6d-ade5-e48e52be7b4c
+- Updated: 2026-07-22T15:12:27Z
 
 ## Task Summary
-- **What to build**: Apply proposed patch changes to src/types.ts, src/components/NegotiationTab.tsx, src/context/PatientContext.tsx, src/App.tsx, and create src/components/FinancialView.tsx with the contents of proposed_FinancialView.tsx.
-- **Success criteria**: Successful build and lint without errors, genuine implementation.
-- **Interface contracts**: [TBD]
-- **Code layout**: src/types.ts, src/components/*, src/context/*, src/App.tsx
+- **What to build**: Fix R1 (3-Way sync event dispatch and subscription, Supabase deletion fix), R3 (Summary card counters in DashboardView), R2 (PaymentRecord interface update, deterministic payment ID & procedure targeting in DashboardView, composite key deduplication in FinancialView), R4 Setup (tsconfig & package.json updates).
+- **Success criteria**: `npm run lint` and `npm run build` pass cleanly.
+- **Interface contracts**: PROJECT.md / Explorer handoff reports.
+- **Code layout**: React + TS codebase in `src/`.
 
 ## Key Decisions Made
-- Copy the proposed FinancialView.tsx component file directly to destination using PowerShell `Copy-Item` to avoid manual copy/paste lint errors or line number issues.
-- Fixed a TS2448 block-scope declaration order issue in NegotiationTab.tsx: Moved the added sync useEffect block below the chosenSim variable declaration since it was referencing it before declaration.
+- Reading explorer handoff reports first to understand exact diagnoses and line numbers.
+
+## Artifact Index
+- ORIGINAL_REQUEST.md — Original user prompt
+- BRIEFING.md — Context briefing
+- progress.md — Heartbeat progress
+- handoff.md — Final handoff report
 
 ## Change Tracker
 - **Files modified**:
-  - `src/types.ts`: Added optional `paymentMethod`, `totalValue`, and `selectedPlanIndex` fields to `TreatmentProposal` interface.
-  - `src/components/NegotiationTab.tsx`: Added `paymentMethod` selector dropdown and updated with `useEffect` to sync simulated cost/plan index to proposal context. Placed the hook after `chosenSim` definition to avoid TS2448 error.
-  - `src/context/PatientContext.tsx`: Appends a manual payment record into the database when the proposal status changes to 'Aprovado (paciente pagou)'.
-  - `src/App.tsx`: Added routing, sidebar item, topbar header labels and imported `FinancialView`.
-  - `src/components/FinancialView.tsx`: Created new component based on proposed_FinancialView.tsx.
-- **Build status**: Pass
+  - `tsconfig.json`: Added include and exclude fields to skip nested duplicate directories.
+  - `package.json`: Added "test": "playwright test" script.
+  - `src/types.ts`: Extended PaymentRecord with optional appointmentId, procedureId, budgetId.
+  - `src/components/EventModal.tsx`: Dispatched appointments-updated event on save and delete; added Supabase deletion cleanup on delete.
+  - `src/components/CalendarView.tsx`: Subscribed to appointments-updated event.
+  - `src/components/DentalCRMView.tsx`: Dispatched appointments-updated event when saving CRM Database with appointment updates.
+  - `src/components/DashboardView.tsx`: Subscribed to appointments-updated event, updated payment ID determinism and procedure targeting, fixed Supabase deletion in handleDeleteAppointment, updated Appointment interface status union, and standardized summary card counter filters.
+  - `src/components/FinancialView.tsx`: Added composite key deduplication filter for payment records.
+- **Build status**: Passed (npm run lint & npm run build exit code 0)
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: Pass (npm run build succeeded)
-- **Lint status**: 0 violations (npm run lint succeeded)
-- **Tests added/modified**: None
+- **Build/test result**: Passed (npm run lint exit 0, npm run build exit 0)
+- **Lint status**: 0 errors
+- **Tests added/modified**: package.json "test" script added
 
-## Artifact Index
-- c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\worker_m2_m3\ORIGINAL_REQUEST.md — Original request details.
-- c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\worker_m2_m3\progress.md — Progress tracker.
+## Loaded Skills
+- None

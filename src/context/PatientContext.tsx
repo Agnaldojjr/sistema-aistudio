@@ -174,19 +174,44 @@ export function PatientProvider({ children }: { children: ReactNode }) {
       setOdontogramaList((crmData.odontograma || []).filter((o: any) => o.patientId === patientId));
 
       // Auto-load Active Sections and Proposal for this patient
-      const latestOdontograma = (crmData.odontograma || []).filter((o: any) => o.patientId === patientId).pop();
-      if (latestOdontograma && latestOdontograma.sections) {
-        setActiveSections(latestOdontograma.sections);
+      const savedSections = localStorage.getItem(`agnaldo_dent_sections_${patientId}`);
+      if (savedSections) {
+        try {
+          setActiveSections(JSON.parse(savedSections));
+        } catch (e) {
+          const latestOdontograma = (crmData.odontograma || []).filter((o: any) => o.patientId === patientId).pop();
+          if (latestOdontograma && latestOdontograma.sections) setActiveSections(latestOdontograma.sections);
+          else setActiveSections(INITIAL_SECTIONS);
+        }
       } else {
-        setActiveSections(INITIAL_SECTIONS);
+        const latestOdontograma = (crmData.odontograma || []).filter((o: any) => o.patientId === patientId).pop();
+        if (latestOdontograma && latestOdontograma.sections) {
+          setActiveSections(latestOdontograma.sections);
+        } else {
+          setActiveSections(INITIAL_SECTIONS);
+        }
       }
 
-      const latestTratamento = (crmData.tratamentos || []).filter((t: any) => t.patientId === patientId).pop();
-      if (latestTratamento && latestTratamento.proposal) {
-        setActiveProposal(latestTratamento.proposal);
+      const savedProposal = localStorage.getItem(`agnaldo_dent_proposal_${patientId}`);
+      if (savedProposal) {
+        try {
+          setActiveProposal(JSON.parse(savedProposal));
+        } catch (e) {
+          const latestTratamento = (crmData.tratamentos || []).filter((t: any) => t.patientId === patientId).pop();
+          if (latestTratamento && latestTratamento.proposal) setActiveProposal(latestTratamento.proposal);
+          else {
+            const pName = (crmData.patients || []).find((p: any) => p.id === patientId)?.name || '';
+            setActiveProposal({ ...INITIAL_PROPOSAL, patientName: pName });
+          }
+        }
       } else {
-        const pName = (crmData.patients || []).find((p: any) => p.id === patientId)?.name || '';
-        setActiveProposal({ ...INITIAL_PROPOSAL, patientName: pName });
+        const latestTratamento = (crmData.tratamentos || []).filter((t: any) => t.patientId === patientId).pop();
+        if (latestTratamento && latestTratamento.proposal) {
+          setActiveProposal(latestTratamento.proposal);
+        } else {
+          const pName = (crmData.patients || []).find((p: any) => p.id === patientId)?.name || '';
+          setActiveProposal({ ...INITIAL_PROPOSAL, patientName: pName });
+        }
       }
     } catch (err) {
       console.error("Falha ao recarregar dados do paciente:", err);
@@ -214,22 +239,22 @@ export function PatientProvider({ children }: { children: ReactNode }) {
   }, [selectedPatient, refreshPatientSubModules]);
 
   useEffect(() => {
-    if (isPresentation) return;
+    if (isPresentation || !selectedPatient) return;
     try {
-      localStorage.setItem('agnaldo_dent_sections', JSON.stringify(activeSections));
+      localStorage.setItem(`agnaldo_dent_sections_${selectedPatient.id}`, JSON.stringify(activeSections));
     } catch (e) {
       console.warn('Não foi possível salvar activeSections no localStorage (limite excedido?)', e);
     }
-  }, [activeSections]);
+  }, [activeSections, selectedPatient]);
 
   useEffect(() => {
-    if (isPresentation) return;
+    if (isPresentation || !selectedPatient) return;
     try {
-      localStorage.setItem('agnaldo_dent_proposal', JSON.stringify(activeProposal));
+      localStorage.setItem(`agnaldo_dent_proposal_${selectedPatient.id}`, JSON.stringify(activeProposal));
     } catch (e) {
       console.warn('Não foi possível salvar activeProposal no localStorage (limite excedido?)', e);
     }
-  }, [activeProposal]);
+  }, [activeProposal, selectedPatient]);
 
   const saveContextToSupabase = async () => {
     if (!selectedPatient) return;

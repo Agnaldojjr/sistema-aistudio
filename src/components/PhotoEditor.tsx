@@ -19,6 +19,7 @@ interface PhotoEditorProps {
   patientName?: string;
   driveFolderId?: string;
   onAddProcedure?: (proc: Procedure) => void;
+  onEditProcedure?: (proc: Procedure) => void;
 }
 
 export default function PhotoEditor({
@@ -29,6 +30,7 @@ export default function PhotoEditor({
   patientName = '',
   driveFolderId = '',
   onAddProcedure,
+  onEditProcedure,
 }: PhotoEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -38,6 +40,11 @@ export default function PhotoEditor({
   
   // Local state for currently active / highlighted tooth marker
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
+  
+  // Inline edit state
+  const [editingProcId, setEditingProcId] = useState<string | null>(null);
+  const [editProcName, setEditProcName] = useState('');
+  const [editProcPrice, setEditProcPrice] = useState<number | string>('');
   const [isDragOver, setIsDragOver] = useState(false);
   
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -1164,41 +1171,103 @@ export default function PhotoEditor({
               <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
                 {procedures.map((proc) => {
                   const isChecked = activeMarker.procedures.includes(proc.id);
+                  if (editingProcId === proc.id) {
+                    return (
+                      <div key={proc.id} className="bg-[#FAF8F5] border border-[#E6DEC9] rounded-lg p-2 space-y-2">
+                        <input
+                          type="text"
+                          value={editProcName}
+                          onChange={(e) => setEditProcName(e.target.value)}
+                          className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-md px-2 py-1 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none"
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={editProcPrice}
+                            onChange={(e) => setEditProcPrice(e.target.value)}
+                            className="flex-1 bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-md px-2 py-1 text-xs font-mono text-zinc-800 focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onEditProcedure && editProcName.trim()) {
+                                onEditProcedure({
+                                  ...proc,
+                                  name: editProcName,
+                                  price: typeof editProcPrice === 'number' ? editProcPrice : parseFloat(String(editProcPrice)) || 0,
+                                });
+                                setEditingProcId(null);
+                              }
+                            }}
+                            className="px-2 py-1 bg-[#4E1119] text-white text-[10px] rounded"
+                          >
+                            Salvar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingProcId(null)}
+                            className="px-2 py-1 bg-zinc-200 text-zinc-700 text-[10px] rounded"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  
                   return (
-                    <button
-                      key={proc.id}
-                      id={`opt-treatment-${section.id}-${activeMarker.toothNumber}-${proc.id}`}
-                      type="button"
-                      onClick={() => toggleProcedureForMarker(activeMarker.id, proc.id)}
-                      className={`w-full flex items-center justify-between p-2 rounded-lg text-left text-xs border transition-all ${
+                    <div key={proc.id} className={`w-full flex items-center justify-between p-1 rounded-lg border transition-all ${
                         isChecked
                           ? 'border-[#C09553]/40 bg-amber-50/20 font-medium'
                           : 'border-zinc-100 hover:bg-zinc-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate pr-2.5">
-                        <span
-                          className={`w-2 h-2 rounded-full flex-shrink-0 ${isChecked ? 'scale-125' : 'opacity-40'}`}
-                          style={{ backgroundColor: proc.color }}
-                        />
-                        <span className="truncate text-zinc-700">{proc.name}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-1.5 flex-shrink-0 font-mono">
-                        <span className="text-[10px] text-zinc-400 font-semibold">
-                          R$ {proc.price.toLocaleString('pt-BR')}
-                        </span>
-                        <div
-                          className={`w-4 h-4 rounded-md border flex items-center justify-center ${
-                            isChecked
-                              ? 'bg-[#4E1119] border-[#4E1119] text-white'
-                              : 'border-zinc-300 bg-white'
-                          }`}
-                        >
-                          {isChecked && <CheckIcon className="w-2.5 h-2.5" />}
+                      }`}>
+                      <button
+                        id={`opt-treatment-${section.id}-${activeMarker.toothNumber}-${proc.id}`}
+                        type="button"
+                        onClick={() => toggleProcedureForMarker(activeMarker.id, proc.id)}
+                        className="flex-1 flex items-center justify-between text-left text-xs p-1"
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2.5">
+                          <span
+                            className={`w-2 h-2 rounded-full flex-shrink-0 ${isChecked ? 'scale-125' : 'opacity-40'}`}
+                            style={{ backgroundColor: proc.color }}
+                          />
+                          <span className="truncate text-zinc-700">{proc.name}</span>
                         </div>
-                      </div>
-                    </button>
+                        
+                        <div className="flex items-center gap-1.5 flex-shrink-0 font-mono">
+                          <span className="text-[10px] text-zinc-400 font-semibold">
+                            R$ {proc.price.toLocaleString('pt-BR')}
+                          </span>
+                          <div
+                            className={`w-4 h-4 rounded-md border flex items-center justify-center ${
+                              isChecked
+                                ? 'bg-[#4E1119] border-[#4E1119] text-white'
+                                : 'border-zinc-300 bg-white'
+                            }`}
+                          >
+                            {isChecked && <CheckIcon className="w-2.5 h-2.5" />}
+                          </div>
+                        </div>
+                      </button>
+                      {onEditProcedure && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingProcId(proc.id);
+                            setEditProcName(proc.name);
+                            setEditProcPrice(proc.price);
+                          }}
+                          className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-200 rounded transition-colors ml-1"
+                          title="Editar procedimento"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
