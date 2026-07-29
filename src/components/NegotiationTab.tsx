@@ -1076,8 +1076,13 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         doc.text(`Prazo: À Vista`, 20, currentY + 32);
       } else {
         doc.text(`Opção Selecionada: ${chosenSim.name} (Entrada de ${formatCurrency(chosenSim.entrada)})`, 20, currentY + 20);
-        doc.text(`Valor Restante Parcelado: ${formatCurrency(chosenSim.cobradoCard)}`, 20, currentY + 26);
-        doc.text(`Parcelamento Sugerido: ${installments}x de ${formatCurrency(chosenSim.valorParcela)} sem juros no cartão`, 20, currentY + 32);
+        if (chosenSim.cobradoCard === 0) {
+          doc.text(`Valor Restante Parcelado: Nenhum saldo financiado`, 20, currentY + 26);
+          doc.text(`Parcelamento Sugerido: Pagamento único, sem parcelas`, 20, currentY + 32);
+        } else {
+          doc.text(`Valor Restante Parcelado: ${formatCurrency(chosenSim.cobradoCard)}`, 20, currentY + 26);
+          doc.text(`Parcelamento Sugerido: ${installments}x de ${formatCurrency(chosenSim.valorParcela)} sem juros no cartão`, 20, currentY + 32);
+        }
       }
 
       // Big font for total
@@ -1119,11 +1124,11 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       const safePatientName = patientName || 'Paciente_Anonimo';
       const cleanFileName = `Orcamento_${safePatientName.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
       
-      await uploadPatientFileToSupabase(safePatientName, pdfBlob, cleanFileName, 'Orçamentos');
+      await uploadPatientFileToSupabase(safePatientName, pdfBlob, cleanFileName, 'Orcamentos');
       log(`✅ Sucesso! PDF salvo na pasta de Documentos no Supabase de "${safePatientName}".`);
 
       log("🔗 3/5 - Configurando permissões de leitura no Supabase...");
-      const pdfLink = await getPatientFileUrlFromSupabase(safePatientName, cleanFileName, 315360000, 'Orçamentos');
+      const pdfLink = await getPatientFileUrlFromSupabase(safePatientName, cleanFileName, 315360000, 'Orcamentos');
       if (!pdfLink) {
         throw new Error("Não foi possível obter a URL pública do PDF do Supabase.");
       }
@@ -1225,9 +1230,9 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         }
       }
       
-      await uploadPatientFileToSupabase(patientName, fileBlob, versionFilename, 'Orçamentos');
+      await uploadPatientFileToSupabase(patientName, fileBlob, versionFilename, 'Orcamentos');
       
-      const res = { id: `Orçamentos/${versionFilename}` };
+      const res = { id: `Orcamentos/${versionFilename}` };
       if (res && res.id && setCurrentFileId) {
         setCurrentFileId(res.id);
       }
@@ -1910,9 +1915,11 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                       </div>
                     ) : (
                       <div className="py-2 text-center bg-zinc-50 border border-zinc-100/50 rounded-lg my-1">
-                        <span className="text-[10px] text-zinc-400 uppercase tracking-wide block">Valor da Parcela ({installments}x)</span>
+                        <span className="text-[10px] text-zinc-400 uppercase tracking-wide block">
+                          {sim.cobradoCard === 0 ? 'Pagamento Único' : `Valor da Parcela (${installments}x)`}
+                        </span>
                         <strong className="text-sm font-bold text-[#8B0000] block font-mono mt-0.5">
-                          {installments}x de {formatCurrency(sim.valorParcela)}
+                          {sim.cobradoCard === 0 ? 'Sem parcelas' : `${installments}x de ${formatCurrency(sim.valorParcela)}`}
                         </strong>
                       </div>
                     )}
@@ -2289,12 +2296,14 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
             <div className="col-span-2 bg-[#F5EFE3] border border-[#D5CBB3] p-2.5 rounded-lg flex justify-between items-center">
               <span className="text-[#8B0000] font-bold text-[10.5px] uppercase tracking-wider block">
-                {selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado' ? 'Acordo de Pagamento:' : 'Acordo de Desembolso Mensal:'}
+                {(selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado') || chosenSim.cobradoCard === 0 ? 'Acordo de Pagamento:' : 'Acordo de Desembolso Mensal:'}
               </span>
               <span className="text-sm font-bold text-[#8B0000] font-mono whitespace-nowrap bg-white border border-[#D5CBB3] px-2 py-0.5 rounded-md">
-                {selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado'
+                {(selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado')
                   ? `Pagamento Único à Vista (${formatCurrency(chosenSim.custoTotal)})` 
-                  : `${installments}x de ${formatCurrency(chosenSim.valorParcela)}`}
+                  : chosenSim.cobradoCard === 0
+                    ? `Pagamento Único (${formatCurrency(chosenSim.entrada)})`
+                    : `${installments}x de ${formatCurrency(chosenSim.valorParcela)}`}
               </span>
             </div>
           </div>
@@ -2382,7 +2391,9 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
               <span className="col-span-2 text-zinc-800 text-left">{clinicSettings.doctorName || 'Dr. Agnaldo Ferreira'}</span>
 
               <span className="font-bold text-left">Proposta:</span>
-              <span className="col-span-2 text-zinc-800 text-left">{chosenSim.name} ({installments}x de {formatCurrency(chosenSim.valorParcela)})</span>
+              <span className="col-span-2 text-zinc-800 text-left">
+                {chosenSim.name} {chosenSim.cobradoCard === 0 ? '(Sem parcelas)' : `(${installments}x de ${formatCurrency(chosenSim.valorParcela)})`}
+              </span>
             </div>
           </div>
 

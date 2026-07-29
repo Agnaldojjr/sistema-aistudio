@@ -69,7 +69,7 @@ export async function listPatientFilesFromSupabase(patientName: string, subfolde
 
   // Se estiver listando a raiz sem subpasta específica, buscar também na subpasta 'Orçamentos'
   if (!subfolder) {
-    const subfolderFiles = await fetchFilesInPath(`${basePath}/Orçamentos`, 'Orçamentos');
+    const subfolderFiles = await fetchFilesInPath(`${basePath}/Orcamentos`, 'Orcamentos');
     rawFiles = [...rawFiles, ...subfolderFiles];
   }
 
