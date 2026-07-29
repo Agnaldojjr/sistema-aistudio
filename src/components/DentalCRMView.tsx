@@ -58,7 +58,7 @@ import {
   getPatientFileUrlFromSupabase,
   downloadFileAsDataUrlFromSupabase
 } from '../lib/supabaseStorage';
-import { compressFileToDataUrl } from '../lib/imageUtils';
+import { compressFileToDataUrl, compressImage } from '../lib/imageUtils';
 import ImageMarkupEditor from './ImageMarkupEditor';
 import { AIAssistedWhatsApp } from './AIAssistedWhatsApp';
 import { usePatientContext } from '../context/PatientContext';
@@ -5322,7 +5322,12 @@ export default function DentalCRMView({
                                       try {
                                         const newSections: any[] = [];
                                         for (const fileId of selectedBatchPhotos) {
-                                          const dataUrl = await downloadFileAsDataUrlFromSupabase(fileId);
+                                          let dataUrl = await downloadFileAsDataUrlFromSupabase(fileId);
+                                          try {
+                                            dataUrl = await compressImage(dataUrl, 1024, 0.7);
+                                          } catch (err) {
+                                            console.warn("Falha ao comprimir imagem da galeria, usando original", err);
+                                          }
                                           newSections.push({
                                             id: `extra-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                                             title: `Quadrante Adicional`,
