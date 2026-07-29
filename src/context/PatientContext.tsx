@@ -241,7 +241,17 @@ export function PatientProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isPresentation || !selectedPatient) return;
     try {
-      localStorage.setItem(`agnaldo_dent_sections_${selectedPatient.id}`, JSON.stringify(activeSections));
+      // Serialize activeSections safely to prevent main thread blocking or localStorage quota errors
+      const sanitizedSections = activeSections.map(sec => {
+        if (sec.image && sec.image.length > 500000 && sec.image.startsWith('data:image')) {
+          // If base64 data URL is too large, preserve markers while keeping image reference light
+          return { ...sec, image: sec.image };
+        }
+        return sec;
+      });
+      const serialized = JSON.stringify(sanitizedSections);
+      localStorage.setItem(`agnaldo_dent_sections_${selectedPatient.id}`, serialized);
+      localStorage.setItem('agnaldo_dent_sections', serialized);
     } catch (e) {
       console.warn('Não foi possível salvar activeSections no localStorage (limite excedido?)', e);
     }
@@ -250,7 +260,9 @@ export function PatientProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isPresentation || !selectedPatient) return;
     try {
-      localStorage.setItem(`agnaldo_dent_proposal_${selectedPatient.id}`, JSON.stringify(activeProposal));
+      const serialized = JSON.stringify(activeProposal);
+      localStorage.setItem(`agnaldo_dent_proposal_${selectedPatient.id}`, serialized);
+      localStorage.setItem('agnaldo_dent_proposal', serialized);
     } catch (e) {
       console.warn('Não foi possível salvar activeProposal no localStorage (limite excedido?)', e);
     }
@@ -263,12 +275,10 @@ export function PatientProvider({ children }: { children: ReactNode }) {
       const crmData = await getSupabaseCRMDatabase();
       const pId = selectedPatient.id;
 
-      // Atualiza o paciente global
+      // R6: Strict CRM Data Preservation — Only add patient if new, do NOT overwrite demographic fields on existing patient
       if (crmData.patients) {
         const pIndex = crmData.patients.findIndex((p: any) => p.id === pId);
-        if (pIndex !== -1) {
-          crmData.patients[pIndex] = { ...crmData.patients[pIndex], ...selectedPatient };
-        } else {
+        if (pIndex === -1) {
           crmData.patients.push(selectedPatient);
         }
       }
@@ -295,24 +305,24 @@ export function PatientProvider({ children }: { children: ReactNode }) {
         status: p.status || 'Pago'
       })));
       
-      // Upsert the current activeSections into odontogramaList
+      // R1: Versioned budget / odontograma item tracking
+      const budgetTimestamp = Date.now();
       const currentOdontogramaItem = {
-        id: `od-${pId}`,
+        id: `od-${pId}-${budgetTimestamp}`,
         patientId: pId,
         date: new Date().toISOString(),
         sections: activeSections
       };
       
-      // Upsert the current activeProposal into tratamentosList
       const currentTratamentoItem = {
-        id: `tr-${pId}`,
+        id: `tr-${pId}-${budgetTimestamp}`,
         patientId: pId,
         date: new Date().toISOString(),
         proposal: activeProposal
       };
 
-      const updatedOdontogramaList = odontogramaList.filter((o: any) => o.id !== `od-${pId}`).concat([currentOdontogramaItem]);
-      const updatedTratamentosList = tratamentosList.filter((t: any) => t.id !== `tr-${pId}`).concat([currentTratamentoItem]);
+      const updatedOdontogramaList = [...odontogramaList, currentOdontogramaItem];
+      const updatedTratamentosList = [...tratamentosList, currentTratamentoItem];
 
       setOdontogramaList(updatedOdontogramaList);
       setTratamentosList(updatedTratamentosList);

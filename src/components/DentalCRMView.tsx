@@ -1293,8 +1293,7 @@ export default function DentalCRMView({
   };
 
   const filterSupabaseImages = (files: any[]) => {
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
-    return (files || []).filter(f => imageExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+    return (files || []).filter(f => f.name && !f.name.startsWith('.'));
   };
 
   const syncGoogleSupabaseDataForPatient = async (patientName: string) => {
@@ -5152,8 +5151,7 @@ export default function DentalCRMView({
                       </div>
 
                       {/* Sub-panel: Mapeamento Clínico */}
-                      {activeDetailTab === 'plan_editor' && (
-                    <div className="space-y-4">
+                      <div className={activeDetailTab === 'plan_editor' ? 'space-y-4 block' : 'hidden'}>
                       {activeSections && activeSections.length > 0 ? (
                         <div className="space-y-6">
                           <div className="flex items-center justify-between mb-2">
@@ -5404,12 +5402,10 @@ export default function DentalCRMView({
                           <p className="text-xs mt-1">Selecione um paciente para iniciar o mapeamento clínico.</p>
                         </div>
                       )}
-                    </div>
-                   )}
+                      </div>
 
                       {/* Sub-panel: Emissão de Orçamento */}
-                      {activeDetailTab === 'plan_negotiation' && (
-                    <div>
+                      <div className={activeDetailTab === 'plan_negotiation' ? 'block' : 'hidden'}>
                       <NegotiationTab
                         sections={activeSections || []}
                         procedures={procedures || []}
@@ -5419,8 +5415,7 @@ export default function DentalCRMView({
                         currentFileId={currentFileId}
                         setCurrentFileId={setCurrentFileId}
                       />
-                    </div>
-                      )}
+                      </div>
                     </div>
                   )}
 
@@ -6077,81 +6072,116 @@ export default function DentalCRMView({
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                            {driveImages.map((img) => (
-                              <div key={img.id} className="bg-white border rounded-xl overflow-hidden border-[#E6DEC9] shadow-2xs hover:shadow-xs transition-all group text-left relative flex flex-col justify-between">
-                                <div 
-                                  className="aspect-square bg-zinc-200 relative flex items-center justify-center overflow-hidden cursor-pointer"
-                                  onClick={() => setExpandedImage({ url: img.thumbnailLink ? img.thumbnailLink.replace('=s220', '=s1000') : '', title: img.name, date: img.createdTime, id: img.id, source: 'drive' })}
-                                >
-                                  {img.thumbnailLink ? (
-                                    <img 
-                                      src={img.thumbnailLink.replace('=s220', '=s600')} 
-                                      alt={img.name} 
-                                      className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
-                                      referrerPolicy="no-referrer"
-                                    />
-                                  ) : (
-                                    <div className="flex flex-col items-center justify-center p-4 text-zinc-400 space-y-2">
-                                      <span className="text-3xl">🩻</span>
-                                      <span className="text-[9px] font-mono uppercase bg-zinc-100 px-2 py-0.5 rounded text-zinc-650 font-bold">Imagem Clínica</span>
-                                    </div>
-                                  )}
+                            {driveImages.map((img) => {
+                              const lname = (img.name || '').toLowerCase();
+                              const isPdf = lname.endsWith('.pdf');
+                              const isDoc = lname.endsWith('.doc') || lname.endsWith('.docx') || lname.endsWith('.txt');
+                              const isJson = lname.endsWith('.json');
 
-                                  <div className="absolute right-2 top-2 bg-zinc-950/75 text-[#FAF8F5] text-[8px] font-mono px-1.5 py-0.5 rounded-md font-bold shadow-sm uppercase">
-                                    {normalizeDateDisplay(img.createdTime)}
-                                  </div>
-
-                                  {/* Edit Photo Button Overlay */}
-                                  <div className="absolute top-2 left-2 z-10">
-                                    {isDownloadingForEdit === img.id ? (
-                                      <div className="w-8 h-8 rounded-xl bg-white/95 text-zinc-600 flex items-center justify-center shadow-md border border-zinc-200/80">
-                                        <Loader2 className="w-4 h-4 animate-spin text-[#C09553]" />
+                              return (
+                                <div key={img.id} className={`bg-white border rounded-xl overflow-hidden shadow-2xs hover:shadow-xs transition-all group text-left relative flex flex-col justify-between ${
+                                  isPdf ? 'border-red-200 bg-red-50/20' :
+                                  isDoc ? 'border-blue-200 bg-blue-50/20' :
+                                  isJson ? 'border-amber-200 bg-amber-50/20' : 'border-[#E6DEC9]'
+                                }`}>
+                                  <div 
+                                    className={`aspect-square relative flex items-center justify-center overflow-hidden cursor-pointer ${
+                                      isPdf ? 'bg-red-50/80' : isDoc ? 'bg-blue-50/80' : isJson ? 'bg-amber-50/80' : 'bg-zinc-200'
+                                    }`}
+                                    onClick={() => {
+                                      if (img.thumbnailLink) {
+                                        window.open(img.thumbnailLink, '_blank');
+                                      } else {
+                                        setExpandedImage({ url: img.thumbnailLink ? img.thumbnailLink.replace('=s220', '=s1000') : '', title: img.name, date: img.createdTime, id: img.id, source: 'drive' });
+                                      }
+                                    }}
+                                  >
+                                    {isPdf ? (
+                                      <div className="flex flex-col items-center justify-center p-4 text-red-600 space-y-2">
+                                        <FileText className="w-14 h-14 text-red-600" />
+                                        <span className="text-[9px] font-mono uppercase bg-red-600 text-white px-2 py-0.5 rounded font-bold">Documento PDF</span>
                                       </div>
+                                    ) : isDoc ? (
+                                      <div className="flex flex-col items-center justify-center p-4 text-blue-600 space-y-2">
+                                        <FileText className="w-14 h-14 text-blue-600" />
+                                        <span className="text-[9px] font-mono uppercase bg-blue-600 text-white px-2 py-0.5 rounded font-bold">Documento DOC / TXT</span>
+                                      </div>
+                                    ) : isJson ? (
+                                      <div className="flex flex-col items-center justify-center p-4 text-[#C09553] space-y-2">
+                                        <FileText className="w-14 h-14 text-[#C09553]" />
+                                        <span className="text-[9px] font-mono uppercase bg-[#C09553] text-white px-2 py-0.5 rounded font-bold">Orçamento JSON</span>
+                                      </div>
+                                    ) : img.thumbnailLink ? (
+                                      <img 
+                                        src={img.thumbnailLink.replace('=s220', '=s600')} 
+                                        alt={img.name} 
+                                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
+                                        referrerPolicy="no-referrer"
+                                      />
                                     ) : (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          e.preventDefault();
-                                          handleEditGalleryImage(img.id);
-                                        }}
-                                        className="w-8 h-8 rounded-xl bg-white/95 text-[#B48C4D] hover:text-[#4E1119] flex items-center justify-center shadow-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer border border-zinc-200/80"
-                                        title="Editar imagem (Marcações/Adesivos)"
-                                      >
-                                        <Pencil className="w-3.5 h-3.5" />
-                                      </button>
+                                      <div className="flex flex-col items-center justify-center p-4 text-zinc-400 space-y-2">
+                                        <span className="text-3xl">🩻</span>
+                                        <span className="text-[9px] font-mono uppercase bg-zinc-100 px-2 py-0.5 rounded text-zinc-650 font-bold">Imagem Clínica</span>
+                                      </div>
+                                    )}
+
+                                    <div className="absolute right-2 top-2 bg-zinc-950/75 text-[#FAF8F5] text-[8px] font-mono px-1.5 py-0.5 rounded-md font-bold shadow-sm uppercase">
+                                      {normalizeDateDisplay(img.createdTime)}
+                                    </div>
+
+                                    {!isPdf && !isDoc && !isJson && (
+                                      <div className="absolute top-2 left-2 z-10">
+                                        {isDownloadingForEdit === img.id ? (
+                                          <div className="w-8 h-8 rounded-xl bg-white/95 text-zinc-600 flex items-center justify-center shadow-md border border-zinc-200/80">
+                                            <Loader2 className="w-4 h-4 animate-spin text-[#C09553]" />
+                                          </div>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              e.preventDefault();
+                                              handleEditGalleryImage(img.id);
+                                            }}
+                                            className="w-8 h-8 rounded-xl bg-white/95 text-[#B48C4D] hover:text-[#4E1119] flex items-center justify-center shadow-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer border border-zinc-200/80"
+                                            title="Editar imagem (Marcações/Adesivos)"
+                                          >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                          </button>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
-                                </div>
 
-                                <div className="p-3.5 space-y-1.5">
-                                  <p className="text-xs font-semibold text-zinc-800 line-clamp-2 leading-relaxed font-sans" title={img.name}>
-                                    {img.name}
-                                  </p>
-                                </div>
+                                  <div className="p-3.5 space-y-1.5">
+                                    <p className="text-xs font-semibold text-zinc-800 line-clamp-2 leading-relaxed font-sans" title={img.name}>
+                                      {img.name}
+                                    </p>
+                                  </div>
 
-                                <div className="p-2 border-t bg-[#FAF8F5] flex justify-between items-center gap-1.5">
-                                  {img.webViewLink && (
-                                    <a 
-                                      href={img.webViewLink} 
-                                      target="_blank" 
-                                      rel="noreferrer"
-                                      className="text-[9px] uppercase font-bold text-[#C09553] hover:text-amber-700 tracking-wider flex items-center gap-1 px-2 py-1 hover:bg-zinc-100 rounded-md"
+                                  <div className="p-2 border-t bg-[#FAF8F5] flex justify-between items-center gap-1.5">
+                                    {img.thumbnailLink && (
+                                      <a 
+                                        href={img.thumbnailLink} 
+                                        target="_blank" 
+                                        rel="noreferrer"
+                                        className="text-[9px] uppercase font-bold text-[#C09553] hover:text-amber-700 tracking-wider flex items-center gap-1 px-2 py-1 hover:bg-zinc-100 rounded-md"
+                                      >
+                                        Visualizar / Baixar
+                                      </a>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteSupabaseFile(img.id)}
+                                      className="p-1 px-1.5 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded text-rose-500 transition-colors cursor-pointer"
+                                      title="Remover"
                                     >
-                                      Visualizar Original
-                                    </a>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => deleteSupabaseFile(img.id)}
-                                    className="p-1 px-1.5 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded text-rose-500 transition-colors cursor-pointer"
-                                    title="Remover"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>

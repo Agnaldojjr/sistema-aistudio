@@ -35,6 +35,7 @@ export interface ToothMarker {
     paymentDate?: string;
     photoAntesUrl?: string;
     photoDepoisUrl?: string;
+    photos?: string[];
   }[];
   // --- Integração 3D ---
   condition?: ToothCondition;
@@ -42,12 +43,25 @@ export interface ToothMarker {
 }
 
 export interface PhotoSection {
-  id: 'upper' | 'lower' | 'smile' | 'panoramic';
+  id: 'upper' | 'lower' | 'smile' | 'panoramic' | 'geral';
   title: string;
   subtitle: string;
   image: string | null; // Data URL or reference image path
   markers: ToothMarker[];
   installments?: number;
+}
+
+export interface BudgetVersion {
+  id: string;
+  versionNumber: number;
+  versionLabel: string;
+  createdAt: string;
+  filename: string;
+  status: 'Aberto (paciente não pagou)' | 'Aprovado (paciente pagou)' | 'Aguardando Aprovação' | 'Em Andamento' | 'Concluído' | 'Arquivado';
+  sections: PhotoSection[];
+  proposal: TreatmentProposal;
+  totalGross: number;
+  totalNet: number;
 }
 
 export interface ClinicSettings {
@@ -59,6 +73,7 @@ export interface ClinicSettings {
 }
 
 export interface PatientData {
+  budgets?: BudgetVersion[];
   // Dados Cadastrais
   photoUrl?: string; // URL da foto de perfil
   birthDate?: string;

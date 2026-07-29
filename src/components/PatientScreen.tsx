@@ -12,22 +12,33 @@ const formatCurrency = (val: number) => {
 
 // Custom hook to reactively track localStorage
 function useReactiveLocalStorage<T>(key: string, defaultValue: T): T {
+  const getResolvedKey = (k: string) => {
+    if (k === 'agnaldo_dent_sections' || k === 'agnaldo_dent_proposal') {
+      const keys = Object.keys(localStorage);
+      const matched = keys.find(item => item.startsWith(`${k}_`));
+      if (matched) return matched;
+    }
+    return k;
+  };
+
   const [value, setValue] = useState<T>(() => {
-    const cached = localStorage.getItem(key);
+    const activeKey = getResolvedKey(key);
+    const cached = localStorage.getItem(activeKey) || localStorage.getItem(key);
     if (!cached) return defaultValue;
     try { return JSON.parse(cached); } catch { return cached as any; }
   });
 
   useEffect(() => {
-    // Keep track of the last processed string representation to prevent unnecessary state resets
-    let lastRawValue = localStorage.getItem(key);
+    let activeKey = getResolvedKey(key);
+    let lastRawValue = localStorage.getItem(activeKey) || localStorage.getItem(key);
 
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === key && e.newValue) {
+      const currentKey = getResolvedKey(key);
+      if ((e.key === currentKey || e.key === key) && e.newValue) {
         lastRawValue = e.newValue;
         try { setValue(JSON.parse(e.newValue)); } catch { setValue(e.newValue as any); }
       } else if (e.key === null) {
-        const cached = localStorage.getItem(key);
+        const cached = localStorage.getItem(currentKey) || localStorage.getItem(key);
         lastRawValue = cached;
         if (cached) {
           try { setValue(JSON.parse(cached)); } catch { setValue(cached as any); }
@@ -39,10 +50,9 @@ function useReactiveLocalStorage<T>(key: string, defaultValue: T): T {
 
     window.addEventListener('storage', handleStorage);
 
-    // Fast polling interval (200ms) to ensure instant updates in iframe/sandbox environments
-    // where storage events might be restricted or blocked by security policies
     const pollInterval = setInterval(() => {
-      const currentRawValue = localStorage.getItem(key);
+      const currentKey = getResolvedKey(key);
+      const currentRawValue = localStorage.getItem(currentKey) || localStorage.getItem(key);
       if (currentRawValue !== lastRawValue) {
         lastRawValue = currentRawValue;
         if (currentRawValue) {

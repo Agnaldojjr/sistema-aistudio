@@ -306,14 +306,15 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
   const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !selectedPatient) return;
-    const file = files[0];
     
     try {
       setIsUploading(true);
-      await uploadPatientFileToSupabase(selectedPatient.name, file, file.name);
+      for (const file of Array.from(files)) {
+        await uploadPatientFileToSupabase(selectedPatient.id || selectedPatient.name, file, file.name);
+      }
       
       // Refresh patient images list
-      const allFiles = await listPatientFilesFromSupabase(selectedPatient.name);
+      const allFiles = await listPatientFilesFromSupabase(selectedPatient.id || selectedPatient.name);
       setPatientImages(allFiles.filter(f => f.mimeType.startsWith('image/')));
     } catch (err: any) {
       alert('Erro ao fazer upload da imagem: ' + err.message);

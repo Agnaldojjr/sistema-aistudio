@@ -210,10 +210,19 @@ export default function NegotiationTab({
   }, [sections, procedures]);
 
   // If user wants to manually adjust the base Valor Líquido Desejado, fallback to calculated total
+  const customNetKey = selectedPatient?.id ? `ag_neg_custom_net_${selectedPatient.id}` : 'ag_neg_custom_net';
   const [customNetDesired, setCustomNetDesired] = useState<number | null>(() => {
-    const cached = localStorage.getItem('ag_neg_custom_net');
+    const cached = localStorage.getItem(customNetKey);
     return cached ? parseFloat(cached) : null;
   });
+
+  // Reset customNetDesired when selected patient changes to allow calculatedGrossTotal to drive new budgets
+  useEffect(() => {
+    if (selectedPatient?.id) {
+      const cached = localStorage.getItem(`ag_neg_custom_net_${selectedPatient.id}`);
+      setCustomNetDesired(cached ? parseFloat(cached) : null);
+    }
+  }, [selectedPatient?.id]);
 
   const desiredNet = customNetDesired !== null ? customNetDesired : calculatedGrossTotal;
 
@@ -277,11 +286,13 @@ export default function NegotiationTab({
     localStorage.setItem('ag_neg_show_patient_sims', JSON.stringify(showInPatientScreen));
     localStorage.setItem('ag_neg_first_option_method', firstOptionMethod);
     if (customNetDesired !== null) {
+      localStorage.setItem(customNetKey, customNetDesired.toString());
       localStorage.setItem('ag_neg_custom_net', customNetDesired.toString());
     } else {
+      localStorage.removeItem(customNetKey);
       localStorage.removeItem('ag_neg_custom_net');
     }
-  }, [salesVolume, cardBrand, installments, percentSim1, percentSim2, patientOfferInput, selectedPlanIndex, customNetDesired, showInPatientScreen, firstOptionMethod]);
+  }, [salesVolume, cardBrand, installments, percentSim1, percentSim2, patientOfferInput, selectedPlanIndex, customNetDesired, showInPatientScreen, firstOptionMethod, customNetKey]);
 
   // Is app in inside iframe constraint
   const isInsideIframe = useMemo(() => {
@@ -1108,11 +1119,11 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       const safePatientName = patientName || 'Paciente_Anonimo';
       const cleanFileName = `Orcamento_${safePatientName.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
       
-      await uploadPatientFileToSupabase(safePatientName, pdfBlob, cleanFileName);
+      await uploadPatientFileToSupabase(safePatientName, pdfBlob, cleanFileName, 'Orçamentos');
       log(`✅ Sucesso! PDF salvo na pasta de Documentos no Supabase de "${safePatientName}".`);
 
       log("🔗 3/5 - Configurando permissões de leitura no Supabase...");
-      const pdfLink = await getPatientFileUrlFromSupabase(safePatientName, cleanFileName, 315360000);
+      const pdfLink = await getPatientFileUrlFromSupabase(safePatientName, cleanFileName, 315360000, 'Orçamentos');
       if (!pdfLink) {
         throw new Error("Não foi possível obter a URL pública do PDF do Supabase.");
       }
@@ -1200,10 +1211,24 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       
       const jsonStr = JSON.stringify(stateToSave);
       const fileBlob = new Blob([jsonStr], { type: 'application/json' });
-      await uploadPatientFileToSupabase(patientName, fileBlob, 'orcamento_salvo.json');
       
-      const res = { id: 'supabase-orcamento.json' };
-      if (res && res.id && setCurrentFileId && (!currentFileId || currentFileId === 'NEW_FILE')) {
+      // R1: Non-Overwriting & Versioned Budgets
+      let versionFilename = `orcamento_v${Date.now()}.json`;
+      if (currentFileId && currentFileId !== 'NEW_FILE' && currentFileId.includes('.json')) {
+        const cleanName = currentFileId.split('/').pop()!;
+        const match = cleanName.match(/orcamento_v(\d+)/);
+        if (match) {
+          const nextV = parseInt(match[1], 10) + 1;
+          versionFilename = `orcamento_v${nextV}.json`;
+        } else {
+          versionFilename = `orcamento_v2_${Date.now()}.json`;
+        }
+      }
+      
+      await uploadPatientFileToSupabase(patientName, fileBlob, versionFilename, 'Orçamentos');
+      
+      const res = { id: `Orçamentos/${versionFilename}` };
+      if (res && res.id && setCurrentFileId) {
         setCurrentFileId(res.id);
       }
 

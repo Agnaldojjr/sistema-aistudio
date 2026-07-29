@@ -155,15 +155,17 @@ export default function AppointmentClinicalDrawer({
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !patientName) return;
+    const files = e.target.files;
+    if (!files || files.length === 0 || !patientName) return;
 
     setIsUploadingPhoto(true);
     setUploadError('');
 
     try {
-      const filename = `foto_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      await uploadPatientFileToSupabase(patientName, file, filename);
+      for (const file of Array.from(files)) {
+        const filename = `foto_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        await uploadPatientFileToSupabase(patientName, file, filename);
+      }
 
       // Refresh photo list
       const updatedFiles = await listPatientFilesFromSupabase(patientName);
