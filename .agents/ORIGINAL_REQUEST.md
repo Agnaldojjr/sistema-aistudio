@@ -35,3 +35,54 @@ Resolver as causas raízes na camada de estado unificado / contexto sem criar ab
 - [ ] Causa raiz corrigida no ponto central do fluxo de dados.
 - [ ] Projeto testado e validado (`npm run build`).
 - [ ] Alterações commitadas e enviadas para o repositório GitHub.
+
+## 2026-07-29T12:58:21Z
+
+Refactor the CRM's budget and cloud drive modules to support multiple independent and versioned budgets, significantly improve the UX and performance of the planning/budget tabs, fix a photo upload bug, and transform the cloud drive into a versatile photo and document gallery.
+
+Working directory: c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main
+Integrity mode: development
+
+## Requirements
+
+### R1. Non-Overwriting & Versioned Budgets
+The system must allow the existence of multiple individual budgets per patient without overwriting each other. It must support both creating completely independent budgets (e.g., different procedures at different times) AND versioning of the same budget (e.g., Orçamento V1, V2).
+
+### R2. Planning and Budget Integration (UX & Bugs)
+Redesign the integration between the "Planejamento" (Planning) and "Orçamentos" (Budgets) tabs for a fluid UX. Specifically:
+- Fix performance issues (UI freezing or lagging when switching tabs).
+- Ensure data correctly copies from planning to the new budget.
+- Make navigation intuitive and seamless.
+
+### R3. Cloud Drive File Segregation
+Budgets saved in the Cloud Drive must be exclusively routed to and displayed within a dedicated "Orçamentos" folder.
+
+### R4. Cloud Drive as Photo Gallery
+The main view of the Cloud Drive must display patient photos in a visual grid format. It must also allow the visualization of other file types (like documents or PDFs) using representative icons alongside the photos.
+
+### R5. Fix Patient Screen Photo Upload Bug
+Fix a specific bug in the patient screen ("tela do paciente") where uploading 3 photos results in only 2 photos being displayed to the patient.
+
+### R6. STRICT CRM DATA PRESERVATION (Ponytail Mode: Full)
+CRITICAL REGULATION: It is strictly forbidden to delete, overwrite, or alter patient registration data and records present in the CRM database. All modifications must only add new budget records or read existing data safely.
+Apply "ponytail" principles (laziest solution that actually works, simplest, shortest, most minimal). Do not over-engineer the UI redesign or data structures.
+
+## Acceptance Criteria
+
+### Budgets
+- [ ] Users can create two independent budgets for a patient, and they appear as distinct records.
+- [ ] Users can create a new version of an existing budget, preserving the previous version.
+- [ ] Creating or editing a budget does not overwrite unrelated budgets.
+
+### UI Integration & Bug Fixes
+- [ ] Switching between Planning and Budgets tabs has zero noticeable lag or freezing.
+- [ ] Planning data automatically and correctly populates the budget fields upon creation.
+- [ ] Uploading N photos on the patient screen results in exactly N photos being displayed to the patient.
+
+### Cloud Drive
+- [ ] Saving a budget PDF places it inside the "Orçamentos" folder automatically.
+- [ ] The root of the Cloud Drive displays image files in a grid and PDF/Doc files with distinct icons.
+
+### Data Safety
+- [ ] Running operations (creating budgets, uploading files) leaves the core patient registration data completely untouched and unmodified.
+

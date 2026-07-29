@@ -14,6 +14,12 @@ const formatCurrency = (val: number) => {
 function useReactiveLocalStorage<T>(key: string, defaultValue: T): T {
   const getResolvedKey = (k: string) => {
     if (k === 'agnaldo_dent_sections' || k === 'agnaldo_dent_proposal') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const patientId = urlParams.get('patientId');
+      if (patientId) {
+        return `${k}_${patientId}`;
+      }
+      
       const keys = Object.keys(localStorage);
       const matched = keys.find(item => item.startsWith(`${k}_`));
       if (matched) return matched;

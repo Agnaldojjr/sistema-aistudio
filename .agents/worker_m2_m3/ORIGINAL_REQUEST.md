@@ -1,43 +1,45 @@
-## 2026-07-22T15:12:27Z
+## 2026-07-29T13:06:45Z
+You are worker_m2_m3 working in c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\worker_m2_m3.
+Your task is to implement the CRM Refactoring for Requirements R1, R2, R3, R4, R5, and R6, as well as fixing the TypeScript lint error.
 
-<USER_REQUEST>
-You are Worker 1. Your working directory is `c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\worker_m2_m3`.
+Read the handoff reports from the 3 Explorers:
+- `.agents/explorer_1/handoff.md` (R1 & R2)
+- `.agents/explorer_2/handoff.md` (R3, R4, R5)
+- `.agents/explorer_3/handoff.md` (R6 & Build/Lint)
 
-MANDATORY INTEGRITY WARNING:
-DO NOT CHEAT. All implementations must be genuine. DO NOT hardcode test results, create dummy/facade implementations, or circumvent the intended task. A Forensic Auditor will independently verify your work. Integrity violations WILL be detected and your work WILL be rejected.
+### Implementation Tasks:
 
-Your assigned task is to implement the fixes for Requirements R1, R2, R3, and R4 setup, as diagnosed by Explorers 1, 2, and 3:
+1. **R1: Non-Overwriting & Versioned Budgets**:
+   - In `src/types.ts`: Add `BudgetVersion` interface with `id`, `versionNumber`, `versionLabel` ("V1", "V2"), `createdAt`, `filename`, `status`, `sections`, `proposal`, `totalGross`, `totalNet`. Add `budgets?: BudgetVersion[]` to patient/odontogram records.
+   - In `src/components/NegotiationTab.tsx`, `src/context/PatientContext.tsx`, and `src/lib/supabaseStorage.ts`:
+     - Replace hardcoded `'orcamento_salvo.json'` with versioned filenames (`orcamento_v${versionNumber}.json` or `orcamento_${budgetId}.json`).
+     - Support creating independent new budgets (separate procedures) and creating new versions of existing budgets (V1, V2). Ensure creating/editing a budget does not overwrite unrelated budgets or previous versions.
 
-1. READ THE EXPLORER HANDOFF REPORTS FIRST:
-   - `c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\explorer_1\handoff.md` (R1 & R3)
-   - `c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\explorer_2\handoff.md` (R2)
-   - `c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\explorer_3\handoff.md` (R4)
+2. **R2: Planning and Budget Integration (UX & Lag Fix)**:
+   - In `src/components/DentalCRMView.tsx`: Replace conditional unmounting (`activeDetailTab === 'plan_negotiation' ? <NegotiationTab /> : null`) with CSS display toggling (`hidden` vs `block` or wrapping container) so switching tabs has zero noticeable lag or freezing.
+   - In `src/context/PatientContext.tsx`: Optimize `localStorage` serialization — avoid synchronous JSON stringifying of multi-megabyte base64 Data URLs during tab switching / state updates.
+   - In `src/components/NegotiationTab.tsx`: Scope `customNetDesired` per patient/budget ID instead of global `localStorage.setItem('ag_neg_custom_net')`. Clear/reset `customNetDesired` when creating a new budget from planning so `calculatedGrossTotal` populates new budget fields cleanly.
 
-2. IMPLEMENTATION STEPS:
-   A. R1 & R3 (3-Way Real-time Sync & Summary Card Reconciliation):
-      - In `EventModal.tsx`, `DashboardView.tsx`, and `DentalCRMView.tsx`: Dispatch `window.dispatchEvent(new Event('appointments-updated'))` whenever appointments are saved, status-updated, or deleted.
-      - In `DashboardView.tsx` and `CalendarView.tsx`: Subscribe to `'appointments-updated'` via `useEffect` to trigger state refresh instantly without F5.
-      - In `DashboardView.tsx` `handleDeleteAppointment`: Filter out deleted appointment from `crmData.appointments` in Supabase before saving to avoid ghost records on reload.
-      - In `DashboardView.tsx`: Standardize summary card counter filters:
-        - `Total`: `appointments.length`
-        - `Confirmadas`: `appointments.filter(a => a.status === 'Confirmado').length`
-        - `Faltas`: `appointments.filter(a => a.status === 'Falta' || a.status === 'Faltou').length`
-        - `Pendentes`: `appointments.filter(a => a.status === 'Pendente' || a.status === 'Agendado' || a.status === 'Reagendado').length`
+3. **R3: Cloud Drive Segregation**:
+   - In `src/lib/supabaseStorage.ts`: Update `uploadPatientFileToSupabase` to accept an optional `subfolder?: string` parameter (e.g. `${userId}/${patientFolder}/${subfolder}/${filename}`).
+   - In `src/components/NegotiationTab.tsx`: Pass `'Orçamentos'` as the `subfolder` parameter when exporting budget PDFs so budget PDFs land inside the `"Orçamentos"` folder.
+   - Update file listing in `supabaseStorage.ts` / `DentalCRMView.tsx` to handle folder segregation.
 
-   B. R2 (Financial Unification):
-      - In `src/types.ts`: Extend `PaymentRecord` with optional `appointmentId?: string`, `procedureId?: string`, `budgetId?: string`.
-      - In `DashboardView.tsx` `handleConfirmQuickPayment`: Set `procedureId: appt.linkedProcedureId` and `appointmentId: appt.id` on `newPaymentRecord`. Use deterministic payment ID (`pay-proc-${appt.linkedProcedureId}` if present, else `pay-appt-${appt.id}`). Target odontogram procedure status update to the linked procedure (`appt.linkedProcedureId`) rather than marking all patient procedures paid. Dispatch `window.dispatchEvent(new Event('appointments-updated'))`.
-      - In `FinancialView.tsx`: Add a composite key deduplication filter so any existing or duplicate entries are cleanly deduplicated before rendering.
+4. **R4: Cloud Drive as Visual Photo Gallery Grid with Document Icons**:
+   - In `src/components/DentalCRMView.tsx`: Remove `filterSupabaseImages` restriction that excludes `.pdf` and `.doc` files from the main drive view (`drive_records` tab).
+   - Render root Cloud Drive as a visual tile grid: image thumbnails for photos (`.jpg`, `.png`, etc.), red document card tiles with PDF icons for `.pdf` files, blue document tiles for `.doc`/`.docx`/`.txt` files, and gold proposal tiles for `.json` files.
 
-   C. R4 Setup (tsconfig & package.json):
-      - In `tsconfig.json`: Add `"include": ["src/**/*", "server.ts"]` and `"exclude": ["node_modules", "dist", "sistema-aistudio-main", "test-results"]`.
-      - In `package.json`: Add `"test": "playwright test"`.
+5. **R5: Patient Screen Photo Upload 3->2 Display Bug**:
+   - In `src/types.ts`: Add `photos?: string[]` array to `ToothMarker.procedureInstances` so procedure instances can hold any number of photos ($N$).
+   - In file upload handlers (`src/components/PatientsModal.tsx`, `src/components/AppointmentClinicalDrawer.tsx`, `src/components/DentalCRMView.tsx`, `src/components/PatientGallery.tsx`): Update file input handlers to iterate over `Array.from(e.target.files)` instead of truncating at `files[0]`.
+   - In `src/components/PatientScreen.tsx`: Align LocalStorage key to `agnaldo_dent_sections_${selectedPatient.id}` (matching `PatientContext.tsx:244`) so uploaded photos update reactively and display all $N$ uploaded photos without off-by-one or key mismatch truncation.
 
-3. VERIFICATION:
-   - Run `npm run lint` (`tsc --noEmit`) and verify exit code 0.
-   - Run `npm run build` and verify exit code 0.
+6. **R6: Strict CRM Data Preservation**:
+   - In `src/context/PatientContext.tsx`: Update budget save/update logic to execute pure append/upsert operations on `crmData.tratamentos` and `crmData.odontograma` without spreading/overwriting demographic fields in `crmData.patients`.
+   - In `src/lib/supabaseStorage.ts`: Use immutable `patientId` for storage folder paths (`${userId}/${patientId}/${subfolder}/${filename}`).
 
-4. DELIVERABLES:
-   - Save your implementation summary, modified files list, and build/lint outputs to `c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\worker_m2_m3\handoff.md`.
-   - Send a summary message back to the parent agent when finished.
-</USER_REQUEST>
+7. **TypeScript Lint Fix**:
+   - In `src/types.ts` (or `src/components/DentalCRMView.tsx:318`), update `PhotoSection.id` type definition to include `'geral'` so `npm run lint` (`tsc --noEmit`) passes cleanly with exit code 0!
+
+8. **Build & Test Verification**:
+   - Run `npm run build` and `npm run lint` (`tsc --noEmit`) to verify zero build or type errors.

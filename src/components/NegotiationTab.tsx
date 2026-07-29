@@ -1319,7 +1319,12 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           <button
             type="button"
             onClick={() => {
-              window.open(window.location.origin + '?mode=patient', '_blank', 'width=1100,height=800');
+              const currentPatientId = proposal?.patientData?.id;
+              if (currentPatientId) {
+                window.open(window.location.origin + '?mode=patient&patientId=' + currentPatientId, '_blank', 'width=1100,height=800');
+              } else {
+                window.open(window.location.origin + '?mode=patient', '_blank', 'width=1100,height=800');
+              }
             }}
             className="flex items-center justify-center gap-2 bg-[#FAF8F5] text-[#8B0000] border-2 border-[#C09553]/30 hover:border-[#C09553] font-bold text-xs px-5 py-3 rounded-xl transition-all shadow-sm hover:shadow-md cursor-pointer select-none active:scale-95"
           >

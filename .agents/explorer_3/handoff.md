@@ -1,150 +1,116 @@
-# Requirement R4 & System Architecture Investigation Report
+# Handoff Report — explorer_3
+
+**Date**: 2026-07-29  
+**Agent**: `explorer_3`  
+**Task**: Investigation of Requirement R6 (STRICT CRM DATA PRESERVATION under Ponytail Full principles) and System Build Infrastructure  
+**Status**: Completed  
+
+---
 
 ## 1. Observation
 
-### 1.1 Project Structure & Build Configuration
-- **Root Directory**: `c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main`
-- **Subdirectory Anomaly**: An untracked nested directory `sistema-aistudio-main/` exists inside root (`c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\sistema-aistudio-main`), duplicating source, `node_modules`, `package.json`, and `server.ts`.
-- **`package.json` (`c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\package.json`)**:
-  - Scripts:
-    ```json
-    "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "start": "node dist/server.cjs",
-    "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
-    ```
-  - Missing: No `"test"` script is defined in `package.json`.
-  - Dependencies include React 19.0.1, Vite 6.2.3, Express 4.21.2, Supabase JS 2.108.2, Firebase 12.14.0, Three.js 0.185.1, FullCalendar 6.1.20, Zod 4.4.3.
-  - DevDependencies include `@playwright/test` 1.61.1, `playwright` 1.61.1, `typescript` ~5.8.2, `esbuild` 0.25.0.
+1. **Patient Data Structure (`src/types.ts`)**:
+   - `CRMPatient` / `PatientData` interface defined in `src/types.ts` lines 61-110:
+     - Demographics & Contact: `id`, `codigo_paciente`, `name`, `cpf`, `rg`, `rgIssuer`, `birthDate`, `gender`, `status`, `maritalStatus`, `photoUrl`, `medicalRecord`, `howKnewClinic`, `phone`, `mobile`, `email`, `observations`.
+     - Responsible Data: `respName`, `respBirthDate`, `respPhone`, `respMobile`, `respMaritalStatus`, `respCpf`, `respRg`, `respRgIssuer`, `respProfession`.
+     - Address: `cep`, `street`, `number`, `complement`, `neighborhood`, `city`, `state`.
+     - Insurance: `healthInsurance`, `healthInsuranceCard`, `healthInsuranceValidity`.
+     - Audit & Sub-modules: `createdAt`, `updatedAt`, `appointments`, `clinical_history`, `communications`, `anamnese`, `avisos`, `documentos`, `galeria`, `pagamentos`, `tratamentos`, `odontograma`.
 
-- **`tsconfig.json` (`c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\tsconfig.json`)**:
-  ```json
-  {
-    "compilerOptions": {
-      "target": "ES2022",
-      "experimentalDecorators": true,
-      "useDefineForClassFields": false,
-      "module": "ESNext",
-      "lib": ["ES2022", "DOM", "DOM.Iterable"],
-      "skipLibCheck": true,
-      "moduleResolution": "bundler",
-      "isolatedModules": true,
-      "moduleDetection": "force",
-      "allowJs": true,
-      "jsx": "react-jsx",
-      "paths": { "@/*": ["./*"] },
-      "allowImportingTsExtensions": true,
-      "noEmit": true
-    }
-  }
-  ```
-  - Note: Lacks `"include"` and `"exclude"` arrays.
+2. **Persistence Mechanics (`src/context/PatientContext.tsx` & `src/lib/supabaseCrm.ts`)**:
+   - In `src/context/PatientContext.tsx:267-274`, saving context updates `crmData.patients` via:
+     ```typescript
+     if (crmData.patients) {
+       const pIndex = crmData.patients.findIndex((p: any) => p.id === pId);
+       if (pIndex !== -1) {
+         crmData.patients[pIndex] = { ...crmData.patients[pIndex], ...selectedPatient };
+       } else {
+         crmData.patients.push(selectedPatient);
+       }
+     }
+     ```
+   - Sub-lists are merged with `mergeLists(globalList, localList)` for `appointments`, `clinical_history`, `communications`, `anamnese`, `avisos`, `documentos`, `galeria`, `pagamentos`, `tratamentos`, `odontograma`.
+   - `saveSupabaseCRMDatabase` in `src/lib/supabaseCrm.ts:40-59` contains a deletion safeguard:
+     `if (currentCount > 5 && newCount < currentCount - 2)` prompts confirmation to prevent bulk patient data loss.
 
-- **`vite.config.ts` (`c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\vite.config.ts`)**:
-  - Uses `@tailwindcss/vite` and `@vitejs/plugin-react`.
-  - Path alias `@` mapped to root `.`.
-  - HMR disabled conditionally via `process.env.DISABLE_HMR`.
+3. **Storage & Gallery Mechanics (`src/components/PatientGallery.tsx` & `src/lib/supabaseStorage.ts`)**:
+   - `uploadPatientFileToSupabase` in `src/lib/supabaseStorage.ts:20-21` uses `getSafePatientPath(patientName)`:
+     `const filePath = ${userId}/${patientFolder}/${filename};`
+   - `PatientGallery` receives `selectedPatient` as `string` (patient name), not `CRMPatient.id`.
 
-### 1.2 Git Setup (`git status`, `git branch`, `git remote -v`)
-- Command: `git status; git branch; git remote -v`
-- Result:
-  - Branch: `main`
-  - Up to date with `origin/main` (`https://github.com/Agnaldojjr/sistema-aistudio.git`).
-  - Untracked: `.agents/ORIGINAL_REQUEST.md`, `.agents/explorer_1/`, `.agents/explorer_2/`, `.agents/explorer_3/`, and nested folder `sistema-aistudio-main`.
+4. **Build & Infrastructure Execution Commands**:
+   - `npm run build` command: `vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs`
+     - Command Result: **PASSED**. `vite build` completed successfully, producing production assets in `dist/`, and `esbuild` generated `dist/server.cjs`.
+   - `npm run lint` command: `tsc --noEmit`
+     - Command Result: **FAILED** (Exit code 1).
+     - Verbatim error log:
+       ```
+       src/components/DentalCRMView.tsx(318,29): error TS2322: Type '"geral"' is not assignable to type '"upper" | "lower" | "smile" | "panoramic"'.
+       ```
 
-### 1.3 Execution Results of Build & Typecheck Commands
-- **Command**: `npm run build`
-  - Output: `vite build && esbuild server.ts ...`
-  - Result: Completed successfully (Exit code 0).
-  - Artifacts: `dist/index.html` (0.85 kB), `dist/assets/index-BjhDH69g.js` (3,336.69 kB / 943.90 kB gzip), `dist/assets/index-DXFHiO7I.css` (137.47 kB), `dist/server.cjs` (44.5 kB).
-  - Vite Warning: Single bundle size > 500 kB (3.3 MB main chunk).
-
-- **Command**: `npm run lint` (`tsc --noEmit`)
-  - Output: Exit code 1.
-  - Verbatim Error:
-    ```
-    sistema-aistudio-main/src/components/PhotoEditor.tsx(1348,6): error TS2322: Type ... is not assignable to type 'SVGProps<SVGSVGElement>'.
-    Types of property 'ref' are incompatible. Two different types with this name exist, but they are unrelated.
-    ```
-  - Path of error: Notice the error is located in `sistema-aistudio-main/src/components/PhotoEditor.tsx` inside the nested folder, NOT in the root `src/components/PhotoEditor.tsx`.
-
-### 1.4 Test Suite Setup
-- **Existing Test Files**:
-  1. `tests/regressions.test.ts` (2 tests: 3D canvas regression check, CRM patient duplicate validation check).
-  2. `tests/ux_flow.test.ts` (10 tests: Dashboard, Navigation, Patient modal, Budget flow, Agenda calendar, 3D Arcada, Central IA, Financial, Mobile responsiveness, Network 500 status checks).
-- **Test Command**: `npx playwright test --list`
-  - Output: `Total: 12 tests in 2 files`. All 12 tests discovered successfully.
-- **Framework**: Playwright E2E (`@playwright/test` v1.61.1). No Unit test frameworks (Vitest/Jest) configured.
+5. **Git Repository State**:
+   - `git status`: Branch `main`, up to date with `origin/main`. Working tree clean for source code, dirty only in `.agents/` metadata.
+   - `git log -n 3`:
+     - `80e20c5`: `feat: adicionar seleção de fotos da galeria no envio em lote`
+     - `9738fae`: `feat: adicionar procedimento avulso, edicao inline e persistencia de orcamento`
+     - `e58c238`: `feat: add date picker to 'Hoje' button in dashboard agenda`
 
 ---
 
 ## 2. Logic Chain
 
-1. **Root Cause of `npm run lint` Failure**:
-   - Observation 1.1 shows `tsconfig.json` has no `"include"` or `"exclude"` arrays.
-   - Without explicit inclusion/exclusion rules, TypeScript recursively includes all `.ts`/`.tsx` files under `.`, including those in the nested `sistema-aistudio-main/` folder.
-   - Observation 1.1 shows the nested folder has its own `node_modules`.
-   - When `tsc --noEmit` runs, TypeScript resolves `@types/react` from both root `node_modules` and nested `node_modules`, leading to duplicate type instances and TS2322 type errors during global check.
-   - Step conclusion: Adding `"include": ["src/**/*", "server.ts"]` and `"exclude": ["node_modules", "dist", "sistema-aistudio-main", "test-results"]` to `tsconfig.json` will restrict typechecking exclusively to active root source files and resolve the lint command failure.
+1. **Observation 1 & 2 -> Risk in Budget Creation**:
+   - Budget saving in `PatientContext.tsx` spreads `selectedPatient` onto `crmData.patients[pIndex]`.
+   - If `selectedPatient` in local state is partially initialized or missing demographic attributes, spreading `{ ...crmData.patients[pIndex], ...selectedPatient }` mutates or nullifies valid CRM demographic fields during budget creation/updating.
+   - *Logic Conclusion*: Budget operations (`tratamentos` and `odontograma`) must have an isolated mutation boundary. They should execute pure `append/upsert` operations on budget lists without re-saving or spreading over `crmData.patients`.
 
-2. **Test Automation Standardization (Requirement R4)**:
-   - Observation 1.1 shows `package.json` has devDependencies for `@playwright/test` but lacks a `"test"` script.
-   - Observation 1.4 shows 12 working Playwright E2E tests in `tests/regressions.test.ts` and `tests/ux_flow.test.ts`.
-   - Step conclusion: Adding `"test": "playwright test"` to `package.json` establishes a standard `npm test` entry point per project conventions without adding unnecessary dependencies.
+2. **Observation 2 -> Risk in Tab Switching**:
+   - Tab switching in `DentalCRMView.tsx` toggles `activeDetailTab`.
+   - Edits made in `PatientRegistrationTab` reside in React component state until explicitly saved.
+   - If `refreshPatientSubModules` is triggered during tab switching or background sync, uncommitted demographic form state is overwritten by the database values.
+   - *Logic Conclusion*: Unsaved demographic edits should be auto-buffered in LocalStorage (`agnaldo_dent_draft_patient_${patientId}`) to prevent loss on tab switching.
 
-3. **Application Architecture & Ponytail (Full Level) Assessment**:
-   - Observation 1.1 shows `npm run build` succeeds, but Vite produces a single heavy bundle (`index-BjhDH69g.js` at 3.3 MB).
-   - In `App.tsx`, all top-level views (`DashboardView`, `FinancialView`, `DentalCRMView`, `CalendarView`, `TreatmentPlanning3D`, `SentinelDashboard`) are imported statically.
-   - Applying Ponytail (Full level) principles (laziest, simplest solution that works):
-     - Avoid complex custom Rollup plugin configurations or extra state management libraries.
-     - Implement standard React `React.lazy()` and `<Suspense>` for heavy views like `TreatmentPlanning3D` to break up the 3.3 MB bundle naturally.
-     - Keep proposed changes for R1 (Auth/Firebase), R2 (Sentinel/Central IA), and R3 (Backend/Chat) inside their designated agent file boundaries (`AGENTS.md`) using standard React hooks and standard fetch/Supabase client methods.
+3. **Observation 3 -> Risk in Photo Uploading**:
+   - `uploadPatientFileToSupabase` constructs storage folder paths using `patientName` (`getSafePatientPath(patientName)`).
+   - If a patient's name is edited in the CRM, their storage directory name changes, detaching previously uploaded photos.
+   - *Logic Conclusion*: Storage paths must use the immutable `patientId` (`${userId}/${patientId}/${filename}`) rather than mutable `patientName`. Photo metadata must append directly to `crmData.galeria` without touching `crmData.patients`.
+
+4. **Observation 4 -> Infrastructure Status**:
+   - `npm run build` passes cleanly, confirming production bundling is working.
+   - `npm run lint` fails on `DentalCRMView.tsx:318` because `'geral'` is assigned to `PhotoSection.id`, which expects `'upper' | 'lower' | 'smile' | 'panoramic'`.
+   - *Logic Conclusion*: To pass `npm run lint`, either update `PhotoSection.id` type definition in `src/types.ts` to include `'geral'` or map `'geral'` to a valid enum member.
 
 ---
 
 ## 3. Caveats
 
-- **Nested Directory Cleaning**: The nested directory `sistema-aistudio-main/` inside the root workspace was not removed during this investigation because this agent operates in read-only mode. It should either be deleted or excluded via `.gitignore` and `tsconfig.json`.
-- **E2E Test Execution in CI/Headless**: Playwright E2E tests target `TEST_BASE_URL` (defaulting to `https://sistema-aistudio.vercel.app/?bypass_auth=true` or local server). Running Playwright locally requires an active dev server or deployed URL.
+- **No Source Code Modifications Made**: Under explorer read-only guidelines, no fixes were committed to `src/`. All recommendations are provided as precise actionable guidelines for implementers.
+- **E2E Tests Not Executed**: `npm run test` (`playwright test`) was not run as browser binaries may require display/server environment.
+- **Supabase Authentication State**: Supabase backend calls depend on active user session (`supabase.auth.getSession()`); offline behavior relies on LocalStorage fallbacks.
 
 ---
 
 ## 4. Conclusion
 
-1. **Build Setup**: `npm run build` is fully functional and produces valid output in `dist/`.
-2. **TypeScript Fix**: `npm run lint` fails solely due to `tsconfig.json` scanning the duplicate nested directory `sistema-aistudio-main/`. Fixing `tsconfig.json` with proper `"include"` and `"exclude"` fields will fix `npm run lint` instantly.
-3. **Test Setup**: 12 E2E Playwright tests are present in `tests/`. Adding `"test": "playwright test"` to `package.json` completes Requirement R4 test script setup.
-4. **Architecture Alignment**: The codebase architecture is solid (React 19 + TypeScript + Vite + Supabase/Firebase + Tailwind v4). Proposed fixes across R1, R2, R3 can easily follow Ponytail (Full level) minimal principles by avoiding speculative abstractions, using native React patterns, and staying strictly within agent file ownership bounds defined in `AGENTS.md`.
+Requirement R6 (Strict CRM Data Preservation under Ponytail Full principles) is structurally feasible with three critical safety boundary rules:
+1. **Isolated Budget Mutation Boundary**: Budget creation/edits must strictly target `crmData.tratamentos` and `crmData.odontograma` (append/upsert), removing the `crmData.patients` spread in `PatientContext.tsx:270`.
+2. **Immutable Storage Path Boundary**: Photo uploads in `src/lib/supabaseStorage.ts` must use immutable `patientId` instead of `patientName` to avoid folder detachment when demographic names change.
+3. **Demographic Draft Preservation Boundary**: Local edits in `PatientRegistrationTab` must be buffered in LocalStorage to prevent loss during tab switching.
+
+System Infrastructure: `npm run build` is operational. `npm run lint` requires a single 1-line type fix at `src/components/DentalCRMView.tsx:318` (`'geral'` section ID).
 
 ---
 
 ## 5. Verification Method
 
-To independently verify these conclusions:
+To independently verify these findings:
 
-1. **Build Verification**:
-   ```bash
-   npm run build
-   ```
-   *Expected result*: Exit code 0, files generated in `dist/`.
+1. **Verify Build Infrastructure**:
+   - Run `npm run build` in root: observe successful Vite build and esbuild compilation.
+   - Run `npm run lint` in root: observe TypeScript error at `src/components/DentalCRMView.tsx:318`.
 
-2. **TypeScript / Lint Fix Verification**:
-   Proposed change to `tsconfig.json`:
-   ```json
-   "include": ["src/**/*", "server.ts"],
-   "exclude": ["node_modules", "dist", "sistema-aistudio-main", "test-results"]
-   ```
-   Run:
-   ```bash
-   npm run lint
-   ```
-   *Expected result*: `tsc --noEmit` exits with 0 without scanning nested directory.
-
-3. **Test Suite Verification**:
-   Run:
-   ```bash
-   npx playwright test --list
-   ```
-   *Expected result*: Lists 12 tests across `tests/regressions.test.ts` and `tests/ux_flow.test.ts`.
+2. **Inspect Patient Data Preservation Boundaries**:
+   - View `src/types.ts` lines 61-110 to verify `CRMPatient` fields.
+   - View `src/context/PatientContext.tsx` lines 260-331 to inspect `saveContextToSupabase` and `crmData.patients` spread logic.
+   - View `src/lib/supabaseStorage.ts` lines 8-27 to inspect `getSafePatientPath(patientName)` usage.
+   - View `src/components/PatientGallery.tsx` lines 18-30 to verify patient prop typing.

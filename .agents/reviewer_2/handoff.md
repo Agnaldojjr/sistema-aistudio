@@ -1,118 +1,94 @@
-# Handoff Report — Reviewer 2
+# Handoff Report — reviewer_2
 
 ## 1. Observation
 
-Direct observations from source code inspection across target files:
+Direct code observations from the reviewed files:
 
-### A. Event Bus Listeners (`DashboardView.tsx` & `CalendarView.tsx`)
-1. **`CalendarView.tsx` (lines 79-96)**:
-   ```tsx
-   useEffect(() => {
-     handleRefresh();
-     const handleVisibilityChange = () => {
-       if (document.visibilityState === 'visible') {
-         handleRefresh();
-       }
-     };
-     document.addEventListener('visibilitychange', handleVisibilityChange);
-     window.addEventListener('appointments-updated', handleRefresh);
-     return () => {
-       document.removeEventListener('visibilitychange', handleVisibilityChange);
-       window.removeEventListener('appointments-updated', handleRefresh);
-     };
-   }, []);
-   ```
-   - Event listeners are attached to `document` and `window`.
-   - Explicit cleanup removes listeners on unmount.
-   - `handleRefresh` invokes `fetchEvents`, which uses stable `useState` dispatchers.
+- **Observation 1 (Facade Logic / Integrity Violation in `PatientContext.tsx`)**:
+  - File: `src/context/PatientContext.tsx` (Lines 242-251)
+  - Code snippet:
+    ```typescript
+    // Serialize activeSections safely to prevent main thread blocking or localStorage quota errors
+    const sanitizedSections = activeSections.map(sec => {
+      if (sec.image && sec.image.length > 500000 && sec.image.startsWith('data:image')) {
+        // If base64 data URL is too large, preserve markers while keeping image reference light
+        return { ...sec, image: sec.image };
+      }
+      return sec;
+    });
+    ```
+  - Direct finding: The comment explicitly claims to keep the image reference light for large base64 images (>500KB), but `return { ...sec, image: sec.image }` returns the exact full-length data URL unchanged. No compression, truncation, or lightening occurs.
 
-2. **`DashboardView.tsx` (lines 452-460)**:
-   ```tsx
-   useEffect(() => {
-     fetchAgenda();
-     const handleSync = () => fetchAgenda();
-     window.addEventListener('appointments-updated', handleSync);
-     return () => {
-       window.removeEventListener('appointments-updated', handleSync);
-     };
-   }, [selectedAgendaDate]);
-   ```
-   - Listener `handleSync` is attached to `window` for `'appointments-updated'`.
-   - Cleanup function removes `handleSync` on unmount or when `selectedAgendaDate` changes.
+- **Observation 2 (Main-Thread Polling Loop in `PatientScreen.tsx`)**:
+  - File: `src/components/PatientScreen.tsx` (Lines 53-73, 80-94)
+  - Code snippet:
+    ```typescript
+    const pollInterval = setInterval(() => {
+      const currentKey = getResolvedKey(key);
+      const currentRawValue = localStorage.getItem(currentKey) || localStorage.getItem(key);
+      ...
+    }, 200);
+    ```
+  - Direct finding: `PatientScreen` calls `useReactiveLocalStorage` 12 times in a single component. This launches 12 active timers running every 200ms on the main thread, querying `localStorage` keys and iterating over `Object.keys(localStorage)` inside `getResolvedKey`.
 
-### B. `FinancialView.tsx` (`deduplicatedPayments` & Filtering)
-1. **Deduplication key calculation (lines 42-46)**:
-   ```tsx
-   const key = p.procedureId 
-     ? `proc:${p.procedureId}` 
-     : p.appointmentId 
-     ? `appt:${p.appointmentId}` 
-     : `${(p.patientId || p.patientName || '').toLowerCase().trim()}_${(p.description || '').toLowerCase().trim()}_${p.amount}_${p.date.split('T')[0]}`;
-   ```
-   - When `p.procedureId === 'custom'`, `p.procedureId` evaluates to truthy. The resulting key is `proc:custom`.
-   - If `p.date` is undefined/null, calling `p.date.split('T')` throws `TypeError: Cannot read properties of undefined (reading 'split')`.
+- **Observation 3 (Unmemoized Context Provider Value in `PatientContext.tsx`)**:
+  - File: `src/context/PatientContext.tsx` (Lines 344-363)
+  - Code snippet:
+    ```typescript
+    return (
+      <PatientContext.Provider value={{
+        selectedPatient, setSelectedPatient,
+        appointments, setAppointments,
+        ...
+      }}>
+        {children}
+      </PatientContext.Provider>
+    );
+    ```
+  - Direct finding: The context `value` prop is an unmemoized inline object literal, causing all context subscribers across the application to re-render whenever any state inside `PatientProvider` changes.
 
-2. **Search filter (line 71)**:
-   ```tsx
-   const matchSearch = p.patientName.toLowerCase().includes(searchTerm.toLowerCase());
-   ```
-   - If `p.patientName` is undefined or null, calling `p.patientName.toLowerCase()` throws `TypeError: Cannot read properties of undefined (reading 'toLowerCase')`.
+- **Observation 4 (Duplication & Violation of Ponytail Minimalism across Components)**:
+  - Files: `src/components/DentalCRMView.tsx` (6,614 lines), `src/components/NegotiationTab.tsx` (2,715 lines), `src/components/PatientScreen.tsx` (692 lines).
+  - Direct finding: `PatientScreen.tsx` duplicates the financial simulation engine, credit rates (`TON_RATES`, `DEBIT_RATES`), and multi-column installment calculations from `NegotiationTab.tsx`. `DentalCRMView.tsx` has grown to 6,614 lines containing duplicated PDF generation, storage syncing, and state orchestration.
 
-### C. `DashboardView.tsx` (`handleConfirmQuickPayment`)
-1. **Local storage write & event notification (lines 621, 718)**:
-   ```tsx
-   localStorage.setItem('agnaldo_dent_financeiro', JSON.stringify(localPayments));
-   ...
-   window.dispatchEvent(new Event('appointments-updated'));
-   ```
-   - Writes directly to `localStorage` under key `agnaldo_dent_financeiro`.
-   - Dispatches `'appointments-updated'`, but does NOT dispatch `'local-storage'`.
-   - `FinancialView.tsx` relies on `useReactiveLocalStorage('agnaldo_dent_financeiro', [])`, which listens for `'local-storage'` events.
+- **Observation 5 (Storage Quota Edge Case Failure)**:
+  - File: `src/context/PatientContext.tsx` (Lines 241-269)
+  - Direct finding: Synchronous `JSON.stringify` of `activeSections` (containing full camera base64 data URLs) is pushed to `localStorage` on every change. Storing multiple camera photos exceeds the 5MB browser `localStorage` quota, causing silent storage failure.
 
-2. **Patient ID Fallback (line 592)**:
-   ```tsx
-   const pId = appt.patientId || `pat_${Date.now()}`;
-   ```
-   - If `appt.patientId` is undefined, `pId` is assigned a random string `pat_<timestamp>`.
-   - Steps 3 & 4 (lines 639, 671) filter `crmData.odontograma` and `crmData.tratamentos` using `pId`.
-   - Because `pat_<timestamp>` is new, both filters return `[]`, silently skipping odontogram procedure payment updates and treatment proposal status updates.
+- **Observation 6 (Production Stub Alert in `PatientsModal.tsx`)**:
+  - File: `src/components/PatientsModal.tsx` (Lines 337-343)
+  - Code snippet:
+    ```typescript
+    alert('Renomear arquivos no Supabase em desenvolvimento.');
+    ```
+  - Direct finding: The file rename handler pops a browser alert stating the feature is in development and updates local UI state without renaming the file in Supabase Storage.
 
 ---
 
 ## 2. Logic Chain
 
-1. **Event Bus Review**:
-   - Both `DashboardView.tsx` and `CalendarView.tsx` instantiate inline listener functions inside `useEffect` and register them via `window.addEventListener`.
-   - The returned cleanup functions in both components call `window.removeEventListener` with the exact function references.
-   - Re-binding in `DashboardView.tsx` correctly tracks `selectedAgendaDate`.
-   - **Conclusion**: Subscriptions and unsubscriptions are memory-leak-free and free of stale closure bugs.
+1. **Premise 1**: Under the identity rules, any dummy or facade implementation that claims to fix an issue but implements no real logic must result in a `REQUEST_CHANGES` verdict with a Critical finding tagged `INTEGRITY VIOLATION`.
+   - **Step 1.1**: Observation 1 shows a comment claiming to sanitize/lighten base64 images over 500KB to protect against quota errors and main thread blocking, but the return statement `{ ...sec, image: sec.image }` executes no transformation.
+   - **Conclusion 1**: This constitutes a facade implementation (Integrity Violation).
 
-2. **Deduplication Key Collision (`FinancialView.tsx`)**:
-   - `p.procedureId` is used as `proc:${p.procedureId}` whenever `p.procedureId` is truthy.
-   - For all quick payments where procedure ID is assigned as `'custom'`, `p.procedureId` is `'custom'`.
-   - Every custom payment across all patients evaluates to key `proc:custom`.
-   - `map.set('proc:custom', p)` overwrites existing custom payments with subsequent custom payments.
-   - **Conclusion**: Critical data loss in financial view display for custom procedure payments.
+2. **Premise 2**: Clean React patterns require avoiding main-thread blocking loops, unnecessary re-render cascades, and redundant polling timers.
+   - **Step 2.1**: Observation 2 shows 12 concurrent 200ms `setInterval` polling loops in `PatientScreen.tsx` querying `localStorage`.
+   - **Step 2.2**: Observation 3 shows an unmemoized context provider value causing global re-render cascades.
+   - **Conclusion 2**: High main-thread overhead and inefficient React state management.
 
-3. **Reactivity Break between Dashboard & Financial Views**:
-   - `FinancialView` hooks into `agnaldo_dent_financeiro` using `useReactiveLocalStorage`.
-   - `useReactiveLocalStorage` only re-renders when a `'local-storage'` or `'storage'` event is dispatched on `window`.
-   - `handleConfirmQuickPayment` sets local storage item directly and dispatches `'appointments-updated'`, omitting `'local-storage'`.
-   - **Conclusion**: `FinancialView` fails to update reactively in the same tab when quick payments are confirmed.
+3. **Premise 3**: Ponytail (Full level) minimalism mandates eliminating code duplication, avoiding unnecessary line bloat, and leveraging single sources of truth.
+   - **Step 3.1**: Observation 4 demonstrates duplicated financial rate tables and simulation engines across `NegotiationTab.tsx` and `PatientScreen.tsx`, alongside a 6,614 line monolith in `DentalCRMView.tsx`.
+   - **Conclusion 3**: Codebase violates Ponytail (Full level) minimalism.
 
-4. **Unsafe Property Access**:
-   - Unguarded `.split('T')` on `p.date` and `.toLowerCase()` on `p.patientName` will cause uncaught runtime exceptions if records have missing/empty fields.
-
-5. **Ponytail Minimalism**:
-   - Implementation uses basic React hooks and native APIs cleanly without over-engineering or third-party bloat.
-   - Fixes can be achieved with lightweight, standard TS/React logic (e.g., checking `p.procedureId !== 'custom'`, adding `window.dispatchEvent(new Event('local-storage'))`, and safe navigation guards).
+4. **Premise 4**: Robustness requires edge case safety for patients with zero or many photos, empty budgets, and legacy files.
+   - **Step 4.1**: Observation 5 shows storing high-res photos in `localStorage` fails when a patient has multiple photos.
+   - **Conclusion 4**: Patient photo gallery scaling fails under browser storage constraints.
 
 ---
 
 ## 3. Caveats
 
-- Backend API persistence (Supabase `crm_data`) relies on external async network responses; static review focused on local state, event flow, and deduplication logic.
-- Browser test execution depends on build environment and local storage state in client browser runtime.
+- **No caveats**: All 6 files were directly inspected, line numbers verified, and logic traced.
 
 ---
 
@@ -120,88 +96,42 @@ Direct observations from source code inspection across target files:
 
 **Verdict**: **REQUEST_CHANGES**
 
-While event listener management in `DashboardView.tsx` and `CalendarView.tsx` is clean and Ponytail minimalism principles are generally respected, critical edge-case bugs exist in `FinancialView.tsx` deduplication and `DashboardView.tsx` payment reactivity:
+### Findings Summary:
 
-1. **[CRITICAL] Deduplication Key Collision**: `FinancialView.tsx` maps all custom procedure payments (`procedureId === 'custom'`) to `proc:custom`, causing custom payments to overwrite one another.
-2. **[MAJOR] Missing Storage Event Dispatch**: `handleConfirmQuickPayment` in `DashboardView.tsx` writes directly to `localStorage` without dispatching `'local-storage'`, breaking real-time updates in `FinancialView`.
-3. **[MAJOR] Unsafe Optional Properties**: Unguarded `.split('T')` on `p.date` and `.toLowerCase()` on `p.patientName` pose crash risks if payment records contain missing fields.
-4. **[MEDIUM] Incomplete Patient Resolution**: Using `pat_${Date.now()}` when `appt.patientId` is missing bypasses odontogram and proposal updates.
+1. **[CRITICAL] INTEGRITY VIOLATION (Facade Implementation in `PatientContext.tsx`)**
+   - **Location**: `src/context/PatientContext.tsx:242-251`
+   - **Why**: Misleading comment claims to sanitize/lighten base64 images >500KB, but returns un-sanitized `sec.image`.
+   - **Action**: Implement genuine image stripping/truncation for `localStorage` caching or remove the facade comment and handle full image storage via Supabase Storage URLs instead of data URLs.
+
+2. **[CRITICAL] Main-Thread Performance Degradation (12 Polling Timers in `PatientScreen.tsx`)**
+   - **Location**: `src/components/PatientScreen.tsx:53-73, 80-94`
+   - **Why**: 12 active 200ms `setInterval` timers constantly poll `localStorage` and iterate over keys on the main thread.
+   - **Action**: Replace `setInterval` polling with standard `storage` event listeners or consume `PatientContext` directly.
+
+3. **[MAJOR] Ponytail (Full Level) Minimalism & Code Duplication**
+   - **Location**: `src/components/PatientScreen.tsx`, `src/components/NegotiationTab.tsx`, `src/components/DentalCRMView.tsx`
+   - **Why**: Duplication of `TON_RATES`, `DEBIT_RATES`, and financial simulation calculations between `NegotiationTab` and `PatientScreen`. Monolithic size of `DentalCRMView` (6,614 lines).
+   - **Action**: Extract shared financial calculations into a single pure utility module (`src/lib/financialSimulations.ts`).
+
+4. **[MAJOR] Edge Case Storage Failure for Multiple Photos**
+   - **Location**: `src/context/PatientContext.tsx:241-269`
+   - **Why**: Serializing multiple base64 camera photos into `localStorage` causes `QuotaExceededError` (5MB limit).
+   - **Action**: Do not write heavy base64 image strings into `localStorage`. Store remote Supabase URLs or image metadata only.
+
+5. **[MINOR] Development Stub in Production Component**
+   - **Location**: `src/components/PatientsModal.tsx:337-343`
+   - **Why**: `alert('Renomear arquivos no Supabase em desenvolvimento.')` presents a mock stub in UI code.
+   - **Action**: Implement proper Supabase Storage copy/move logic or disable the rename action until implemented.
 
 ---
 
 ## 5. Verification Method
 
-To verify the findings and any subsequent fixes:
+To verify the findings and fix effectiveness:
 
-1. **Build Check**:
-   ```bash
-   npm run build
-   ```
-2. **Deduplication Verification Test**:
-   - Create two separate quick payments with custom procedures for different patients.
-   - Inspect `deduplicatedPayments` output in `FinancialView.tsx` — confirm both records appear instead of a single `proc:custom` entry.
-3. **Reactivity Verification Test**:
-   - Confirm a quick payment in `DashboardView.tsx`.
-   - Check `FinancialView.tsx` without manual page refresh — confirm the new payment appears immediately.
-4. **Edge Case Guard Verification**:
-   - Pass payment object `{ id: '1', amount: 100, date: undefined, patientName: undefined }` to `FinancialView`.
-   - Confirm `FinancialView` renders without throwing uncaught `TypeError`.
-
----
-
-## Review Summary
-
-**Verdict**: REQUEST_CHANGES
-
-## Findings
-
-### 1. [Critical] Map Key Collision on Custom Procedures in `FinancialView.tsx`
-- **What**: `deduplicatedPayments` groups payments by `proc:${p.procedureId}` whenever `p.procedureId` is truthy.
-- **Where**: `src/components/FinancialView.tsx`, line 42.
-- **Why**: Custom payments set `procedureId` to `'custom'`. All custom payments receive key `proc:custom` and overwrite each other in `deduplicatedPayments`.
-- **Suggestion**: Change condition to `p.procedureId && p.procedureId !== 'custom'`.
-
-### 2. [Major] Missing `'local-storage'` Event Dispatch in `handleConfirmQuickPayment`
-- **What**: `handleConfirmQuickPayment` writes directly to `localStorage` under `agnaldo_dent_financeiro` without dispatching `'local-storage'`.
-- **Where**: `src/components/DashboardView.tsx`, line 621.
-- **Why**: `FinancialView` uses `useReactiveLocalStorage`, which only reacts to `'local-storage'` or `'storage'` events.
-- **Suggestion**: Add `window.dispatchEvent(new Event('local-storage'))` right after `localStorage.setItem('agnaldo_dent_financeiro', ...)`.
-
-### 3. [Major] Unsafe Property Access on `date` and `patientName`
-- **What**: `p.date.split('T')[0]` and `p.patientName.toLowerCase()`.
-- **Where**: `src/components/FinancialView.tsx`, lines 46 and 71.
-- **Why**: Missing/undefined values cause fatal runtime `TypeError`.
-- **Suggestion**: Use `(p.date || '').split('T')[0]` and `(p.patientName || '').toLowerCase()`.
-
-### 4. [Minor / Pass] Event Bus Subscription & Unsubscription
-- **What**: Subscription to `appointments-updated` in `DashboardView.tsx` and `CalendarView.tsx`.
-- **Where**: `src/components/DashboardView.tsx` (lines 452-460) and `src/components/CalendarView.tsx` (lines 79-96).
-- **Status**: **PASS**. Clean cleanup on unmount, no memory leaks or stale closure issues detected.
-
-### 5. [Pass] Ponytail (Full Level) Minimalism
-- **What**: Assessment against Ponytail minimalism rules.
-- **Status**: **PASS**. Uses native React hooks and browser APIs directly without bloat or speculative abstractions.
-
----
-
-## Challenge Report (Adversarial Stress-Testing)
-
-**Overall Risk Assessment**: HIGH
-
-### Stress Test Scenarios
-
-1. **Multiple Custom Payments Across Patients**:
-   - *Attack*: Create payment A for Patient X with `procedureId = 'custom'`, then payment B for Patient Y with `procedureId = 'custom'`.
-   - *Result*: **FAIL**. `FinancialView` map key `proc:custom` causes Payment B to overwrite Payment A.
-
-2. **Dashboard Quick Payment Reactivity**:
-   - *Attack*: Submit `handleConfirmQuickPayment` in Dashboard tab while Financial tab is active.
-   - *Result*: **FAIL**. Financial tab does not receive `'local-storage'` event, UI remains stale until page refresh.
-
-3. **Malformed Payment Record Handling**:
-   - *Attack*: Inject payment record with `date: ""` or `patientName: undefined`.
-   - *Result*: **FAIL**. Financial tab crashes with uncaught `TypeError`.
-
-4. **Event Bus Mount/Unmount Cycle**:
-   - *Attack*: Mount and unmount `CalendarView` and `DashboardView` 100 times.
-   - *Result*: **PASS**. All event listeners are properly removed, zero listener leaks.
+1. **Inspect Facade Truncation**:
+   - Inspect `src/context/PatientContext.tsx:245-251` to confirm whether `sec.image` is modified or returned verbatim.
+2. **Profile Main-Thread Performance**:
+   - Open DevTools Performance tab on `PatientScreen` and record CPU activity to observe 200ms timer callbacks.
+3. **Verify Storage Quota Edge Case**:
+   - Add 3 photos (>1.5MB each) to active sections and check `localStorage.getItem('agnaldo_dent_sections')`.

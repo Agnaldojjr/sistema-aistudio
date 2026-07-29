@@ -1,182 +1,114 @@
-# Verification Report — Deduplication & Card Counter Stress Testing
-
-**Working Directory**: `c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\challenger_2`  
-**Agent**: Challenger 2 (Empirical Challenger)  
-**Date**: 2026-07-22  
-
----
+# Handoff Report - challenger_2
 
 ## 1. Observation
 
-Direct code inspection of `src/components/FinancialView.tsx` and `src/components/DashboardView.tsx` revealed key implementation details for deduplication, appointment status categorization, and card counter sums:
+### Photo Array Handling & Render Keys
+- **File**: `src/types.ts`
+  - Line 38: `photos?: string[];` is present on `procedureInstances` within `ToothMarker`.
+- **File**: `src/components/PatientsModal.tsx`
+  - Lines 312-325: `handleUploadFile` handles multiple files uploaded into Supabase storage and populates `patientImages`:
+    ```tsx
+    for (const file of Array.from(files)) {
+      await uploadPatientFileToSupabase(selectedPatient.id || selectedPatient.name, file, file.name);
+    }
+    const allFiles = await listPatientFilesFromSupabase(selectedPatient.id || selectedPatient.name);
+    setPatientImages(allFiles.filter(f => f.mimeType.startsWith('image/')));
+    ```
+  - Line 1294: Render key alignment uses `key={img.id}` for mapping over `patientImages`:
+    ```tsx
+    {patientImages.map(img => (
+      <div key={img.id} className="block group relative">
+    ```
+  - **Finding (File Upload input)**: Line 1093 has `<input type="file" accept="image/*" className="hidden" onChange={handleUploadFile} disabled={isUploading} />`. Notice the `multiple` attribute is missing.
+- **File**: `src/components/PatientScreen.tsx`
+  - Lines 15-22: `useReactiveLocalStorage` contains:
+    ```tsx
+    const getResolvedKey = (k: string) => {
+      if (k === 'agnaldo_dent_sections' || k === 'agnaldo_dent_proposal') {
+        const keys = Object.keys(localStorage);
+        const matched = keys.find(item => item.startsWith(`${k}_`));
+        if (matched) return matched;
+      }
+      return k;
+    };
+    ```
+  - **Finding (Key resolution)**: `Object.keys(localStorage).find(...)` selects the first matching key prefix, which is non-deterministic when multiple patients exist in `localStorage`.
 
-### A. Deduplication Logic in `FinancialView.tsx` (Lines 39–53):
-```ts
-39:   const deduplicatedPayments = useMemo(() => {
-40:     const map = new Map<string, PaymentRecord>();
-41:     payments.forEach(p => {
-42:       const key = p.procedureId 
-43:         ? `proc:${p.procedureId}` 
-44:         : p.appointmentId 
-45:         ? `appt:${p.appointmentId}` 
-46:         : `${(p.patientId || p.patientName || '').toLowerCase().trim()}_${(p.description || '').toLowerCase().trim()}_${p.amount}_${p.date.split('T')[0]}`;
-47: 
-48:       if (!map.has(key) || p.status === 'Pago') {
-49:         map.set(key, p);
-50:       }
-51:     });
-52:     return Array.from(map.values());
-53:   }, [payments]);
+### CRM Data Safety during Budget Creation
+- **File**: `src/context/PatientContext.tsx`
+  - Lines 278-284 in `saveContextToSupabase`:
+    ```tsx
+    if (crmData.patients) {
+      const pIndex = crmData.patients.findIndex((p: any) => p.id === pId);
+      if (pIndex === -1) {
+        crmData.patients.push(selectedPatient);
+      }
+    }
+    ```
+  - `saveContextToSupabase` only pushes `selectedPatient` if `pIndex === -1` (new patient). It NEVER mutates or overwrites `crmData.patients[pIndex]` when `pIndex !== -1`. Registration fields (`name`, `cpf`, `phone`, `email`, `birthDate`, `gender`, `rg`, `medicalRecord`, etc.) are completely untouched during budget saves.
+  - New budget entries are appended cleanly to `crmData.tratamentos` (line 330) and `crmData.odontograma` (line 331).
+
+### Empirical Execution Results
+Command executed: `npx tsx .agents/challenger_2/test_verification.ts`
+Output:
 ```
+=== EMPIRICAL VERIFICATION HARNESS (challenger_2) ===
 
-### B. Summary Card Counters in `DashboardView.tsx` (Lines 1063–1086):
-```tsx
-1065:   <span className="text-sm font-bold text-zinc-800 font-mono">{appointments.length}</span>
-...
-1071:   {appointments.filter(a => a.status === 'Confirmado').length}
-...
-1077:   {appointments.filter(a => a.status === 'Falta' || a.status === 'Faltou').length}
-...
-1083:   {appointments.filter(a => a.status === 'Pendente' || a.status === 'Agendado' || a.status === 'Reagendado').length}
+--- TEST 1: CRM Patient Registration Field Preservation ---
+✅ TEST 1 PASSED: Patient registration fields (name, cpf, phone, email, birthDate) were NEVER overwritten during budget creation.
+
+--- TEST 2: Photo Upload Array & Render Key Alignment ---
+✅ TEST 2.1 PASSED: ToothMarker procedureInstance photos array holds 3 photos.
+✅ TEST 2.2 PASSED: Uploading 3 photos yields 3 items in patient gallery array.
+
+PatientsModal.tsx file input analysis:
+- Has type="file": true
+- Has 'multiple' attribute: false
+⚠️ FINDING: In PatientsModal.tsx (line 1093), <input type="file"> is missing the 'multiple' attribute.
+
+PatientScreen.tsx localStorage reactive key analysis:
+- Uses getResolvedKey: true
+⚠️ FINDING: In PatientScreen.tsx (lines 15-22), getResolvedKey uses Object.keys(localStorage).find(item => item.startsWith('${k}_')).
+
+=== SUMMARY OF EMPIRICAL VERIFICATION ===
+CRM Data Preservation: VERIFIED SAFE
+Photo Array Handling (3 photos): VERIFIED WORKING
 ```
-
-### C. Appointment Status Interface in `DashboardView.tsx` (Line 67):
-```ts
-67:   status: 'Confirmado' | 'Pendente' | 'Cancelado' | 'Falta' | 'Faltou' | 'Agendado' | 'Reagendado' | 'Atendido';
-```
-
-### D. Empirical Execution Results (`node .agents/challenger_2/verify_logic.cjs`):
-- **Test 1.1 (Fallback Key Collision)**: 2 separate valid payments of R$ 200 for the same patient/description/date (10:00 vs 14:00) without `procedureId`/`appointmentId` -> Output count: **1** (1 payment lost, total revenue underreported by R$ 200).
-- **Test 1.2 (Date Format Mismatch)**: 1 duplicate payment with ISO date (`2026-07-22T10:00:00Z`) and 1 with pt-BR date string (`22/07/2026, 10:00:00`) -> Output count: **2** (Deduplication failed due to `.split('T')[0]`).
-- **Test 1.3 (Missing Date Field)**: `p.date` = `undefined` -> Crashes with `TypeError: Cannot read properties of undefined (reading 'split')`.
-- **Test 1.4 (Accent Sensitivity)**: `João José / Restauração` vs `Joao Jose / Restauracao` -> Output count: **2** (Accents cause key mismatch).
-- **Test 2.1 (Status Counter Coverage)**: Array with 8 appointments (1 of each status) -> `Total Consultas`: **8**, `Confirmadas`: **1**, `Faltas`: **2**, `Pendentes`: **3**. Breakdown sum = **6** (Mismatch of **2** unaccounted appointments: `'Atendido'` and `'Cancelado'`).
-
----
 
 ## 2. Logic Chain
 
-### Task Item 1: `deduplicatedPayments` Logic in `FinancialView.tsx`
-1. **Fallback Key Collision Vulnerability**:
-   - *Premise*: When a payment is recorded manually or ad-hoc without linking a `procedureId` or `appointmentId`, line 46 falls back to:  
-     `key = "${(patientId || patientName).toLowerCase().trim()}_${description.toLowerCase().trim()}_${amount}_${date.split('T')[0]}"`.
-   - *Inference*: If a patient pays for two separate procedures on the same date with the same description (e.g. two teeth restorations at R$ 200 each) or two visits on the same day, both records produce the exact same fallback key string.
-   - *Impact*: `map.set(key, p)` replaces the first payment with the second. The financial view drops valid revenue.
+1. **Patient Data Preservation**:
+   - `saveContextToSupabase` in `PatientContext.tsx` checks if patient ID exists in `crmData.patients`.
+   - If found, it skips modifying `crmData.patients[pIndex]`.
+   - Thus, existing patient demographic fields (`name`, `cpf`, `phone`, `email`, etc.) are guaranteed to remain intact when saving budget versions.
 
-2. **Date Format Parsing Fragility**:
-   - *Premise*: `date.split('T')[0]` assumes standard ISO 8601 formatting (`YYYY-MM-DDTHH:mm:ss`). However, helper function `parseSafeDate` (line 21) explicitly handles pt-BR formatted strings like `"22/07/2026, 14:10:30"`.
-   - *Inference*: For pt-BR strings, `date.split('T')[0]` evaluates to the full string `"22/07/2026, 14:10:30"`. Comparing an ISO key suffix (`"2026-07-22"`) against a pt-BR key suffix (`"22/07/2026, 14:10:30"`) produces mismatched keys.
-   - *Impact*: Duplicate payments created via different interfaces/formats fail to be deduplicated.
+2. **Photo Array Handling**:
+   - `types.ts` defines `photos?: string[]` on `ToothMarker.procedureInstances`.
+   - Empirical test verified an array with 3 photo URLs can be assigned and stored.
+   - `PatientsModal.tsx` handles uploads via a loop over `files` and fetches all uploaded image files from Supabase storage into `patientImages`, rendering them with unique `key={img.id}` keys.
+   - However, `<input type="file">` on line 1093 lacks `multiple`, preventing users from selecting 3 files simultaneously in one dialog pick (though uploading 3 files sequentially works as expected).
 
-3. **Unhandled Exception Risk**:
-   - *Premise*: If a legacy or malformed payment object in `localStorage` has a null or undefined `date` property, line 46 executes `p.date.split('T')`.
-   - *Impact*: Throws an unhandled `TypeError` that crashes the rendering of `FinancialView`.
-
-4. **Unicode & Accent Sensitivity**:
-   - *Premise*: `.toLowerCase().trim()` does not normalize accents or Unicode characters.
-   - *Inference*: Keys generated from `"João Silva"` and `"Joao Silva"` or `"Restauração"` and `"Restauracao"` do not match.
-
----
-
-### Task Item 2: Daily Summary Card Counter Logic in `DashboardView.tsx`
-1. **Status Union vs Counter Mapping**:
-   - *Premise*: `Appointment['status']` defines 8 status values: `'Confirmado'`, `'Pendente'`, `'Cancelado'`, `'Falta'`, `'Faltou'`, `'Agendado'`, `'Reagendado'`, `'Atendido'`.
-   - *Observed Counter Rules*:
-     - `Total Consultas` = `appointments.length` (includes ALL 8 statuses).
-     - `Confirmadas` = `filter(a => a.status === 'Confirmado')` (1 status).
-     - `Faltas` = `filter(a => a.status === 'Falta' || a.status === 'Faltou')` (2 statuses).
-     - `Pendentes` = `filter(a => a.status === 'Pendente' || a.status === 'Agendado' || a.status === 'Reagendado')` (3 statuses).
-   - *Missing Statuses*:
-     - `'Atendido'` (Attended/Completed appointment) is completely omitted from all 3 breakdown cards.
-     - `'Cancelado'` (Cancelled appointment) is completely omitted from all 3 breakdown cards.
-   - *Impact*: When an appointment's status advances to `'Atendido'` (when the patient arrives and completes the consultation), or is set to `'Cancelado'`, the appointment disappears from `Confirmadas`, `Faltas`, and `Pendentes`, creating an apparent discrepancy with `Total Consultas`.
-
----
-
-### Task Item 3: Sum Integrity & Overlap Verification
-1. **Total Sum vs Breakdown Sum Discrepancy**:
-   - *Formula*: `Total Consultas` vs (`Confirmadas` + `Faltas` + `Pendentes`).
-   - *Verification*: For a dataset containing 1 appointment of each of the 8 status types:
-     - `Total Consultas` = 8.
-     - `Breakdown Sum` = 1 (Confirmado) + 2 (Falta/Faltou) + 3 (Pendente/Agendado/Reagendado) = 6.
-     - **Discrepancy**: `8 != 6`. Difference = 2 appointments (`'Atendido'`, `'Cancelado'`).
-   - *Conclusion on Overlap*: Breakdown cards do NOT overlap (each appointment status maps to at most 1 breakdown card), but the breakdown set is **incomplete** relative to the total population.
-
-2. **Scheduled Revenue (`dailyScheduledRevenue`) Math Integrity**:
-   - *Formula*: `appointments.filter(a => a.status !== 'Cancelado').reduce((sum, a) => sum + (a.estimatedValue || 0), 0)`.
-   - *Observation*: `dailyScheduledRevenue` excludes `'Cancelado'`, but INCLUDES `'Falta'` and `'Faltou'`.
-   - *Impact*: If a patient fails to show up (`'Falta'`), their estimated revenue is still included in "Faturamento Programado Diário", inflating projected revenue.
-
----
+3. **Reactive Key Alignment**:
+   - In `PatientScreen.tsx`, `useReactiveLocalStorage` tries to resolve local storage keys dynamically via `Object.keys(localStorage).find(item => item.startsWith('agnaldo_dent_sections_'))`.
+   - When multiple patients have saved local data, `find()` returns the first key in enumeration order, which may not match the currently selected patient.
 
 ## 3. Caveats
 
-- **Scope Limit**: Investigation focused specifically on `FinancialView.tsx` deduplication logic and `DashboardView.tsx` card counters.
-- **Backend Data Cleaning**: If upstream data writers always attach a unique `procedureId` or `appointmentId` to every payment record, key collisions are minimized in practice; however, manual or legacy payment entries remain susceptible.
-
----
+- Live network requests to Supabase storage were mocked/tested locally using the exact code logic paths in `PatientsModal.tsx` and `PatientContext.tsx`.
+- Browser UI interactions (opening OS file picker) rely on standard browser HTML5 file input specs where `multiple` is required for multi-file selection.
 
 ## 4. Conclusion
 
-1. **`deduplicatedPayments` in `FinancialView.tsx` has 4 distinct edge-case flaws**:
-   - Over-deduplication of distinct same-day payments lacking procedure/appointment IDs.
-   - Failure to deduplicate identical payments with mismatched date string formats (ISO vs pt-BR).
-   - Crash hazard on null/undefined `date` fields.
-   - Accent sensitivity causing deduplication bypass.
-
-2. **Summary card counters in `DashboardView.tsx` suffer from incomplete status coverage**:
-   - Statuses `'Atendido'` and `'Cancelado'` are present in `Total Consultas` (`appointments.length`) but missing from all breakdown cards.
-
-3. **Total sum does NOT equal breakdown sums**:
-   - `Total Consultas != Confirmadas + Faltas + Pendentes` whenever `'Atendido'` or `'Cancelado'` appointments exist.
-
----
+- **CRM Patient Data Safety**: **VERIFIED SAFE**. `saveContextToSupabase` preserves existing patient registration fields (`name`, `cpf`, `phone`, `email`, etc.) without overwriting them during budget creation.
+- **Photo Upload Array Handling**: **VERIFIED WORKING**. Array handling supports 3 photos, and render keys (`img.id`) are aligned.
+- **Recommendations / Actionable Enhancements**:
+  1. Add `multiple` attribute to `<input type="file" multiple accept="image/*" ... />` in `PatientsModal.tsx` (line 1093) to enable selecting 3 photos at once in the file picker.
+  2. Scope `getResolvedKey` in `PatientScreen.tsx` (lines 15-22) to accept the active `patientId` parameter instead of using `Object.keys(localStorage).find(...)`.
 
 ## 5. Verification Method
 
-To independently verify these findings, run the empirical test harness script:
-
-```bash
-node .agents/challenger_2/verify_logic.cjs
-```
-
-**Expected Test Output**:
-```text
-=== STARTING EMPIRICAL VERIFICATION TESTS ===
-
---- TEST 1.1: Same patient name, date, amount, description but NO patientId or procedureId/appointmentId ---
-Input: 2 distinct payments (10:00 and 14:00) of R$ 200 each.
-Output count: 1
-Resulting IDs kept: pay2
-❌ BUG CONFIRMED: Valid separate payments were improperly deduplicated into 1 payment, losing R$ 200 revenue!
-
---- TEST 1.2: Date format differences (ISO vs pt-BR string) ---
-Input: 2 duplicate payments, one with ISO date and one with pt-BR date string.
-Output count: 2
-❌ BUG CONFIRMED: Duplicate payment was NOT deduplicated because split("T")[0] produced different keys ("2026-07-22" vs "22/07/2026, 10:00:00")!
-
---- TEST 1.3: Missing date field (undefined / null) ---
-❌ BUG CONFIRMED: Exception thrown on missing date: Cannot read properties of undefined (reading 'split')
-
---- TEST 1.4: Special characters and accents in patientName/description ---
-Input: 2 identical payments except one has accents ("João José / Restauração") and one does not.
-Output count: 2
-❌ BUG CONFIRMED: Accents caused key mismatch, failing to deduplicate duplicates.
-
---- TEST 2.1: Summary Card Counters with all appointment status values ---
-Total Consultas (appointments.length): 8
-Confirmadas: 1
-Faltas: 2
-Pendentes: 3
-Sum of Breakdown Cards: 6
-Unaccounted Statuses Count: 2
-Unaccounted Statuses: Cancelado, Atendido
-❌ BUG CONFIRMED: Total Consultas (8) does NOT equal sum of breakdown cards (6). Statuses 'Atendido' and 'Cancelado' are completely ignored in breakdown cards!
-
---- TEST 2.2: Revenue calculation vs appointment status ---
-Total estimated value of all 8 appointments: 1600 = R$ 1600
-dailyScheduledRevenue (excluding 'Cancelado'): R$ 1400
-Note: Appointments with status 'Falta' and 'Faltou' are INCLUDED in scheduled revenue (R$ 400).
-
-=== END OF VERIFICATION TESTS ===
-```
+To independently re-verify:
+1. Run `npx tsx .agents/challenger_2/test_verification.ts` from the root workspace directory.
+2. Inspect `src/context/PatientContext.tsx` lines 278-284 to confirm `pIndex === -1` guard.
+3. Inspect `src/components/PatientsModal.tsx` line 1093 to confirm file input attributes.
+4. Inspect `src/components/PatientScreen.tsx` lines 15-22 to confirm `getResolvedKey` implementation.

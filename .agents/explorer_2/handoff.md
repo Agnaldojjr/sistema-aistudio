@@ -1,250 +1,134 @@
-# Handoff Report — Financial Entry Generation and Unification (Requirement R2)
+# Handoff Report — CRM Refactoring Requirements (R3, R4, R5)
 
 ## 1. Observation
 
-### Key Codebase Files Examined:
-1. `src/types.ts`: Lines 112–129 (`CRMAppointment`), Lines 167–176 (`PaymentRecord`).
-2. `src/components/EventModal.tsx`: Lines 73–81, 216–234, 258–313, 437–555 (`handleSave`, appointment procedure linking).
-3. `src/components/CalendarView.tsx`: Lines 18–36, 179–205 (Calendar appointment triggering).
-4. `src/components/DashboardView.tsx`: Lines 565–696 (`handleOpenQuickPayment`, `handleConfirmQuickPayment`).
-5. `src/components/DentalCRMView.tsx`: Lines 331–415 (auto-sync `useEffect`), Lines 1125–1171 (`updateProcedureInstanceStatus`), Lines 4809–4853 (`handleApproveBudget`).
-6. `src/components/NegotiationTab.tsx`: Lines 668–727 (procedure payment toggle sync), Lines 1211–1253 (budget proposal approval sync).
-7. `src/components/FinancialView.tsx`: Lines 10–60 (`useReactiveLocalStorage`, `PaymentRecord` rendering).
-8. `src/context/PatientContext.tsx`: Lines 30–31, 87, 165, 257 (`pagamentosList` state & Supabase context sync).
+Direct observations from codebase inspection (`src/lib/supabaseStorage.ts`, `src/components/DentalCRMView.tsx`, `src/components/NegotiationTab.tsx`, `src/components/PatientsModal.tsx`, `src/components/PatientScreen.tsx`, `src/context/PatientContext.tsx`, `src/types.ts`):
 
----
+1. **Storage Path Construction (`src/lib/supabaseStorage.ts:15-35`)**:
+   - `uploadPatientFileToSupabase` function signature:
+     ```typescript
+     export async function uploadPatientFileToSupabase(patientName: string, file: File | Blob, filename: string) {
+       const userId = session.user.id;
+       const patientFolder = getSafePatientPath(patientName);
+       const filePath = `${userId}/${patientFolder}/${filename}`;
+       ...
+     ```
+   - Observed that `filePath` is hardcoded to `${userId}/${patientFolder}/${filename}` without any subfolder parameter or automatic subfolder placement.
 
-### Verbatim Code Findings:
+2. **Budget PDF Export (`src/components/NegotiationTab.tsx:1109-1111`)**:
+   - Budget PDF upload execution:
+     ```typescript
+     const cleanFileName = `Orcamento_${safePatientName.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
+     await uploadPatientFileToSupabase(safePatientName, pdfBlob, cleanFileName);
+     ```
+   - Observed that `cleanFileName` is generated without any subfolder prefix (`Orcamento_...pdf`).
 
-#### Finding A: Data Types Lack Linking Relations (`src/types.ts`)
-```ts
-// Lines 167-176
-export interface PaymentRecord {
-  id: string;
-  patientId?: string;
-  patientName: string;
-  date: string;
-  amount: number;
-  paymentMethod: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito';
-  status: 'Pago' | 'Pendente';
-  description?: string;
-}
-```
-*Observation*: `PaymentRecord` does not contain any reference field (`appointmentId`, `procedureId`, `procedureInstanceId`, or `budgetId`) connecting the payment record back to the appointment or budget item.
+3. **Cloud Drive Non-Image Filtering (`src/components/DentalCRMView.tsx:1295`)**:
+   - Image filter definition:
+     ```typescript
+     const filterSupabaseImages = (files: any[]) => {
+       const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+       return (files || []).filter(f => imageExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+     };
+     ```
+   - Observed that `filterSupabaseImages` excludes `.pdf`, `.doc`, `.docx`, and `.txt` files from being loaded into `driveImages`.
 
-#### Finding B: Appointment Saving Records Procedure Meta but No Payment Record (`src/components/EventModal.tsx`)
-```ts
-// Lines 299-312
-const newApptRecord = {
-  id: eventId,
-  patientId,
-  patientName: title,
-  date,
-  time: startTime,
-  status: 'Confirmado',
-  observations: description,
-  estimatedValue: Number(estimatedValue) || 0,
-  linkedProcedureId: selectedPlanProcedureId || selectedCatalogId || 'custom',
-  linkedProcedureName: finalProcedureName,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString()
-};
-```
-*Observation*: `EventModal` links the appointment to a plan/catalog procedure ID (`linkedProcedureId`) and estimated value (`estimatedValue`), but does not register a financial record yet.
+4. **Cloud Drive Tab Render Loop (`src/components/DentalCRMView.tsx:5717-6150`)**:
+   - `activeDetailTab === 'drive_records'` renders `driveProposals` (`.json` files) in Part 1 and `driveImages` (image files only) in Part 2.
+   - Observed that PDFs (like `Orcamento_...pdf`) and documents are not rendered in either Part 1 or Part 2.
 
-#### Finding C: Quick Payment in Dashboard Generates Random ID (`src/components/DashboardView.tsx`)
-```ts
-// Lines 583-595
-const paymentId = `pay_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-const pId = appt.patientId || `pat_${Date.now()}`;
+5. **Procedure Instance Photo Slots Schema (`src/types.ts:36-37`)**:
+   - `ToothMarker.procedureInstances` fields:
+     ```typescript
+     photoAntesUrl?: string;
+     photoDepoisUrl?: string;
+     ```
+   - In `DentalCRMView.tsx:526-530` (`handleUploadTimelinePhoto`):
+     ```typescript
+     if (type === 'antes') {
+       inst.photoAntesUrl = storageFilename;
+     } else {
+       inst.photoDepoisUrl = storageFilename;
+     }
+     ```
+   - Observed that there are only two string properties (`photoAntesUrl` and `photoDepoisUrl`) available per procedure instance.
 
-const newPaymentRecord: PaymentRecord = {
-  id: paymentId,
-  patientId: pId,
-  patientName: appt.patientName,
-  date: paymentDate,
-  amount: Number(paymentAmount) || 0,
-  paymentMethod: paymentMethod,
-  status: 'Pago',
-  description: paymentDescription
-};
-```
-*Observation*: When a payment is recorded for an appointment in `DashboardView`, a non-deterministic random string ID (`pay_1772849...`) is created.
+6. **File Input Single-File Truncation (`src/components/PatientsModal.tsx:309`)**:
+   - File upload change handler:
+     ```typescript
+     const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+       const files = e.target.files;
+       if (!files || files.length === 0 || !selectedPatient) return;
+       const file = files[0];
+     ```
+   - Observed that `files[0]` extracts only the first file from `e.target.files`, ignoring remaining files.
 
-#### Finding D: Auto-Sync in DentalCRM & NegotiationTab Generates Deterministic IDs (`src/components/DentalCRMView.tsx` & `NegotiationTab.tsx`)
-In `DentalCRMView.tsx` (Lines 368, 1126):
-```ts
-const payId = `pay-${instanceId}`;
-```
-In `NegotiationTab.tsx` (Line 681):
-```ts
-const payId = `pay-proc-${sectionId}-${markerId}-${procId}`;
-```
-In Budget Approval (`DentalCRMView.tsx:4813` & `NegotiationTab.tsx:1213`):
-```ts
-const budgetPayId = 'pay-budget-' + fileKey.replace(/[^a-zA-Z0-9-]/g, '_');
-```
-*Observation*: Budget procedures and proposals generate financial entries using deterministic IDs derived from procedure/file keys, while appointment payments generate random timestamp IDs.
-
-#### Finding E: Bulk Side-Effect in Dashboard Payment Confirmation (`src/components/DashboardView.tsx`)
-```ts
-// Lines 619-637
-const patientOdonts = crmData.odontograma.filter((o: any) => o.patientId === pId);
-if (patientOdonts.length > 0) {
-  const latestOdont = patientOdonts[patientOdonts.length - 1];
-  if (latestOdont && latestOdont.sections) {
-    latestOdont.sections.forEach((sec: any) => {
-      sec.markers?.forEach((m: any) => {
-        if (m.procedureInstances) {
-          m.procedureInstances.forEach((inst: any) => {
-            if (!inst.paid) {
-              inst.paid = true;
-              inst.paymentMethod = paymentMethod;
-              inst.paymentDate = paymentDate;
-              inst.status = 'Realizado';
-            }
-          });
-        }
-      });
-    });
-  }
-}
-```
-*Observation*: When quick payment is confirmed for an appointment in `DashboardView`, it sets `inst.paid = true` and `inst.status = 'Realizado'` for ALL unpaid procedure instances in the patient's entire odontogram. When `DentalCRMView` mounts or updates, its auto-sync `useEffect` sees those procedures marked as `Realizado` and creates additional `pay-${instanceId}` entries for each procedure!
+7. **PatientScreen LocalStorage Key Mismatch (`src/components/PatientScreen.tsx:70` vs `src/context/PatientContext.tsx:244`)**:
+   - `PatientScreen.tsx:70`:
+     ```typescript
+     const sections = useReactiveLocalStorage<PhotoSection[]>('agnaldo_dent_sections', []);
+     ```
+   - `PatientContext.tsx:244`:
+     ```typescript
+     localStorage.setItem(`agnaldo_dent_sections_${selectedPatient.id}`, JSON.stringify(activeSections));
+     ```
+   - Observed that `PatientScreen.tsx` listens to key `'agnaldo_dent_sections'` while `PatientContext.tsx` writes to `agnaldo_dent_sections_${selectedPatient.id}`.
 
 ---
 
 ## 2. Logic Chain
 
-1. **Premise 1 (Multiple Entry Generators)**: Financial entries are created from 4 distinct UI locations:
-   - Dashboard Quick Payment (`DashboardView.tsx`)
-   - Budget Proposal Approval (`DentalCRMView.tsx` & `NegotiationTab.tsx`)
-   - Budget Procedure Status Change / Auto-sync (`DentalCRMView.tsx`)
-   - Individual Procedure Payment Toggle (`NegotiationTab.tsx`)
+1. **R3 (Cloud Drive Segregation)**:
+   - Observation 1 shows `uploadPatientFileToSupabase` constructs `filePath` as `${userId}/${patientFolder}/${filename}` with no subfolder logic.
+   - Observation 2 shows `NegotiationTab.tsx:1111` calls `uploadPatientFileToSupabase` passing `cleanFileName` (`Orcamento_...pdf`) without an `'Orçamentos'` subfolder prefix or parameter.
+   - **Step Reasoning**: Because no subfolder parameter or prefix is provided, Supabase Storage places budget PDFs directly in the patient's root directory (`${userId}/${patientFolder}/Orcamento_...pdf`), failing to segregate them into an `"Orçamentos"` folder.
 
-2. **Premise 2 (Inconsistent ID Schema)**:
-   - `DashboardView.tsx` assigns `id = pay_${Date.now()}_${random}` when paying an appointment.
-   - `DentalCRMView.tsx` assigns `id = pay-${instanceId}` when auto-syncing executed procedures.
-   - `NegotiationTab.tsx` assigns `id = pay-proc-${sectionId}-${markerId}-${procId}`.
+2. **R4 (Cloud Drive Photo Gallery Grid & Doc Icons)**:
+   - Observation 3 shows `filterSupabaseImages` filters files strictly by image extensions (`.jpg`, `.png`, `.webp`, etc.).
+   - Observation 4 shows `DentalCRMView.tsx:5717-6150` renders `.json` proposals in Part 1 and image files in Part 2.
+   - **Step Reasoning**: Because non-image files like PDFs and Word documents are stripped out by `filterSupabaseImages`, they are never passed to the render loop. To display non-images in the visual grid, the fetching filter must be updated and grid tile render components added for PDFs (red document tile), Word/text files (blue document tile), and JSON proposals (gold tile).
 
-3. **Premise 3 (Lack of Linking Key & Deduplication)**:
-   - `PaymentRecord` has no `procedureId` or `appointmentId` field.
-   - When an appointment is scheduled for a budget procedure (e.g. R$ 200 for "Restauração Dente 14"), `EventModal` records `linkedProcedureId = proc_upper-14_proc_1`.
-   - When the appointment is paid in `DashboardView`, it creates entry A with `id = pay_17728491...`, `amount = 200`.
-   - Simultaneously, `DashboardView` marks the procedure `proc_upper-14_proc_1` as `Realizado`.
-   - `DentalCRMView`'s auto-sync effect runs, checks if `pay-proc_upper-14_proc_1` exists in `localList` / `agnaldo_dent_financeiro`. Since entry A has ID `pay_17728491...`, the check returns `false`!
-   - `DentalCRMView` creates entry B with `id = pay-proc_upper-14_proc_1`, `amount = 200`.
-
-4. **Conclusion / Exact Root Cause**:
-   The duplicate financial entries (e.g., two R$ 200 entries instead of one unified R$ 200 entry) occur because:
-   a) **ID Disparity**: Appointment payments create random IDs while budget procedure sync creates deterministic IDs, causing deduplication checks (`localList.some(p => p.id === payId)`) to fail.
-   b) **Missing Relation Link**: `PaymentRecord` lacks linking fields (`procedureId` / `appointmentId`) to recognize that entry A and entry B refer to the exact same procedure.
-   c) **Cascading Side-Effects**: `DashboardView.tsx` marks all unpaid budget procedures as `Realizado` upon appointment payment, triggering secondary auto-sync payment creation in `DentalCRMView.tsx`.
+3. **R5 (Patient Screen Photo Upload Bug - 3 Photos -> 2 Displayed)**:
+   - Observation 5 shows `procedureInstances` in `types.ts` contains only 2 string fields (`photoAntesUrl` and `photoDepoisUrl`). When uploading 3 photos for a procedure record, the 3rd upload overwrites one of the existing slots because no 3rd slot or array exists.
+   - Observation 6 shows file input handlers like `PatientsModal.tsx:309` take `files[0]`, discarding files index `1` and `2` when selecting 3 files in the OS file browser.
+   - Observation 7 shows `PatientScreen.tsx` listens to LocalStorage key `'agnaldo_dent_sections'` while `PatientContext.tsx` writes to `agnaldo_dent_sections_${selectedPatient.id}`.
+   - **Step Reasoning**: The combination of 2-slot schema bounds (`photoAntesUrl`/`photoDepoisUrl`), single-file array indexing (`files[0]`), and LocalStorage key mismatch causes multi-photo uploads of 3 photos to truncate to 2 photos (or 1 photo) on the patient screen.
 
 ---
 
 ## 3. Caveats
 
-- **No Source Code Edits Made**: This investigation was strictly read-only per rules.
-- **Backend Persistence**: Financial records rely on both `localStorage` (`agnaldo_dent_financeiro`) and Supabase JSON column `crm_data.pagamentos`. Any fix must update both stores synchronously.
-- **Existing Duplicate Cleaning**: The fix strategy must address both future entry creation and retroactive cleaning of existing duplicates already stored in `localStorage` or `Supabase`.
+- **Existing Storage Data**: Budget PDFs already saved to Supabase Storage prior to this refactoring reside at the root patient directory (`${userId}/${patientFolder}/Orcamento_...pdf`). A migration helper or fallback lookup may be needed to display legacy PDFs inside the `"Orçamentos"` folder.
+- **LocalStorage Quota**: Data URLs (base64 images) stored in `activeSections` in `localStorage` can hit the 5MB browser quota if multiple high-resolution photos are uploaded. Compressing images or storing Supabase Storage URLs is strongly recommended.
 
 ---
 
-## 4. Conclusion & Concrete Fix Strategy
+## 4. Conclusion
 
-To solve Requirement R2 cleanly following `/ponytail` (minimalist, standard TS/React logic, no heavy dependencies) and `/systematic-debugging`:
-
-### Step-by-Step Fix Recommendations:
-
-#### Step 1: Extend `PaymentRecord` Interface in `src/types.ts`
-Add optional relation keys to `PaymentRecord`:
-```ts
-export interface PaymentRecord {
-  id: string;
-  patientId?: string;
-  patientName: string;
-  date: string;
-  amount: number;
-  paymentMethod: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito';
-  status: 'Pago' | 'Pendente';
-  description?: string;
-  // Unification Keys (R2)
-  appointmentId?: string;
-  procedureId?: string; // links to ToothMarker procedureInstance id
-  budgetId?: string;
-}
-```
-
-#### Step 2: Standardize Deterministic Financial Entry IDs
-Adopt a single deterministic ID policy across all modules:
-- If a financial entry is for a budget procedure instance `procId`:
-  `payId = pay-proc-${procId}`
-- If a financial entry is for an appointment with a `linkedProcedureId`:
-  `payId = appt.linkedProcedureId && appt.linkedProcedureId !== 'custom' ? pay-proc-${appt.linkedProcedureId} : pay-appt-${appt.id}`
-- If a financial entry is for a full budget:
-  `payId = pay-budget-${budgetId}`
-
-#### Step 3: Implement Unified Upsert Function for Financial Entries
-Create a single helper function in `src/lib/calendar.ts` or a shared utility:
-```ts
-export function upsertPaymentRecord(payments: PaymentRecord[], newRecord: PaymentRecord): PaymentRecord[] {
-  const index = payments.findIndex(p => 
-    p.id === newRecord.id ||
-    (newRecord.procedureId && p.procedureId === newRecord.procedureId) ||
-    (newRecord.appointmentId && p.appointmentId === newRecord.appointmentId)
-  );
-
-  if (index >= 0) {
-    const updated = [...payments];
-    updated[index] = { ...updated[index], ...newRecord, id: updated[index].id || newRecord.id };
-    return updated;
-  }
-  return [newRecord, ...payments];
-}
-```
-
-#### Step 4: Refine Dashboard Payment Side-Effects (`DashboardView.tsx`)
-In `handleConfirmQuickPayment`:
-- Set `procedureId: appt.linkedProcedureId` and `appointmentId: appt.id` on `newPaymentRecord`.
-- Use `payId = appt.linkedProcedureId ? pay-proc-${appt.linkedProcedureId} : pay-appt-${appt.id}`.
-- Instead of marking *all* procedures in the patient's odontogram as `paid`, mark *only* the procedure matching `appt.linkedProcedureId` (or require explicit selection).
-
-#### Step 5: Retroactive Deduplication Filter in `FinancialView.tsx`
-When loading `payments` from `agnaldo_dent_financeiro`, run a light deduplication pass:
-```ts
-const uniquePayments = useMemo(() => {
-  const map = new Map<string, PaymentRecord>();
-  payments.forEach(p => {
-    // Unique key priority: procedureId -> appointmentId -> composite (patientId + description + amount + date)
-    const key = p.procedureId 
-      ? `proc:${p.procedureId}` 
-      : p.appointmentId 
-      ? `appt:${p.appointmentId}` 
-      : `${p.patientId || ''}_${p.description}_${p.amount}_${p.date.split('T')[0]}`;
-    
-    if (!map.has(key) || p.status === 'Pago') {
-      map.set(key, p);
-    }
-  });
-  return Array.from(map.values());
-}, [payments]);
-```
+1. **R3 Solution**:
+   - Add `subfolder?: string` parameter to `uploadPatientFileToSupabase` in `src/lib/supabaseStorage.ts`.
+   - Update `NegotiationTab.tsx:1111` to pass `'Orçamentos'` as the `subfolder` argument when exporting budget PDFs.
+2. **R4 Solution**:
+   - Replace restrictive `filterSupabaseImages` in `src/components/DentalCRMView.tsx` with unified file listing.
+   - Render grid tiles in the `drive_records` view with representative icons: PDF icon for `.pdf`, Document icon for `.doc`/`.docx`, and Proposal icon for `.json`.
+3. **R5 Solution**:
+   - Add `photos?: string[]` to `ToothMarker.procedureInstances` in `src/types.ts`.
+   - Update file upload handlers (`PatientsModal.tsx:309`, `AppointmentClinicalDrawer.tsx:158`, `DentalCRMView.tsx`) to iterate over `Array.from(e.target.files)`.
+   - Align `PatientScreen.tsx:70` LocalStorage key to `agnaldo_dent_sections_${selectedPatientId}`.
 
 ---
 
 ## 5. Verification Method
 
-1. **Test Case 1: Appointment + Budget Procedure Link**:
-   - Schedule an appointment for a patient in `CalendarView` / `EventModal` and select an open budget procedure (e.g., R$ 200).
-   - In `DashboardView`, confirm payment for the appointment.
-   - Inspect `agnaldo_dent_financeiro` in LocalStorage and navigate to `FinancialView`.
-   - **Expected Result**: Exactly ONE financial entry of R$ 200 appears in `FinancialView` (not two).
+To independently verify these findings:
 
-2. **Test Case 2: Budget Approval After Appointment Payment**:
-   - Approve the patient's budget in `DentalCRMView`.
-   - Inspect `FinancialView`.
-   - **Expected Result**: The financial entry for the procedure completed via appointment is updated in place, not duplicated.
-
-3. **Test Case 3: Code Verification**:
-   - Run `python .agents/scripts/checklist.py .` to ensure no lint or type errors are introduced.
+1. **Verify R3 (Cloud Drive Segregation)**:
+   - Open `src/lib/supabaseStorage.ts:15-35` and `src/components/NegotiationTab.tsx:1109-1111`.
+   - Confirm `filePath` is constructed without `Orçamentos/` prefix.
+2. **Verify R4 (Cloud Drive Photo Gallery)**:
+   - Open `src/components/DentalCRMView.tsx:1295` and inspect `filterSupabaseImages`.
+   - Confirm non-image extensions (`.pdf`, `.doc`) are excluded.
+3. **Verify R5 (Photo Upload Bug)**:
+   - Inspect `src/types.ts:36-37` to verify only `photoAntesUrl` and `photoDepoisUrl` exist on procedure instances.
+   - Inspect `src/components/PatientsModal.tsx:309` to confirm `e.target.files[0]` truncates multi-file selections.
+   - Inspect `src/components/PatientScreen.tsx:70` vs `src/context/PatientContext.tsx:244` to verify key mismatch.

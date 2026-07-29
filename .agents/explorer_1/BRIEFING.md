@@ -1,45 +1,37 @@
-# BRIEFING — 2026-07-22T18:10:27Z
+# BRIEFING — 2026-07-29T13:01:05Z
 
 ## Mission
-Investigate state management and real-time synchronization issues between DashboardView, CalendarView, and DentalCRMView (Requirements R1 & R3).
+Investigate CRM Refactoring requirements R1 (Non-Overwriting & Versioned Budgets) and R2 (Planning and Budget Integration tab freezing and data copying).
 
 ## 🔒 My Identity
 - Archetype: explorer
-- Roles: state management & sync explorer
+- Roles: Read-only investigation, analysis, handoff synthesis
 - Working directory: c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\explorer_1
-- Original parent: 085a0765-5881-4f6d-ade5-e48e52be7b4c
-- Milestone: State & Realtime Sync Analysis Complete
+- Original parent: 0c8b92b8-14a2-4298-9d7e-13671c306815
+- Milestone: CRM Refactoring R1 & R2 Investigation
 
 ## 🔒 Key Constraints
 - Read-only investigation — do NOT implement code changes in src/
-- Follow systematic-debugging and ponytail minimalism
-- Write findings to handoff.md in working directory
-- Send summary message to parent agent
+- Follow handoff protocol (Observation, Logic Chain, Caveats, Conclusion, Verification Method)
 
 ## Current Parent
-- Conversation ID: 085a0765-5881-4f6d-ade5-e48e52be7b4c
-- Updated: 2026-07-22T18:10:27Z
+- Conversation ID: 0c8b92b8-14a2-4298-9d7e-13671c306815
+- Updated: 2026-07-29T13:01:05Z
 
 ## Investigation State
-- **Explored paths**:
-  - `src/components/DashboardView.tsx`
-  - `src/components/CalendarView.tsx`
-  - `src/components/DentalCRMView.tsx`
-  - `src/components/EventModal.tsx`
-  - `src/context/PatientContext.tsx`
-  - `src/hooks/useReactiveLocalStorage.ts`
+- **Explored paths**: `src/components/DentalCRMView.tsx`, `src/components/NegotiationTab.tsx`, `src/context/PatientContext.tsx`, `src/lib/supabaseStorage.ts`, `src/types.ts`, `src/TreatmentPlanning3D/context/Planning3DContext.tsx`, `src/App.tsx`.
 - **Key findings**:
-  - Local state fragmentation in 3 isolated islands.
-  - Lack of cross-view event bus or shared global appointment store causes F5 requirement.
-  - Deletion in `DashboardView` misses Supabase cleanup causing ghost re-hydration.
-  - Counter desync caused by strict string filters & un-handled enum values (`'Faltou'`, `'Agendado'`, `'Reagendado'`).
-- **Unexplored areas**: None (Scope complete).
+  - R1: Budgets overwrite because `NegotiationTab.tsx:1203` hardcodes `'orcamento_salvo.json'` with `upsert: true` in `supabaseStorage.ts:26`, and `PatientContext.tsx` uses static item IDs `tr-${pId}` and `od-${pId}`. Schema update `BudgetVersion` needed.
+  - R2: Tab switching lag is caused by conditional unmounting/remounting of `NegotiationTab` combined with synchronous `localStorage` stringify of heavy base64 Data URL images in `PatientContext.tsx:241` and `BroadcastChannel` syncing.
+  - R2: Planning data copying fails/lags because global `localStorage` key `ag_neg_custom_net` overrides `calculatedGrossTotal` from planning markers.
+- **Unexplored areas**: None, investigation completed.
 
 ## Key Decisions Made
-- Formulated minimal `/ponytail` fix strategy leveraging custom event bus (`window.dispatchEvent`) and standardized counter status normalization.
+- Completed read-only investigation and generated `analysis.md` and `handoff.md`.
 
 ## Artifact Index
-- ORIGINAL_REQUEST.md — Initial task prompt
-- BRIEFING.md — Context state
-- progress.md — Task checklist and liveness heartbeat
-- handoff.md — Comprehensive 5-component analysis & fix strategy report
+- ORIGINAL_REQUEST.md — Original task prompt log
+- BRIEFING.md — Context briefing index
+- progress.md — Heartbeat progress log
+- analysis.md — Detailed analysis report for R1 & R2
+- handoff.md — Final 5-component handoff report

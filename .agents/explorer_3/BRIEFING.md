@@ -1,38 +1,40 @@
-# BRIEFING — 2026-07-22T18:12:00Z
+# BRIEFING — 2026-07-29T10:04:00Z
 
 ## Mission
-Investigate build setup, TS/project config, git status, and existing tests (Requirement R4), and evaluate codebase architecture against Ponytail principles.
+Investigate Requirement R6 (STRICT CRM DATA PRESERVATION under Ponytail Full principles) and system build infrastructure.
 
 ## 🔒 My Identity
-- Archetype: Explorer
-- Roles: Explorer 3 - Read-only investigation
+- Archetype: explorer
+- Roles: Teamwork explorer
 - Working directory: c:\Users\Agnaldo\OneDrive\Área de Trabalho\sistema-aistudio-main\.agents\explorer_3
-- Original parent: 085a0765-5881-4f6d-ade5-e48e52be7b4c
-- Milestone: Requirement R4 & Architecture Analysis
+- Original parent: 0c8b92b8-14a2-4298-9d7e-13671c306815
+- Milestone: Investigation R6 & Infrastructure
 
 ## 🔒 Key Constraints
-- Read-only investigation — do NOT implement
-- CODE_ONLY mode
-- Follow rules in AGENTS.md and GEMINI.md
+- Read-only investigation — do NOT implement code changes to src
+- Write only to .agents/explorer_3/ directory
+- Code-only network mode
 
 ## Current Parent
-- Conversation ID: 085a0765-5881-4f6d-ade5-e48e52be7b4c
-- Updated: 2026-07-22T18:12:00Z
+- Conversation ID: 0c8b92b8-14a2-4298-9d7e-13671c306815
+- Updated: 2026-07-29T10:04:00Z
 
 ## Investigation State
-- **Explored paths**: package.json, tsconfig.json, vite.config.ts, src/App.tsx, tests/, git status, npm run build, npm run lint, playwright CLI
+- **Explored paths**: `src/types.ts`, `src/context/PatientContext.tsx`, `src/lib/supabaseCrm.ts`, `src/lib/supabaseStorage.ts`, `src/components/PatientRegistrationTab.tsx`, `src/components/PatientScreen.tsx`, `src/components/DentalCRMView.tsx`, `src/components/PatientGallery.tsx`, `src/TreatmentPlanning3D/components/BudgetPanel3D.tsx`, `package.json`.
 - **Key findings**:
-  - `npm run build` succeeds (vite build + esbuild server.ts).
-  - `npm run lint` (`tsc --noEmit`) fails because `tsconfig.json` lacks `include`/`exclude`, causing `tsc` to scan a nested duplicate directory `sistema-aistudio-main/` with conflicting `@types/react`.
-  - 12 Playwright E2E tests exist in `tests/regressions.test.ts` and `tests/ux_flow.test.ts`. `package.json` lacks a `"test"` script.
-  - Single large JS bundle (~3.3MB) generated during build; could benefit from standard `React.lazy()` chunking per Ponytail principles.
-- **Unexplored areas**: None for R4.
+  - Identified all 35+ fields of patient demographic, responsible, address, insurance, and medical data.
+  - Located state and persistence in `PatientContext.tsx`, `useReactiveLocalStorage`, Supabase `clinic_data.crm_data`, and Supabase storage `patient_files`.
+  - Mapped mutation boundaries: Isolated budget upserts, immutable `patientId` storage paths, draft buffering for tab switches.
+  - Verified build/lint: `npm run build` succeeds; `npm run lint` fails at `DentalCRMView.tsx:318` due to `'geral'` section ID assignment to `PhotoSection.id`.
+- **Unexplored areas**: None (investigation complete).
 
 ## Key Decisions Made
-- Formulated concrete Ponytail (Full level) recommendations for TS config, test scripts, and build chunking.
+- Detailed report written to `.agents/explorer_3/analysis.md`.
+- Handoff report formatted with 5 components written to `.agents/explorer_3/handoff.md`.
 
 ## Artifact Index
-- ORIGINAL_REQUEST.md — Original task prompt
-- BRIEFING.md — Working memory state
-- progress.md — Heartbeat progress log
-- handoff.md — Final investigation report
+- `.agents/explorer_3/ORIGINAL_REQUEST.md` — Original task request
+- `.agents/explorer_3/BRIEFING.md` — Agent briefing & state
+- `.agents/explorer_3/progress.md` — Liveness heartbeat
+- `.agents/explorer_3/analysis.md` — Detailed analysis of R6 and build infrastructure
+- `.agents/explorer_3/handoff.md` — 5-component handoff report
