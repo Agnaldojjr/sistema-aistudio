@@ -187,11 +187,6 @@ export default function NegotiationTab({
     return (cached as 'visa_master' | 'elo_amex') || 'visa_master';
   });
 
-  const [installments, setInstallments] = useState<number>(() => {
-    const cached = localStorage.getItem('ag_neg_installments');
-    return cached ? parseInt(cached) : 12;
-  });
-
   // Calculate procedure list total sum for default liquid amount
   const calculatedGrossTotal = useMemo(() => {
     return sections.reduce((secSum, sec) => {
@@ -226,27 +221,31 @@ export default function NegotiationTab({
 
   const desiredNet = customNetDesired !== null ? customNetDesired : calculatedGrossTotal;
 
-  // Configurations for simulations
-  const [percentSim1, setPercentSim1] = useState<number>(() => {
-    const cached = localStorage.getItem('ag_neg_pct_sim1');
-    return cached ? parseInt(cached) : 30;
+  const [boxEntradas, setBoxEntradas] = useState<number[]>(() => {
+    const cached = localStorage.getItem('ag_neg_box_entradas');
+    return cached ? JSON.parse(cached) : [0, 0, 0, 0];
   });
 
-  const [percentSim2, setPercentSim2] = useState<number>(() => {
-    const cached = localStorage.getItem('ag_neg_pct_sim2');
-    return cached ? parseInt(cached) : 50;
+  const [boxMethods, setBoxMethods] = useState<('pix' | 'debito' | 'credito_vista' | 'credito_parcelado')[]>(() => {
+    const cached = localStorage.getItem('ag_neg_box_methods');
+    return cached ? JSON.parse(cached) : ['pix', 'credito_parcelado', 'credito_parcelado', 'credito_parcelado'];
   });
 
-  const [patientOfferInput, setPatientOfferInput] = useState<number>(() => {
-    const cached = localStorage.getItem('ag_neg_offer_input');
-    return cached ? parseFloat(cached) : 500;
+  const [boxInstallments, setBoxInstallments] = useState<number[]>(() => {
+    const cached = localStorage.getItem('ag_neg_box_installments');
+    return cached ? JSON.parse(cached) : [1, 12, 12, 12];
   });
 
-  // Local state for Option 1 à vista method ('pix' | 'debito' | 'credito_vista' | 'credito_parcelado')
-  const [firstOptionMethod, setFirstOptionMethod] = useState<'pix' | 'debito' | 'credito_vista' | 'credito_parcelado'>(() => {
-    const cached = localStorage.getItem('ag_neg_first_option_method');
-    return (cached as 'pix' | 'debito' | 'credito_vista' | 'credito_parcelado') || 'pix';
-  });
+  useEffect(() => {
+    if (desiredNet > 0) {
+      setBoxEntradas(prev => {
+        if (prev.every(v => v === 0)) {
+          return [desiredNet, desiredNet * 0.3, desiredNet * 0.5, 500];
+        }
+        return prev;
+      });
+    }
+  }, [desiredNet]);
 
   // Index of the chosen simulation to apply in the final printed PDF (0 = À Vista, 1 = Sim 1, 2 = Sim 2, 3 = Patient Offer)
   const [selectedPlanIndex, setSelectedPlanIndex] = useState<number>(() => {
@@ -278,13 +277,11 @@ export default function NegotiationTab({
   useEffect(() => {
     localStorage.setItem('ag_neg_sales_volume', salesVolume);
     localStorage.setItem('ag_neg_card_brand', cardBrand);
-    localStorage.setItem('ag_neg_installments', installments.toString());
-    localStorage.setItem('ag_neg_pct_sim1', percentSim1.toString());
-    localStorage.setItem('ag_neg_pct_sim2', percentSim2.toString());
-    localStorage.setItem('ag_neg_offer_input', patientOfferInput.toString());
+    localStorage.setItem('ag_neg_box_entradas', JSON.stringify(boxEntradas));
+    localStorage.setItem('ag_neg_box_methods', JSON.stringify(boxMethods));
+    localStorage.setItem('ag_neg_box_installments', JSON.stringify(boxInstallments));
     localStorage.setItem('ag_neg_selected_plan', selectedPlanIndex.toString());
     localStorage.setItem('ag_neg_show_patient_sims', JSON.stringify(showInPatientScreen));
-    localStorage.setItem('ag_neg_first_option_method', firstOptionMethod);
     if (customNetDesired !== null) {
       localStorage.setItem(customNetKey, customNetDesired.toString());
       localStorage.setItem('ag_neg_custom_net', customNetDesired.toString());
@@ -292,7 +289,7 @@ export default function NegotiationTab({
       localStorage.removeItem(customNetKey);
       localStorage.removeItem('ag_neg_custom_net');
     }
-  }, [salesVolume, cardBrand, installments, percentSim1, percentSim2, patientOfferInput, selectedPlanIndex, customNetDesired, showInPatientScreen, firstOptionMethod, customNetKey]);
+  }, [salesVolume, cardBrand, boxEntradas, boxMethods, boxInstallments, selectedPlanIndex, customNetDesired, showInPatientScreen, customNetKey]);
 
   // Is app in inside iframe constraint
   const isInsideIframe = useMemo(() => {
@@ -303,14 +300,7 @@ export default function NegotiationTab({
     }
   }, []);
 
-  // Compute machine fee percentage for current selection
-  const machineFeePercent = useMemo(() => {
-    const activeRates = TON_RATES[salesVolume][cardBrand];
-    const index = Math.min(11, Math.max(0, installments - 1));
-    return activeRates[index];
-  }, [salesVolume, cardBrand, installments]);
 
-  const machineFeeDecimal = machineFeePercent / 100;
 
   // Max allowed installments by rule
   const maxInstallmentsRule = useMemo(() => {
@@ -335,159 +325,75 @@ export default function NegotiationTab({
 
   // Compile calculations for each of the 4 columns
   const simulations = useMemo(() => {
-    const isExceeded = installments > maxInstallmentsRule;
-    const effectiveFeeDecimal = isExceeded ? machineFeeDecimal : 0;
-    const t0Ref = desiredNet / (1 - effectiveFeeDecimal);
+    return [0, 1, 2, 3].map(i => {
+      const bEntrada = boxEntradas[i] === undefined ? 0 : boxEntradas[i];
+      const bMethod = boxMethods[i] || 'credito_parcelado';
+      const bInst = boxInstallments[i] || 12;
 
-    // 1. Column index 0: À Vista ou Crédito Parcelado
-    let name0 = 'À Vista no Pix';
-    let label0 = 'PIX';
-    let pctLabel0 = '100%';
-    let e0 = desiredNet;
-    let r0 = 0;
-    let ch0 = 0;
-    let taxa0 = 0;
-    let taxaAbsorvida0 = 0;
-    let inst0 = desiredNet;
-    let t0 = desiredNet;
-    let option0FeeDecimal = 0;
+      const e = Math.min(desiredNet, Math.max(0, bEntrada));
+      const r = desiredNet - e;
 
-    if (firstOptionMethod === 'debito') {
-      const debitRate = (DEBIT_RATES[salesVolume]?.[cardBrand] || 0) / 100;
-      name0 = 'À Vista no Débito';
-      label0 = 'DÉBITO';
-      e0 = 0;
-      r0 = desiredNet;
-      ch0 = desiredNet;
-      taxaAbsorvida0 = desiredNet * debitRate;
-      inst0 = desiredNet;
-      t0 = desiredNet;
-      option0FeeDecimal = debitRate;
-    } else if (firstOptionMethod === 'credito_vista') {
-      const credit1xRate = (TON_RATES[salesVolume]?.[cardBrand]?.[0] || 0) / 100;
-      name0 = 'Crédito à Vista';
-      label0 = 'CRÉDITO 1X';
-      e0 = 0;
-      r0 = desiredNet;
-      ch0 = desiredNet;
-      taxaAbsorvida0 = desiredNet * credit1xRate;
-      inst0 = desiredNet;
-      t0 = desiredNet;
-      option0FeeDecimal = credit1xRate;
-    } else if (firstOptionMethod === 'credito_parcelado') {
-      name0 = '100% no Cartão';
-      label0 = 'Sem Entrada';
-      pctLabel0 = '0%';
-      e0 = 0;
-      r0 = desiredNet;
-      ch0 = r0 / (1 - effectiveFeeDecimal);
-      taxa0 = ch0 - r0;
-      taxaAbsorvida0 = !isExceeded ? r0 * machineFeeDecimal : 0;
-      inst0 = ch0 / installments;
-      t0 = ch0;
-      option0FeeDecimal = machineFeeDecimal;
-    }
+      let optionFeeDecimal = 0;
+      let instCount = 1;
 
-    const recebimentoLiquido0 = e0 + ch0 * (1 - option0FeeDecimal);
-
-    // 2. Column index 1: Simulação 1 %
-    const e1 = (desiredNet * percentSim1) / 100;
-    const r1 = desiredNet - e1;
-    const ch1 = r1 / (1 - effectiveFeeDecimal);
-    const inst1 = ch1 / installments;
-    const t1 = e1 + ch1;
-    const taxa1 = ch1 - r1;
-    const taxaAbsorvida1 = !isExceeded ? r1 * machineFeeDecimal : 0;
-    const recebimentoLiquido1 = e1 + ch1 * (1 - machineFeeDecimal);
-
-    // 3. Column index 2: Simulação 2 %
-    const e2 = (desiredNet * percentSim2) / 100;
-    const r2 = desiredNet - e2;
-    const ch2 = r2 / (1 - effectiveFeeDecimal);
-    const inst2 = ch2 / installments;
-    const t2 = e2 + ch2;
-    const taxa2 = ch2 - r2;
-    const taxaAbsorvida2 = !isExceeded ? r2 * machineFeeDecimal : 0;
-    const recebimentoLiquido2 = e2 + ch2 * (1 - machineFeeDecimal);
-
-    // 4. Column index 3: Oferta Paciente
-    const e3 = Math.min(desiredNet, Math.max(0, patientOfferInput));
-    const r3 = desiredNet - e3;
-    const ch3 = r3 / (1 - effectiveFeeDecimal);
-    const inst3 = ch3 / installments;
-    const t3 = e3 + ch3;
-    const taxa3 = ch3 - r3;
-    const taxaAbsorvida3 = !isExceeded ? r3 * machineFeeDecimal : 0;
-    const recebimentoLiquido3 = e3 + ch3 * (1 - machineFeeDecimal);
-
-    return [
-      {
-        name: name0,
-        label: label0,
-        pctLabel: pctLabel0,
-        entrada: e0,
-        restanteNet: r0,
-        cobradoCard: ch0,
-        valorTaxa: taxa0,
-        taxaAbsorvida: taxaAbsorvida0,
-        isExceeded: false,
-        valorParcela: inst0,
-        custoTotal: t0,
-        economia: Math.max(0, t0Ref - t0),
-        recebimentoLiquido: recebimentoLiquido0,
-      },
-      {
-        name: 'Simulação 1',
-        label: `Entrada (${percentSim1}%)`,
-        pctLabel: `${percentSim1}%`,
-        entrada: e1,
-        restanteNet: r1,
-        cobradoCard: ch1,
-        valorTaxa: taxa1,
-        taxaAbsorvida: taxaAbsorvida1,
-        isExceeded,
-        valorParcela: inst1,
-        custoTotal: t1,
-        economia: Math.max(0, t0Ref - t1),
-        recebimentoLiquido: recebimentoLiquido1,
-      },
-      {
-        name: 'Simulação 2',
-        label: `Entrada (${percentSim2}%)`,
-        pctLabel: `${percentSim2}%`,
-        entrada: e2,
-        restanteNet: r2,
-        cobradoCard: ch2,
-        valorTaxa: taxa2,
-        taxaAbsorvida: taxaAbsorvida2,
-        isExceeded,
-        valorParcela: inst2,
-        custoTotal: t2,
-        economia: Math.max(0, t0Ref - t2),
-        recebimentoLiquido: recebimentoLiquido2,
-      },
-      {
-        name: 'Oferta Paciente',
-        label: 'Entrada Customizada',
-        pctLabel: desiredNet > 0 ? `${Math.round((e3 / desiredNet) * 100)}%` : '0%',
-        entrada: e3,
-        restanteNet: r3,
-        cobradoCard: ch3,
-        valorTaxa: taxa3,
-        taxaAbsorvida: taxaAbsorvida3,
-        isExceeded,
-        valorParcela: inst3,
-        custoTotal: t3,
-        economia: Math.max(0, t0Ref - t3),
-        recebimentoLiquido: recebimentoLiquido3,
+      if (bMethod === 'pix') {
+        optionFeeDecimal = 0;
+        instCount = 1;
+      } else if (bMethod === 'debito') {
+        optionFeeDecimal = (DEBIT_RATES[salesVolume]?.[cardBrand] || 0) / 100;
+        instCount = 1;
+      } else if (bMethod === 'credito_vista') {
+        optionFeeDecimal = (TON_RATES[salesVolume]?.[cardBrand]?.[0] || 0) / 100;
+        instCount = 1;
+      } else if (bMethod === 'credito_parcelado') {
+        const machineFeePercent = TON_RATES[salesVolume][cardBrand][Math.min(11, Math.max(0, bInst - 1))];
+        optionFeeDecimal = machineFeePercent / 100;
+        instCount = bInst;
       }
-    ];
-  }, [desiredNet, machineFeeDecimal, installments, percentSim1, percentSim2, patientOfferInput, maxInstallmentsRule, firstOptionMethod, salesVolume, cardBrand]);
 
-  const chosenSim = simulations[selectedPlanIndex] || simulations[1];
+      const isExceeded = instCount > maxInstallmentsRule && bMethod === 'credito_parcelado';
+      const effectiveFeeDecimal = isExceeded ? optionFeeDecimal : 0;
+      
+      const t0Ref = desiredNet / (1 - effectiveFeeDecimal);
+
+      const ch = r / (1 - effectiveFeeDecimal);
+      const taxa = ch - r;
+      const taxaAbsorvida = !isExceeded ? r * optionFeeDecimal : 0;
+      const instVal = instCount > 0 ? ch / instCount : 0;
+      const t = e + ch;
+
+      const recebimentoLiquido = e + ch * (1 - optionFeeDecimal);
+
+      let label = bMethod.toUpperCase();
+      if (bMethod === 'credito_parcelado') label = `CRÉDITO ${instCount}X`;
+      if (bMethod === 'credito_vista') label = `CRÉDITO 1X`;
+
+      let name = `Opção ${i + 1}`;
+
+      return {
+        name,
+        label,
+        pctLabel: desiredNet > 0 ? `${Math.round((e / desiredNet) * 100)}%` : '0%',
+        entrada: e,
+        restanteNet: r,
+        cobradoCard: ch,
+        valorTaxa: taxa,
+        taxaAbsorvida: taxaAbsorvida,
+        isExceeded,
+        valorParcela: instVal,
+        custoTotal: t,
+        economia: Math.max(0, t0Ref - t),
+        recebimentoLiquido: recebimentoLiquido,
+        method: bMethod,
+        installments: instCount
+      };
+    });
+  }, [desiredNet, boxEntradas, boxMethods, boxInstallments, maxInstallmentsRule, salesVolume, cardBrand]);
+
+  const chosenSim = simulations[selectedPlanIndex] || simulations[0];
   
   // Assistente Comercial AI logic
-  const exceededRule = installments > maxInstallmentsRule;
+  const exceededRule = chosenSim.isExceeded;
   const scriptInstallmentValue = formatCurrency(chosenSim.valorParcela);
   const scriptTotal = formatCurrency(chosenSim.custoTotal);
 
@@ -794,7 +700,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           doctorName: clinicSettings.doctorName,
           procedures: proceduresListOnMapeamento.map(p => p.procedureName),
           totalValue: chosenSim.custoTotal,
-          installments: installments,
+          installments: chosenSim.installments,
           installmentValue: chosenSim.valorParcela
         })
       });
@@ -1061,14 +967,14 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       doc.setFontSize(8);
       doc.setTextColor(60, 60, 60);
       
-      if (selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado') {
+      if (chosenSim.method !== 'credito_parcelado') {
         let methodText = "";
-        if (firstOptionMethod === 'pix') methodText = "PIX";
-        else if (firstOptionMethod === 'debito') methodText = "Débito";
+        if (chosenSim.method === 'pix') methodText = "PIX";
+        else if (chosenSim.method === 'debito') methodText = "Débito";
         else methodText = "Crédito à vista (1x)";
 
         doc.text(`Opção Selecionada: À Vista no ${methodText}`, 20, currentY + 20);
-        if (firstOptionMethod === 'pix') {
+        if (chosenSim.method === 'pix') {
           doc.text(`Pagamento Único: ${formatCurrency(chosenSim.entrada)} via Pix`, 20, currentY + 26);
         } else {
           doc.text(`Pagamento Único: ${formatCurrency(chosenSim.cobradoCard)} via Cartão`, 20, currentY + 26);
@@ -1081,7 +987,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           doc.text(`Parcelamento Sugerido: Pagamento único, sem parcelas`, 20, currentY + 32);
         } else {
           doc.text(`Valor Restante Parcelado: ${formatCurrency(chosenSim.cobradoCard)}`, 20, currentY + 26);
-          doc.text(`Parcelamento Sugerido: ${installments}x de ${formatCurrency(chosenSim.valorParcela)} sem juros no cartão`, 20, currentY + 32);
+          doc.text(`Parcelamento Sugerido: ${chosenSim.installments}x de ${formatCurrency(chosenSim.valorParcela)} sem juros no cartão`, 20, currentY + 32);
         }
       }
 
@@ -1324,7 +1230,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           <button
             type="button"
             onClick={() => {
-              const currentPatientId = proposal?.patientData?.id;
+              const currentPatientId = (proposal?.patientData as any)?.id;
               if (currentPatientId) {
                 window.open(window.location.origin + '?mode=patient&patientId=' + currentPatientId, '_blank', 'width=1100,height=800');
               } else {
@@ -1558,39 +1464,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
               </select>
             </div>
 
-            {/* Installments Dropdown */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wide">
-                Número de Parcelas Desejada
-              </label>
-              <select
-                value={installments}
-                onChange={(e) => setInstallments(parseInt(e.target.value) || 12)}
-                className="w-full bg-[#FAF8F5] border border-[#D5CBB3] rounded-lg p-2.5 text-xs text-zinc-700 font-semibold focus:outline-none focus:border-[#8B0000]"
-              >
-                <option value={1}>Crédito à vista (1x)</option>
-                {Array.from({ length: 11 }, (_, i) => i + 2).map((num) => (
-                  <option key={num} value={num}>Parcelado {num}x</option>
-                ))}
-              </select>
-              <div className={`flex items-center gap-2 mt-2 p-2.5 rounded-lg border text-xs font-semibold shadow-sm transition-colors ${
-                installments <= maxInstallmentsRule 
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-                : 'bg-rose-50 border-rose-200 text-rose-800'
-              }`}>
-                {installments <= maxInstallmentsRule ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" />
-                    <span>Status: SEGURO (Margem protegida, dentro da regra)</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600" />
-                    <span>Status: RISCO (Taxa acima de 14% - Será repassada ao paciente)</span>
-                  </>
-                )}
-              </div>
-            </div>
+
 
             {/* Recebimento (informational) */}
             <div className="bg-[#FAF8F5] border border-[#E6DEC9] p-3 rounded-lg flex justify-between items-center text-xs">
@@ -1733,87 +1607,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                 </div>
               </div>
             </>
-          ) : (
-            // Slider simulators
-            <>
-              <h3 className="font-serif font-bold text-[#8B0000] text-sm tracking-wide uppercase flex items-center gap-2 border-b border-zinc-100 pb-3">
-                <Percent className="w-4 h-4 text-[#B48C4D]" />
-                Ajustar Valores de Entrada
-              </h3>
-
-              <div className="space-y-5">
-                
-                {/* Slider 1 */}
-                <div className="space-y-2 bg-[#FAF8F5] p-3 border border-zinc-100 rounded-xl">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-[#8B0000] uppercase tracking-wide flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 bg-[#B48C4D] rounded-full" />
-                      Simulação 1
-                    </span>
-                    <span className="font-mono font-bold bg-[#FAF8F5] border border-[#D5CBB3] text-[#8B0000] px-2 py-0.5 rounded-md">
-                      {percentSim1}% / {formatCurrency((desiredNet * percentSim1) / 100)}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="5"
-                    max="95"
-                    step="5"
-                    value={percentSim1}
-                    onChange={(e) => setPercentSim1(parseInt(e.target.value))}
-                    className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-[#8B0000]"
-                  />
-                </div>
-
-                {/* Slider 2 */}
-                <div className="space-y-2 bg-[#FAF8F5] p-3 border border-zinc-100 rounded-xl">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-[#8B0000] uppercase tracking-wide flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 bg-[#B48C4D] rounded-full" />
-                      Simulação 2
-                    </span>
-                    <span className="font-mono font-bold bg-[#FAF8F5] border border-[#D5CBB3] text-[#8B0000] px-2 py-0.5 rounded-md">
-                      {percentSim2}% / {formatCurrency((desiredNet * percentSim2) / 100)}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="5"
-                    max="95"
-                    step="5"
-                    value={percentSim2}
-                    onChange={(e) => setPercentSim2(parseInt(e.target.value))}
-                    className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-[#8B0000]"
-                  />
-                </div>
-
-                {/* Slider 3: Specific monetary offer */}
-                <div className="space-y-2 bg-[#FAF8F5] p-3 border border-zinc-100 rounded-xl">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-[#8B0000] uppercase tracking-wide flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 bg-[#B48C4D] rounded-full" />
-                      Entrada da Oferta do Paciente
-                    </span>
-                    <span className="font-mono font-bold bg-[#FAF8F5] border border-[#D5CBB3] text-[#8B0000] px-2 py-0.5 rounded-md">
-                      {desiredNet > 0 ? `${Math.round((patientOfferInput / desiredNet) * 100)}%` : '0%'}
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xs text-zinc-400">R$</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max={desiredNet}
-                      value={patientOfferInput}
-                      onChange={(e) => setPatientOfferInput(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-white border border-[#D5CBB3] pl-8 pr-3 py-1.5 text-xs text-zinc-800 font-bold rounded-lg focus:outline-none focus:border-[#8B0000]"
-                    />
-                  </div>
-                </div>
-
-              </div>
-            </>
-          )}
+          ) : null}
         </div>
 
       </div>
@@ -1856,20 +1650,73 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                   <div className="text-center font-sans">
                     <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase block">{sim.label}</span>
                     <strong className="text-sm font-serif text-[#8B0000] block mt-0.5">{sim.name}</strong>
-                    {index === 0 && (
-                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                    
+                    <div className="mt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      {/* ENTRADA INPUT */}
+                      <div className="flex flex-col text-left">
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Valor de Entrada (R$)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={desiredNet}
+                          value={boxEntradas[index] === undefined ? 0 : boxEntradas[index]}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setBoxEntradas(prev => {
+                              const next = [...prev];
+                              next[index] = val;
+                              return next;
+                            });
+                          }}
+                          className="w-full bg-[#FAF8F5] border border-[#D5CBB3] rounded-lg p-1.5 text-xs font-bold text-zinc-800 focus:outline-none focus:border-[#8B0000]"
+                        />
+                      </div>
+                      
+                      {/* METHOD SELECT */}
+                      <div className="flex flex-col text-left">
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Forma do Restante</label>
                         <select
-                          value={firstOptionMethod}
-                          onChange={(e) => setFirstOptionMethod(e.target.value as 'pix' | 'debito' | 'credito_vista' | 'credito_parcelado')}
-                          className="w-full bg-[#FAF8F5] border border-[#D5CBB3] rounded-lg p-2 text-xs font-semibold text-zinc-700 focus:outline-none focus:border-[#8B0000]"
+                          value={boxMethods[index]}
+                          onChange={(e) => {
+                            const val = e.target.value as any;
+                            setBoxMethods(prev => {
+                              const next = [...prev];
+                              next[index] = val;
+                              return next;
+                            });
+                          }}
+                          className="w-full bg-[#FAF8F5] border border-[#D5CBB3] rounded-lg p-1.5 text-xs font-semibold text-zinc-700 focus:outline-none focus:border-[#8B0000]"
                         >
-                          <option value="pix">À Vista: PIX</option>
-                          <option value="debito">À Vista: Débito</option>
-                          <option value="credito_vista">À Vista: Crédito 1x</option>
+                          <option value="pix">PIX</option>
+                          <option value="debito">Débito</option>
+                          <option value="credito_vista">Crédito 1x</option>
                           <option value="credito_parcelado">Crédito Parcelado</option>
                         </select>
                       </div>
-                    )}
+
+                      {/* INSTALLMENTS SELECT */}
+                      {boxMethods[index] === 'credito_parcelado' && (
+                        <div className="flex flex-col text-left">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Parcelas</label>
+                          <select
+                            value={boxInstallments[index]}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 12;
+                              setBoxInstallments(prev => {
+                                const next = [...prev];
+                                next[index] = val;
+                                return next;
+                              });
+                            }}
+                            className="w-full bg-[#FAF8F5] border border-[#D5CBB3] rounded-lg p-1.5 text-xs font-semibold text-zinc-700 focus:outline-none focus:border-[#8B0000]"
+                          >
+                            {Array.from({ length: 11 }, (_, i) => i + 2).map((num) => (
+                              <option key={num} value={num}>{num}x</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="divide-y divide-zinc-100 font-sans text-xs">
@@ -1906,7 +1753,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                     )}
 
                     {/* Parcellation value detail */}
-                    {index === 0 && firstOptionMethod !== 'credito_parcelado' ? (
+                    {sim.method !== 'credito_parcelado' ? (
                       <div className="py-2 text-center bg-zinc-50 border border-zinc-100/50 rounded-lg my-1">
                         <span className="text-[10px] text-zinc-400 uppercase tracking-wide block">Forma de Pagamento</span>
                         <strong className="text-sm font-bold text-[#8B0000] block font-mono mt-0.5">
@@ -1916,10 +1763,10 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                     ) : (
                       <div className="py-2 text-center bg-zinc-50 border border-zinc-100/50 rounded-lg my-1">
                         <span className="text-[10px] text-zinc-400 uppercase tracking-wide block">
-                          {sim.cobradoCard === 0 ? 'Pagamento Único' : `Valor da Parcela (${installments}x)`}
+                          {sim.cobradoCard === 0 ? 'Pagamento Único' : `Valor da Parcela (${sim.installments}x)`}
                         </span>
                         <strong className="text-sm font-bold text-[#8B0000] block font-mono mt-0.5">
-                          {sim.cobradoCard === 0 ? 'Sem parcelas' : `${installments}x de ${formatCurrency(sim.valorParcela)}`}
+                          {sim.cobradoCard === 0 ? 'Sem parcelas' : `${sim.installments}x de ${formatCurrency(sim.valorParcela)}`}
                         </strong>
                       </div>
                     )}
@@ -1989,7 +1836,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         <div className="bg-[#FAF8F5] border border-[#E6DEC9] p-3.5 rounded-xl flex items-start gap-2.5 text-xs text-zinc-500 leading-normal print:hidden">
           <HelpCircle className="w-4 h-4 text-[#B48C4D] flex-shrink-0 mt-0.5" />
           <p>
-            * Taxa aplicada pela maquininha Ton para a bandeira <strong>{cardBrand === 'visa_master' ? 'Visa / Mastercard' : 'Elo / Amex'}</strong> em <strong>{installments} parcelas</strong> é de <strong>{machineFeePercent}%</strong>. O cálculo do valor cobrado utiliza a fórmula financeira reversa precisa repassando a taxa: <code className="bg-[#F5EFE3] px-1 py-0.5 rounded text-[#8B0000] font-mono text-[11px]">Restante / (1 - Taxa)</code>, garantindo que o cirurgião receba exatamente o valor líquido desejado estabelecido.
+            * As taxas da maquininha Ton para a bandeira <strong>{cardBrand === 'visa_master' ? 'Visa / Mastercard' : 'Elo / Amex'}</strong> são aplicadas dinamicamente com base nas parcelas selecionadas. O cálculo do valor cobrado utiliza a fórmula financeira reversa: <code className="bg-[#F5EFE3] px-1 py-0.5 rounded text-[#8B0000] font-mono text-[11px]">Restante / (1 - Taxa)</code>, garantindo que o consultório receba exatamente o valor líquido desejado.
           </p>
         </div>
       </div>
@@ -2262,22 +2109,22 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           <div className="md:col-span-8 grid grid-cols-2 gap-3 text-xs">
             <div className="bg-white border text-center p-2 rounded-lg">
               <span className="text-[9px] text-zinc-400 uppercase tracking-widest block font-bold">
-                {selectedPlanIndex === 0 && firstOptionMethod === 'pix' ? 'Pagamento À Vista (PIX)' : 'Valor de Entrada'}
+                {chosenSim.method === 'pix' ? 'Pagamento À Vista (PIX)' : 'Valor de Entrada'}
               </span>
               <span className="text-[#B48C4D] font-mono font-extrabold text-sm block mt-1">
                 {formatCurrency(chosenSim.entrada)}
               </span>
               <span className="text-[8.5px] text-zinc-400 block mt-0.5">
-                {selectedPlanIndex === 0 && firstOptionMethod === 'pix' ? 'Transferência instantânea Pix' : 'PIX ou Dinheiro em espécie'}
+                {chosenSim.method === 'pix' ? 'Transferência instantânea Pix' : 'PIX ou Dinheiro em espécie'}
               </span>
             </div>
 
             <div className="bg-white border text-center p-2 rounded-lg">
               <span className="text-[9px] text-zinc-400 uppercase tracking-widest block font-bold">
-                {selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado'
-                  ? (firstOptionMethod === 'debito' 
+                {chosenSim.method !== 'credito_parcelado'
+                  ? (chosenSim.method === 'debito' 
                       ? 'Pagamento no Débito' 
-                      : (firstOptionMethod === 'credito_vista' 
+                      : (chosenSim.method === 'credito_vista' 
                           ? 'Pagamento Crédito 1x' 
                           : 'Saldo do Financiamento'))
                   : 'Saldo do Financiamento'}
@@ -2286,8 +2133,8 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                 {formatCurrency(chosenSim.cobradoCard)}
               </span>
               <span className="text-[8.5px] text-zinc-400 block mt-0.5">
-                {selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado'
-                  ? (firstOptionMethod === 'pix' 
+                {chosenSim.method !== 'credito_parcelado'
+                  ? (chosenSim.method === 'pix' 
                       ? 'Nenhum saldo financiado' 
                       : 'Cobrado à vista no cartão')
                   : 'Financiado na Maquininha Ton'}
@@ -2296,14 +2143,14 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
             <div className="col-span-2 bg-[#F5EFE3] border border-[#D5CBB3] p-2.5 rounded-lg flex justify-between items-center">
               <span className="text-[#8B0000] font-bold text-[10.5px] uppercase tracking-wider block">
-                {(selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado') || chosenSim.cobradoCard === 0 ? 'Acordo de Pagamento:' : 'Acordo de Desembolso Mensal:'}
+                {(chosenSim.method !== 'credito_parcelado') || chosenSim.cobradoCard === 0 ? 'Acordo de Pagamento:' : 'Acordo de Desembolso Mensal:'}
               </span>
               <span className="text-sm font-bold text-[#8B0000] font-mono whitespace-nowrap bg-white border border-[#D5CBB3] px-2 py-0.5 rounded-md">
-                {(selectedPlanIndex === 0 && firstOptionMethod !== 'credito_parcelado')
+                {(chosenSim.method !== 'credito_parcelado')
                   ? `Pagamento Único à Vista (${formatCurrency(chosenSim.custoTotal)})` 
                   : chosenSim.cobradoCard === 0
                     ? `Pagamento Único (${formatCurrency(chosenSim.entrada)})`
-                    : `${installments}x de ${formatCurrency(chosenSim.valorParcela)}`}
+                    : `${chosenSim.installments}x de ${formatCurrency(chosenSim.valorParcela)}`}
               </span>
             </div>
           </div>
@@ -2392,7 +2239,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
               <span className="font-bold text-left">Proposta:</span>
               <span className="col-span-2 text-zinc-800 text-left">
-                {chosenSim.name} {chosenSim.cobradoCard === 0 ? '(Sem parcelas)' : `(${installments}x de ${formatCurrency(chosenSim.valorParcela)})`}
+                {chosenSim.name} {chosenSim.cobradoCard === 0 ? '(Sem parcelas)' : `(${chosenSim.installments}x de ${formatCurrency(chosenSim.valorParcela)})`}
               </span>
             </div>
           </div>
