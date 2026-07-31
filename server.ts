@@ -797,16 +797,21 @@ A mensagem deve ser direta, amigável e pronta para ser enviada no WhatsApp. Nã
 
   app.post("/api/ai/budget-script", async (req, res) => {
     try {
-      const { patientName, doctorName, procedures } = req.body;
+      const { patientName, doctorName, procedures, totalValue, installments, installmentValue } = req.body;
       
       if (!patientName || !doctorName || !procedures || !Array.isArray(procedures)) {
         return res.status(400).json({ error: "Parâmetros incompletos." });
       }
 
-      const proceduresText = procedures.join(", ");
+      const proceduresText = procedures.length > 0 ? procedures.join(", ") : "Avaliação inicial e planejamento";
+      
+      let financialText = "";
+      if (totalValue !== undefined && installments !== undefined) {
+        financialText = `\nO valor total do investimento da opção principal sugerida é de R$ ${totalValue.toFixed(2)}, podendo ser parcelado em até ${installments}x de R$ ${(installmentValue || 0).toFixed(2)}.`;
+      }
       
       const prompt = `Você é um assistente de clínica odontológica trabalhando para o(a) Dr(a). ${doctorName}.
-O paciente ${patientName} tem o seguinte plano de tratamento proposto: ${proceduresText}.
+O paciente ${patientName} tem o seguinte plano de tratamento proposto: ${proceduresText}.${financialText}
 Crie uma mensagem de texto persuasiva, clara e acolhedora para WhatsApp, explicando de modo simples os benefícios de realizar esses tratamentos e convidando o paciente para aprovar o orçamento e agendar a primeira sessão.
 Mantenha o tom profissional mas acessível. Não inclua saudações iniciais suas, apenas a mensagem final pronta para envio.`;
 

@@ -248,9 +248,16 @@ export default function NegotiationTab({
   }, [desiredNet]);
 
   // Index of the chosen simulation to apply in the final printed PDF (0 = À Vista, 1 = Sim 1, 2 = Sim 2, 3 = Patient Offer)
-  const [selectedPlanIndex, setSelectedPlanIndex] = useState<number>(() => {
-    const cached = localStorage.getItem('ag_neg_selected_plan');
-    return cached ? parseInt(cached) : 0; // Default to Option 0 (À Vista)
+  const [selectedPlanIndices, setSelectedPlanIndices] = useState<number[]>(() => {
+    const cached = localStorage.getItem('ag_neg_selected_plans');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    const oldCached = localStorage.getItem('ag_neg_selected_plan');
+    return oldCached ? [parseInt(oldCached)] : [0];
   });
 
   const [showInPatientScreen, setShowInPatientScreen] = useState<boolean[]>(() => {
@@ -280,7 +287,7 @@ export default function NegotiationTab({
     localStorage.setItem('ag_neg_box_entradas', JSON.stringify(boxEntradas));
     localStorage.setItem('ag_neg_box_methods', JSON.stringify(boxMethods));
     localStorage.setItem('ag_neg_box_installments', JSON.stringify(boxInstallments));
-    localStorage.setItem('ag_neg_selected_plan', selectedPlanIndex.toString());
+    localStorage.setItem('ag_neg_selected_plans', JSON.stringify(selectedPlanIndices));
     localStorage.setItem('ag_neg_show_patient_sims', JSON.stringify(showInPatientScreen));
     if (customNetDesired !== null) {
       localStorage.setItem(customNetKey, customNetDesired.toString());
@@ -289,7 +296,7 @@ export default function NegotiationTab({
       localStorage.removeItem(customNetKey);
       localStorage.removeItem('ag_neg_custom_net');
     }
-  }, [salesVolume, cardBrand, boxEntradas, boxMethods, boxInstallments, selectedPlanIndex, customNetDesired, showInPatientScreen, customNetKey]);
+  }, [salesVolume, cardBrand, boxEntradas, boxMethods, boxInstallments, selectedPlanIndices, customNetDesired, showInPatientScreen, customNetKey]);
 
   // Is app in inside iframe constraint
   const isInsideIframe = useMemo(() => {
@@ -390,7 +397,7 @@ export default function NegotiationTab({
     });
   }, [desiredNet, boxEntradas, boxMethods, boxInstallments, maxInstallmentsRule, salesVolume, cardBrand]);
 
-  const chosenSim = simulations[selectedPlanIndex] || simulations[0];
+  const chosenSim = simulations[selectedPlanIndices[0]] || simulations[0];
   
   // Assistente Comercial AI logic
   const exceededRule = chosenSim.isExceeded;
@@ -696,9 +703,9 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          patientName,
-          doctorName: clinicSettings.doctorName,
-          procedures: proceduresListOnMapeamento.map(p => p.procedureName),
+          patientName: patientName || 'Paciente',
+          doctorName: clinicSettings.doctorName || 'Doutor',
+          procedures: proceduresListOnMapeamento.length > 0 ? proceduresListOnMapeamento.map(p => p.procedureName) : ['Avaliação inicial e planejamento'],
           totalValue: chosenSim.custoTotal,
           installments: chosenSim.installments,
           installmentValue: chosenSim.valorParcela
@@ -954,48 +961,59 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       }
 
       // Simulation details
-      doc.setFillColor(250, 248, 245);
-      doc.rect(15, currentY + 5, 180, 48, 'F');
-      doc.setDrawColor(213, 203, 179);
-      doc.rect(15, currentY + 5, 180, 48);
-
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(78, 17, 25);
-      doc.text("PLANO FINANCEIRO ACORDADO", 20, currentY + 12);
-
-      doc.setFontSize(8);
-      doc.setTextColor(60, 60, 60);
+      const selectedSims = selectedPlanIndices.slice().sort().map(idx => simulations[idx]);
       
-      if (chosenSim.method !== 'credito_parcelado') {
-        let methodText = "";
-        if (chosenSim.method === 'pix') methodText = "PIX";
-        else if (chosenSim.method === 'debito') methodText = "Débito";
-        else methodText = "Crédito à vista (1x)";
+      selectedSims.forEach((sim, idx) => {
+        doc.setFillColor(250, 248, 245);
+        doc.rect(15, currentY + 5, 180, 48, 'F');
+        doc.setDrawColor(213, 203, 179);
+        doc.rect(15, currentY + 5, 180, 48);
 
-        doc.text(`Opção Selecionada: À Vista no ${methodText}`, 20, currentY + 20);
-        if (chosenSim.method === 'pix') {
-          doc.text(`Pagamento Único: ${formatCurrency(chosenSim.entrada)} via Pix`, 20, currentY + 26);
-        } else {
-          doc.text(`Pagamento Único: ${formatCurrency(chosenSim.cobradoCard)} via Cartão`, 20, currentY + 26);
-        }
-        doc.text(`Prazo: À Vista`, 20, currentY + 32);
-      } else {
-        doc.text(`Opção Selecionada: ${chosenSim.name} (Entrada de ${formatCurrency(chosenSim.entrada)})`, 20, currentY + 20);
-        if (chosenSim.cobradoCard === 0) {
-          doc.text(`Valor Restante Parcelado: Nenhum saldo financiado`, 20, currentY + 26);
-          doc.text(`Parcelamento Sugerido: Pagamento único, sem parcelas`, 20, currentY + 32);
-        } else {
-          doc.text(`Valor Restante Parcelado: ${formatCurrency(chosenSim.cobradoCard)}`, 20, currentY + 26);
-          doc.text(`Parcelamento Sugerido: ${chosenSim.installments}x de ${formatCurrency(chosenSim.valorParcela)} sem juros no cartão`, 20, currentY + 32);
-        }
-      }
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(78, 17, 25);
+        doc.text(selectedSims.length > 1 ? `PLANO FINANCEIRO ACORDADO - OPÇÃO ${idx + 1}` : "PLANO FINANCEIRO ACORDADO", 20, currentY + 12);
 
-      // Big font for total
-      doc.setFontSize(12);
-      doc.setTextColor(78, 17, 25);
-      doc.setFont('Helvetica', 'bold');
-      doc.text(`INVESTIMENTO TOTAL: ${formatCurrency(chosenSim.custoTotal)}`, 20, currentY + 44);
+        doc.setFontSize(8);
+        doc.setTextColor(60, 60, 60);
+        
+        if (sim.method !== 'credito_parcelado') {
+          let methodText = "";
+          if (sim.method === 'pix') methodText = "PIX";
+          else if (sim.method === 'debito') methodText = "Débito";
+          else methodText = "Crédito à vista (1x)";
+
+          doc.text(`Opção Selecionada: À Vista no ${methodText}`, 20, currentY + 20);
+          if (sim.method === 'pix') {
+            doc.text(`Pagamento Único: ${formatCurrency(sim.entrada)} via Pix`, 20, currentY + 26);
+          } else {
+            doc.text(`Pagamento Único: ${formatCurrency(sim.cobradoCard)} via Cartão`, 20, currentY + 26);
+          }
+          doc.text(`Prazo: À Vista`, 20, currentY + 32);
+        } else {
+          doc.text(`Opção Selecionada: ${sim.name} (Entrada de ${formatCurrency(sim.entrada)})`, 20, currentY + 20);
+          if (sim.cobradoCard === 0) {
+            doc.text(`Valor Restante Parcelado: Nenhum saldo financiado`, 20, currentY + 26);
+            doc.text(`Parcelamento Sugerido: Pagamento único, sem parcelas`, 20, currentY + 32);
+          } else {
+            doc.text(`Valor Restante Parcelado: ${formatCurrency(sim.cobradoCard)}`, 20, currentY + 26);
+            doc.text(`Parcelamento Sugerido: ${sim.installments}x de ${formatCurrency(sim.valorParcela)} sem juros no cartão`, 20, currentY + 32);
+          }
+        }
+
+        // Big font for total
+        doc.setFontSize(12);
+        doc.setTextColor(78, 17, 25);
+        doc.setFont('Helvetica', 'bold');
+        doc.text(`INVESTIMENTO TOTAL: ${formatCurrency(sim.custoTotal)}`, 20, currentY + 44);
+
+        currentY += 55;
+
+        if (currentY > 210 && idx < selectedSims.length - 1) {
+          doc.addPage();
+          currentY = 25;
+        }
+      });
 
       // Signatures
       currentY += 65;
@@ -1117,7 +1135,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         sections,
         procedures,
         simulations,
-        selectedPlanIndex
+        selectedPlanIndices
       };
       
       const jsonStr = JSON.stringify(stateToSave);
@@ -1147,7 +1165,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       if (proposal.status === 'Aprovado (paciente pagou)') {
         const fileKey = currentFileId || 'orcamento_salvo.json';
         const budgetPayId = 'pay-budget-' + fileKey.replace(/[^a-zA-Z0-9-]/g, '_');
-        const amount = simulations[selectedPlanIndex]?.custoTotal || 0;
+        const amount = simulations[selectedPlanIndices[0]]?.custoTotal || 0;
         const description = `Orçamento: ${fileKey.split('/').pop()?.replace('.json', '').replace('orcamento_salvo', 'Orçamento').replace(/_/g, ' ') || 'Orçamento'} - Aprovado e Pago`;
 
         // 1. Add to patient's individual pagamentosList if not already present
@@ -1627,11 +1645,19 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         {/* Responsive Flex/Grid Grid Columns */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {simulations.map((sim, index) => {
-            const isSelected = selectedPlanIndex === index;
+            const isSelected = selectedPlanIndices.includes(index);
             return (
               <div
                 key={index}
-                onClick={() => setSelectedPlanIndex(index)}
+                onClick={() => {
+                  setSelectedPlanIndices(prev => {
+                    if (prev.includes(index)) {
+                      if (prev.length === 1) return prev;
+                      return prev.filter(i => i !== index);
+                    }
+                    return [...prev, index].sort();
+                  });
+                }}
                 className={`border-2 rounded-xl p-4 flex flex-col justify-between transition-all duration-200 cursor-pointer relative ${
                   isSelected
                     ? 'border-[#C09553] bg-[#FAF8F5] shadow-md scale-[1.01]'
