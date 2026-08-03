@@ -720,7 +720,8 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           setAiSalesScript(data.message);
         }
       } else {
-        alert('Falha ao gerar argumentação de venda com IA.');
+        const data = await response.json();
+        alert(`Falha ao gerar argumentação de venda com IA.\nDetalhe: ${data.details || data.error || 'Erro desconhecido'}`);
       }
     } catch (error) {
       console.error('Error generating AI script:', error);

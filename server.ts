@@ -810,6 +810,8 @@ A mensagem deve ser direta, amigável e pronta para ser enviada no WhatsApp. Nã
       let optionsList = "";
       if (simulations && Array.isArray(simulations)) {
         simulations.forEach(sim => {
+          if (!sim) return;
+          
           if (sim.method === 'pix') {
             optionsList += `- À Vista (PIX): ${formatCurrency(sim.entrada || sim.custoTotal)}\n`;
           } else if (sim.method === 'debito') {
@@ -882,7 +884,7 @@ ${doctorName}`;
       res.json({ message: response.text });
     } catch (error: any) {
       console.error("Gemini API Error (budget-script):", error);
-      res.status(500).json({ error: "Erro ao gerar script de orçamento." });
+      res.status(500).json({ error: "Erro ao gerar script de orçamento.", details: error.message || String(error) });
     }
   });
 
