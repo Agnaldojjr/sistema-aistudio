@@ -223,7 +223,8 @@ export function BudgetPanel3D() {
       // Rodapé
       doc.setFontSize(7);
       doc.setTextColor(150, 150, 150);
-      doc.text('Este documento é uma estimativa comercial sujeita a alterações conforme diagnóstico de exames complementares.', 15, 287);
+      doc.text('Este documento é uma estimativa comercial sujeita a alterações conforme diagnóstico de exames complementares.', 15, 283);
+      doc.text('* ATENÇÃO: As taxas informadas são valores aproximados. O valor praticado pela maquininha deve ser consultado e conferido no dia de efetuar o pagamento.', 15, 287);
 
       doc.save(`Proposta_3D_${selectedPatient?.name || activeProposal.patientName || 'Paciente'}.pdf`);
     } catch (err) {

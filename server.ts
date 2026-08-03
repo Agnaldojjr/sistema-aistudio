@@ -797,29 +797,85 @@ A mensagem deve ser direta, amigável e pronta para ser enviada no WhatsApp. Nã
 
   app.post("/api/ai/budget-script", async (req, res) => {
     try {
-      const { patientName, doctorName, procedures, totalValue, installments, installmentValue } = req.body;
+      const { patientName, doctorName, procedures, simulations, customInstruction, pdfLink } = req.body;
       
       if (!patientName || !doctorName || !procedures || !Array.isArray(procedures)) {
         return res.status(400).json({ error: "Parâmetros incompletos." });
       }
 
-      const proceduresText = procedures.length > 0 ? procedures.join(", ") : "Avaliação inicial e planejamento";
-      
-      let financialText = "";
-      if (totalValue !== undefined && installments !== undefined) {
-        financialText = `\nO valor total do investimento da opção principal sugerida é de R$ ${totalValue.toFixed(2)}, podendo ser parcelado em até ${installments}x de R$ ${(installmentValue || 0).toFixed(2)}.`;
+      const formatCurrency = (val: number) => {
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+      };
+
+      let optionsList = "";
+      if (simulations && Array.isArray(simulations)) {
+        simulations.forEach(sim => {
+          if (sim.method === 'pix') {
+            optionsList += `- À Vista (PIX): ${formatCurrency(sim.entrada || sim.custoTotal)}\n`;
+          } else if (sim.method === 'debito') {
+            optionsList += `- À Vista (Débito): ${formatCurrency(sim.entrada || sim.custoTotal)}\n`;
+          } else if (sim.method === 'credito_vista') {
+            optionsList += `- Cartão de Crédito (À vista): ${formatCurrency(sim.cobradoCard || sim.custoTotal)}\n`;
+          } else {
+            const jurosText = sim.isExceeded ? 'com juros' : 'sem juros';
+            optionsList += `- Cartão de Crédito (até ${sim.installments}x ${jurosText}): ${sim.installments}x de ${formatCurrency(sim.valorParcela)} (Total ${formatCurrency(sim.custoTotal)})\n`;
+          }
+        });
       }
-      
-      const prompt = `Você é um assistente de clínica odontológica trabalhando para o(a) Dr(a). ${doctorName}.
-O paciente ${patientName} tem o seguinte plano de tratamento proposto: ${proceduresText}.${financialText}
-Crie uma mensagem de texto persuasiva, clara e acolhedora para WhatsApp, explicando de modo simples os benefícios de realizar esses tratamentos e convidando o paciente para aprovar o orçamento e agendar a primeira sessão.
-Mantenha o tom profissional mas acessível. Não inclua saudações iniciais suas, apenas a mensagem final pronta para envio.`;
+
+      const safePatientName = patientName.replace(/\s+/g, '_').toUpperCase();
+      const dateStr = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+      const fileName = `Orcamento_${safePatientName}_${dateStr}.pdf`;
+
+      const pdfSection = pdfLink 
+        ? `📄 Acesse o documento digitalizado (${fileName}) no nosso sistema seguro pelo link abaixo:\n🔗 ${pdfLink}`
+        : `📄 O PDF do seu plano de tratamento completo (${fileName}) está em anexo.`;
+
+      let prompt = "";
+      if (customInstruction && customInstruction.trim() !== "") {
+        prompt = `Você é o(a) Dr(a). ${doctorName}, enviando o orçamento odontológico para o paciente ${patientName}.
+Você recebeu uma solicitação especial do dentista para adaptar a mensagem: "${customInstruction}".
+
+Crie uma mensagem persuasiva e acolhedora para WhatsApp baseada nas informações abaixo e incorpore perfeitamente a orientação especial solicitada acima.
+Não inclua explicações extras ou saudações suas. A resposta final será copiada e enviada diretamente ao paciente.
+
+📋 Procedimentos Planejados:
+${procedures.map((p: string) => `- ${p}`).join("\n")}
+
+💳 Opções de Pagamento:
+${optionsList.trim()}
+
+${pdfSection}
+
+A mensagem deve convidar o paciente para iniciar o tratamento. Assine como: Atenciosamente, ${doctorName}.`;
+      } else {
+        prompt = `Você é o(a) Dr(a). ${doctorName}, enviando o orçamento odontológico para o paciente ${patientName}.
+Gere ESTRITAMENTE o texto abaixo, sem explicações extras, sem aspas e sem markdown de bloco de código. Mantenha os emojis.
+
+Olá, ${patientName}! Tudo bem? 😁
+
+Conforme conversamos em nossa consulta, estou enviando o seu plano de tratamento detalhado e o resumo do orçamento para alinharmos os próximos passos:
+
+📋 Resumo dos Procedimentos Planejados
+${procedures.map((p: string) => `- ${p}`).join("\n")}
+
+💳 Opções de Pagamento
+${optionsList.trim()}
+
+${pdfSection}
+
+Fico à disposição para tirarmos qualquer dúvida e agendarmos o início do seu tratamento!
+Quando gostaria de começar?
+
+Atenciosamente,
+${doctorName}`;
+      }
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
-          temperature: 0.7,
+          temperature: customInstruction ? 0.7 : 0.1,
         }
       });
 

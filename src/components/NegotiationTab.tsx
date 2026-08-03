@@ -278,6 +278,7 @@ export default function NegotiationTab({
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
   const [aiSalesScript, setAiSalesScript] = useState('');
+  const [customAiInstruction, setCustomAiInstruction] = useState('');
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
 
   // Sync to localStorage
@@ -699,6 +700,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
   const handleGenerateSalesScriptWithAI = async () => {
     setIsGeneratingScript(true);
     try {
+      const selectedSims = selectedPlanIndices.slice().sort().map(idx => simulations[idx]);
       const response = await fetch('/api/ai/budget-script', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -706,9 +708,9 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           patientName: patientName || 'Paciente',
           doctorName: clinicSettings.doctorName || 'Doutor',
           procedures: proceduresListOnMapeamento.length > 0 ? proceduresListOnMapeamento.map(p => p.procedureName) : ['Avaliação inicial e planejamento'],
-          totalValue: chosenSim.custoTotal,
-          installments: chosenSim.installments,
-          installmentValue: chosenSim.valorParcela
+          simulations: selectedSims,
+          customInstruction: customAiInstruction,
+          pdfLink: generatedPdfUrl
         })
       });
       
@@ -1014,6 +1016,14 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           currentY = 25;
         }
       });
+
+      // Disclaimer about fees
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.setFont('Helvetica', 'normal');
+      const feeDisclaimer = "* ATENÇÃO: As taxas informadas são valores aproximados para simulação. O valor praticado pela maquininha deve ser consultado e conferido no dia de efetuar o pagamento.";
+      const splitDisclaimer = doc.splitTextToSize(feeDisclaimer, 180);
+      doc.text(splitDisclaimer, 15, currentY + 20);
 
       // Signatures
       currentY += 65;
@@ -2465,6 +2475,17 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
             <h4 className="font-bold text-teal-900 text-sm">Gerar Argumentação de Venda (IA)</h4>
             <p className="text-[11px] text-teal-700 mt-0.5">Crie um script personalizado para enviar junto ao orçamento no WhatsApp.</p>
           </div>
+        </div>
+
+        <div className="mb-4">
+          <label className="text-xs font-bold text-teal-900 mb-1.5 block">Orientação para a IA (Opcional):</label>
+          <input
+            type="text"
+            placeholder="Ex: Foque na estética, seja mais informal e adicione um senso de urgência..."
+            value={customAiInstruction}
+            onChange={(e) => setCustomAiInstruction(e.target.value)}
+            className="w-full bg-white border border-teal-200 text-teal-900 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500/50 transition-all placeholder:text-teal-400"
+          />
         </div>
 
         <button
