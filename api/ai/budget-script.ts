@@ -8,19 +8,6 @@ export default async function handler(req: any, res: any) {
   try {
     const { patientName, doctorName, procedures } = req.body;
 
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(401).json({ error: "API key is not set in environment variables." });
-    }
-
-    const ai = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
-    });
-
     const prompt = `
     Aja como a secretária comercial premium do dentista ${doctorName}.
     Escreva um script curto de fechamento de venda via WhatsApp para enviar o orçamento em PDF para o paciente chamado ${patientName}.
@@ -33,23 +20,19 @@ export default async function handler(req: any, res: any) {
     4. Não inventar valores em dinheiro, o valor já estará no PDF.
     `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        temperature: 0.7,
-      }
+    const pollinationsResponse = await fetch("https://text.pollinations.ai/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: prompt }]
+      })
     });
+    
+    const responseText = await pollinationsResponse.text();
 
-    res.status(200).json({ message: response.text });
+    res.status(200).json({ message: responseText });
   } catch (error: any) {
-    console.error("Gemini API Error (budget-script):", error);
-    if (error?.status === 403 || error?.status === 401) {
-      return res.status(403).json({ error: "Chave da API inválida ou sem permissão." });
-    }
-    if (error?.status === 429) {
-      return res.status(429).json({ error: "Créditos da API Google Gemini esgotados." });
-    }
+    console.error("Pollinations API Error (budget-script):", error);
     res.status(500).json({ error: "Erro ao gerar script de orçamento." });
   }
 }

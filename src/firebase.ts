@@ -128,6 +128,10 @@ export const getAccessToken = async (): Promise<string | null> => {
           }
         } else {
           console.warn('Erro ao renovar token com o backend:', await response.text());
+          // If refresh fails (e.g. invalid_grant due to 7-day expiry), force logout
+          await logout();
+          window.location.reload();
+          return null;
         }
       } catch (err) {
         console.error('Falha na requisição de refresh do token:', err);

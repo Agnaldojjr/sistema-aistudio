@@ -22,7 +22,11 @@ export async function uploadPatientFileToSupabase(patientName: string, file: Fil
   const userId = session.user.id;
   const patientFolder = getSafePatientPath(patientName);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
-  const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${subfolderPath}${filename}`;
+  
+  const safeFilename = filename.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-.]/g, '');
+  const finalFilename = safeFilename || 'arquivo_sem_nome';
+
+  const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${subfolderPath}${finalFilename}`;
 
   const { data, error } = await supabase.storage
     .from(BUCKET_NAME)

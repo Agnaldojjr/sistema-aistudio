@@ -13,7 +13,7 @@ const formatCurrency = (val: number) => {
 // Custom hook to reactively track localStorage
 function useReactiveLocalStorage<T>(key: string, defaultValue: T): T {
   const getResolvedKey = (k: string) => {
-    if (k === 'agnaldo_dent_sections' || k === 'agnaldo_dent_proposal') {
+    if (k === 'agnaldo_dent_sections' || k === 'agnaldo_dent_proposal' || k === 'ag_neg_custom_net') {
       const urlParams = new URLSearchParams(window.location.search);
       const patientId = urlParams.get('patientId');
       if (patientId) {
@@ -119,12 +119,10 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
 
   const salesVolume = useReactiveLocalStorage<'under_3' | 'between_3_6'>('ag_neg_sales_volume', 'under_3');
   const cardBrand = useReactiveLocalStorage<'visa_master' | 'elo_amex'>('ag_neg_card_brand', 'visa_master');
-  const installments = useReactiveLocalStorage<number>('ag_neg_installments', 12);
-  const percentSim1 = useReactiveLocalStorage<number>('ag_neg_pct_sim1', 30);
-  const percentSim2 = useReactiveLocalStorage<number>('ag_neg_pct_sim2', 50);
-  const patientOfferInput = useReactiveLocalStorage<number>('ag_neg_offer_input', 500);
-  const firstOptionMethod = useReactiveLocalStorage<'pix' | 'debito' | 'credito_vista' | 'credito_parcelado'>('ag_neg_first_option_method', 'pix');
-  const selectedPlanIndex = useReactiveLocalStorage<number>('ag_neg_selected_plan', 0);
+  const boxEntradas = useReactiveLocalStorage<number[]>('ag_neg_box_entradas', [0, 0, 0, 0]);
+  const boxMethods = useReactiveLocalStorage<('pix' | 'debito' | 'credito_vista' | 'credito_parcelado')[]>('ag_neg_box_methods', ['pix', 'credito_parcelado', 'credito_parcelado', 'credito_parcelado']);
+  const boxInstallments = useReactiveLocalStorage<number[]>('ag_neg_box_installments', [1, 12, 12, 12]);
+  const selectedPlanIndices = useReactiveLocalStorage<number[]>('ag_neg_selected_plans', [0]);
   const showInPatientScreen = useReactiveLocalStorage<boolean[]>('ag_neg_show_patient_sims', [true, false, false, false]);
   const customNetDesiredRaw = useReactiveLocalStorage<string | null>('ag_neg_custom_net', null);
   const customNetDesired = customNetDesiredRaw !== null ? parseFloat(customNetDesiredRaw as string) : null;
@@ -148,16 +146,6 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
 
   const desiredNet = customNetDesired !== null && !isNaN(customNetDesired) ? customNetDesired : calculatedGrossTotal;
 
-  // Compute machine fee percentage for current selection
-  const machineFeePercent = useMemo(() => {
-    if (!TON_RATES[salesVolume]) return 0;
-    const activeRates = TON_RATES[salesVolume][cardBrand];
-    const index = Math.min(11, Math.max(0, installments - 1));
-    return activeRates[index];
-  }, [salesVolume, cardBrand, installments]);
-
-  const machineFeeDecimal = machineFeePercent / 100;
-
   // Max allowed installments by rule
   const maxInstallmentsRule = useMemo(() => {
     let baseMax = 6;
@@ -180,100 +168,63 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
 
   // Compile calculations for each of the 4 columns
   const simulations = useMemo(() => {
-    const isExceeded = installments > maxInstallmentsRule;
-    const effectiveFeeDecimal = isExceeded ? machineFeeDecimal : 0;
-    const t0Ref = desiredNet / (1 - effectiveFeeDecimal);
+    return Array.from({ length: 4 }).map((_, i) => {
+      const e = boxEntradas[i] || 0;
+      const bMethod = boxMethods[i] || 'pix';
+      const bInst = boxInstallments[i] || 1;
 
-    // 1. Column index 0: À Vista (Pix / Débito / Crédito 1x) ou Crédito Parcelado
-    let name0 = 'À Vista no Pix';
-    let label0 = 'PIX';
-    let e0 = desiredNet;
-    let ch0 = 0;
-    let inst0 = desiredNet;
-    let t0 = desiredNet;
+      const r = Math.max(0, desiredNet - e);
+      let optionFeeDecimal = 0;
+      let instCount = 0;
 
-    if (firstOptionMethod === 'debito') {
-      const debitRate = (DEBIT_RATES[salesVolume]?.[cardBrand] || 0) / 100;
-      name0 = 'À Vista no Débito';
-      label0 = 'DÉBITO';
-      e0 = 0;
-      ch0 = desiredNet;
-      inst0 = desiredNet;
-      t0 = desiredNet;
-    } else if (firstOptionMethod === 'credito_vista') {
-      const credit1xRate = (TON_RATES[salesVolume]?.[cardBrand]?.[0] || 0) / 100;
-      name0 = 'Crédito à Vista';
-      label0 = 'CRÉDITO 1X';
-      e0 = 0;
-      ch0 = desiredNet;
-      inst0 = desiredNet;
-      t0 = desiredNet;
-    } else if (firstOptionMethod === 'credito_parcelado') {
-      name0 = '100% no Cartão';
-      label0 = 'Sem Entrada';
-      e0 = 0;
-      ch0 = desiredNet / (1 - effectiveFeeDecimal);
-      inst0 = ch0 / installments;
-      t0 = ch0;
-    }
-
-    const e1 = (desiredNet * percentSim1) / 100;
-    const r1 = desiredNet - e1;
-    const ch1 = r1 / (1 - effectiveFeeDecimal);
-    const inst1 = ch1 / installments;
-    const t1 = e1 + ch1;
-
-    const e2 = (desiredNet * percentSim2) / 100;
-    const r2 = desiredNet - e2;
-    const ch2 = r2 / (1 - effectiveFeeDecimal);
-    const inst2 = ch2 / installments;
-    const t2 = e2 + ch2;
-
-    const e3 = Math.min(desiredNet, Math.max(0, patientOfferInput));
-    const r3 = desiredNet - e3;
-    const ch3 = r3 / (1 - effectiveFeeDecimal);
-    const inst3 = ch3 / installments;
-    const t3 = e3 + ch3;
-
-    return [
-      {
-        name: name0,
-        label: label0,
-        entrada: e0,
-        cobradoCard: ch0,
-        valorParcela: inst0,
-        custoTotal: t0,
-        economia: Math.max(0, t0Ref - t0),
-      },
-      {
-        name: 'Simulação 1',
-        label: `Entrada (${percentSim1}%)`,
-        entrada: e1,
-        cobradoCard: ch1,
-        valorParcela: inst1,
-        custoTotal: t1,
-        economia: Math.max(0, t0Ref - t1),
-      },
-      {
-        name: 'Simulação 2',
-        label: `Entrada (${percentSim2}%)`,
-        entrada: e2,
-        cobradoCard: ch2,
-        valorParcela: inst2,
-        custoTotal: t2,
-        economia: Math.max(0, t0Ref - t2),
-      },
-      {
-        name: 'Oferta Paciente',
-        label: 'Entrada Customizada',
-        entrada: e3,
-        cobradoCard: ch3,
-        valorParcela: inst3,
-        custoTotal: t3,
-        economia: Math.max(0, t0Ref - t3),
+      if (bMethod === 'pix') {
+        optionFeeDecimal = 0;
+        instCount = 1;
+      } else if (bMethod === 'debito') {
+        optionFeeDecimal = (DEBIT_RATES[salesVolume]?.[cardBrand] || 0) / 100;
+        instCount = 1;
+      } else if (bMethod === 'credito_vista') {
+        optionFeeDecimal = (TON_RATES[salesVolume]?.[cardBrand]?.[0] || 0) / 100;
+        instCount = 1;
+      } else if (bMethod === 'credito_parcelado') {
+        const machineFeePercent = TON_RATES[salesVolume][cardBrand][Math.min(11, Math.max(0, bInst - 1))];
+        optionFeeDecimal = machineFeePercent / 100;
+        instCount = bInst;
       }
-    ];
-  }, [desiredNet, machineFeeDecimal, installments, percentSim1, percentSim2, patientOfferInput, maxInstallmentsRule, firstOptionMethod, salesVolume, cardBrand]);
+
+      const isExceeded = instCount > maxInstallmentsRule && bMethod === 'credito_parcelado';
+      const effectiveFeeDecimal = isExceeded ? optionFeeDecimal : 0;
+      
+      const t0Ref = desiredNet / (1 - effectiveFeeDecimal);
+
+      const ch = r / (1 - effectiveFeeDecimal);
+      const instVal = instCount > 0 ? ch / instCount : 0;
+      const t = e + ch;
+
+      let label = bMethod.toUpperCase();
+      if (bMethod === 'credito_parcelado') label = `CRÉDITO ${instCount}X`;
+      if (bMethod === 'credito_vista') label = `CRÉDITO 1X`;
+
+      let name = `Opção ${i + 1}`;
+      if (i === 1) name = 'Simulação 1';
+      if (i === 2) name = 'Simulação 2';
+      if (i === 3) name = 'Oferta Paciente';
+      if (i === 0 && bMethod === 'pix') name = 'À Vista no Pix';
+      if (i === 0 && bMethod === 'credito_parcelado') name = '100% no Cartão';
+
+      return {
+        name,
+        label,
+        entrada: e,
+        cobradoCard: ch,
+        valorParcela: instVal,
+        custoTotal: t,
+        economia: Math.max(0, t0Ref - t),
+        method: bMethod,
+        installments: instCount
+      };
+    });
+  }, [desiredNet, boxEntradas, boxMethods, boxInstallments, maxInstallmentsRule, salesVolume, cardBrand]);
 
   const visibleSimulationsCount = useMemo(() => {
     const array = Array.isArray(showInPatientScreen) ? showInPatientScreen : [false, true, false, false];
@@ -285,7 +236,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
     const array = Array.isArray(showInPatientScreen) ? showInPatientScreen : [false, true, false, false];
     const noneChecked = array.every(v => !v);
     if (noneChecked) {
-      return index === selectedPlanIndex;
+      return selectedPlanIndices.includes(index);
     }
     return !!array[index];
   };
@@ -622,7 +573,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
                 Simulador de Condições de Pagamento
               </h4>
               <p className="text-sm text-zinc-500 leading-normal mt-1">
-                Opções de parcelamento facilitado em até {installments} vezes na maquininha.
+                Opções de parcelamento facilitado em até 12 vezes na maquininha.
               </p>
             </div>
 
@@ -637,7 +588,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
             }`}>
               {simulations.map((sim, index) => {
                 if (!isSimVisible(index)) return null;
-                const isSelected = selectedPlanIndex === index;
+                const isSelected = selectedPlanIndices.includes(index);
                 return (
                   <div
                     key={index}
@@ -661,14 +612,14 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
                       </div>
 
                       <div className="divide-y divide-zinc-100 font-sans text-sm">
-                        {index === 0 && firstOptionMethod !== 'credito_parcelado' ? (
+                        {sim.method !== 'credito_parcelado' ? (
                           <>
                             <div className="py-2 flex justify-between items-center">
                               <span className="text-zinc-500 font-medium text-xs">
-                                {firstOptionMethod === 'pix' ? 'Pagamento PIX:' : 'Pagamento Cartão:'}
+                                {sim.method === 'pix' ? 'Pagamento PIX:' : 'Pagamento Único:'}
                               </span>
                               <strong className="text-[#896A39] font-mono font-bold text-sm bg-[#FAF8F5] border border-[#E6DEC9] px-2 py-0.5 rounded-md">
-                                {formatCurrency(firstOptionMethod === 'pix' ? sim.entrada : sim.cobradoCard)}
+                                {formatCurrency(sim.method === 'pix' ? sim.entrada : sim.cobradoCard)}
                               </strong>
                             </div>
 
@@ -683,7 +634,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
                           <>
                             <div className="py-2 flex justify-between items-center">
                               <span className="text-zinc-500 font-medium text-xs">
-                                {index === 0 && firstOptionMethod === 'credito_parcelado' ? 'Entrada (Nenhuma):' : 'Entrada (PIX/Dinheiro):'}
+                                {sim.entrada === 0 ? 'Entrada (Nenhuma):' : 'Entrada (PIX/Dinheiro):'}
                               </span>
                               <strong className="text-[#896A39] font-mono font-bold text-sm bg-[#FAF8F5] border border-[#E6DEC9] px-2 py-0.5 rounded-md">{formatCurrency(sim.entrada)}</strong>
                             </div>
@@ -691,7 +642,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
                             <div className="py-3 text-center bg-zinc-50 border border-zinc-100 rounded-xl my-2">
                               <span className="text-xs text-zinc-400 uppercase tracking-wide block font-semibold mb-1">Restante na Maquininha</span>
                               <strong className="text-lg font-bold text-[#4E1119] block font-mono">
-                                {installments}x de <span className="text-[#B48C4D]">{formatCurrency(sim.valorParcela)}</span>
+                                {sim.installments}x de <span className="text-[#B48C4D]">{formatCurrency(sim.valorParcela)}</span>
                               </strong>
                             </div>
                           </>

@@ -873,15 +873,17 @@ Atenciosamente,
 ${doctorName}`;
       }
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          temperature: customInstruction ? 0.7 : 0.1,
-        }
+      const pollinationsResponse = await fetch("https://text.pollinations.ai/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: prompt }]
+        })
       });
+      
+      const responseText = await pollinationsResponse.text();
 
-      res.json({ message: response.text });
+      res.json({ message: responseText });
     } catch (error: any) {
       console.error("Gemini API Error (budget-script):", error);
       res.status(500).json({ error: "Erro ao gerar script de orçamento.", details: error.message || String(error) });

@@ -84,14 +84,22 @@ export default function CalendarView({ onNewPatient, initialPatientName, onClear
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         handleRefresh();
+        setIframeKey(Date.now());
       }
     };
+    
+    // Auto-refresh periodically (e.g. every 5 minutes)
+    const intervalId = setInterval(() => {
+      handleRefresh();
+      setIframeKey(Date.now());
+    }, 5 * 60 * 1000);
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('appointments-updated', handleRefresh);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('appointments-updated', handleRefresh);
+      clearInterval(intervalId);
     };
   }, []);
 
