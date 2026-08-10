@@ -20,7 +20,7 @@ export default async function handler(req: any, res: any) {
     4. Não inventar valores em dinheiro, o valor já estará no PDF.
     `;
 
-    const pollinationsResponse = await fetch("https://text.pollinations.ai/", {
+    const pollinationsResponse = await fetch("https://text.pollinations.ai/openai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -28,7 +28,8 @@ export default async function handler(req: any, res: any) {
       })
     });
     
-    const responseText = await pollinationsResponse.text();
+    const data = await pollinationsResponse.json();
+    const responseText = data.choices?.[0]?.message?.content || "Erro ao gerar script com AI.";
 
     res.status(200).json({ message: responseText });
   } catch (error: any) {

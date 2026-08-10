@@ -873,7 +873,7 @@ Atenciosamente,
 ${doctorName}`;
       }
 
-      const pollinationsResponse = await fetch("https://text.pollinations.ai/", {
+      const pollinationsResponse = await fetch("https://text.pollinations.ai/openai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -881,7 +881,8 @@ ${doctorName}`;
         })
       });
       
-      const responseText = await pollinationsResponse.text();
+      const data = await pollinationsResponse.json();
+      const responseText = data.choices?.[0]?.message?.content || "Erro ao gerar script com AI.";
 
       res.json({ message: responseText });
     } catch (error: any) {
