@@ -873,15 +873,24 @@ Atenciosamente,
 ${doctorName}`;
       }
 
-      const pollinationsResponse = await fetch("https://text.pollinations.ai/openai", {
+      const deepseekKey = process.env.DEEPSEEK_API_KEY;
+      if (!deepseekKey) {
+        throw new Error("DEEPSEEK_API_KEY não configurada no servidor.");
+      }
+
+      const aiResponse = await fetch("https://api.deepseek.com/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${deepseekKey}`
+        },
         body: JSON.stringify({
+          model: "deepseek-chat",
           messages: [{ role: "user", content: prompt }]
         })
       });
       
-      const data = await pollinationsResponse.json();
+      const data = await aiResponse.json();
       const responseText = data.choices?.[0]?.message?.content || "Erro ao gerar script com AI.";
 
       res.json({ message: responseText });
