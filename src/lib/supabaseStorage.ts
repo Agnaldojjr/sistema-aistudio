@@ -10,8 +10,14 @@ function getSafePatientPath(patientName: string) {
 }
 
 /**
- * Faz o upload de um arquivo para o bucket do Supabase
+ * Função utilitária para garantir um formato seguro de nome de arquivo
  */
+function getSafeFilename(filename: string): string {
+  if (filename.includes('/')) return filename;
+  const safeFilename = filename.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-.]/g, '');
+  return safeFilename || 'arquivo_sem_nome';
+}
+
 /**
  * Faz o upload de um arquivo para o bucket do Supabase
  */
@@ -23,9 +29,7 @@ export async function uploadPatientFileToSupabase(patientName: string, file: Fil
   const patientFolder = getSafePatientPath(patientName);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
   
-  const safeFilename = filename.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-.]/g, '');
-  const finalFilename = safeFilename || 'arquivo_sem_nome';
-
+  const finalFilename = getSafeFilename(filename);
   const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${subfolderPath}${finalFilename}`;
 
   const { data, error } = await supabase.storage
@@ -159,7 +163,8 @@ export async function deletePatientFileFromSupabase(patientName: string, filenam
   const userId = session.user.id;
   const patientFolder = getSafePatientPath(patientName);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
-  const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${subfolderPath}${filename}`;
+  const finalFilename = getSafeFilename(filename);
+  const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${subfolderPath}${finalFilename}`;
 
   const { error } = await supabase.storage
     .from(BUCKET_NAME)
@@ -199,7 +204,8 @@ export async function getPatientFileUrlFromSupabase(patientName: string, filenam
   const userId = session.user.id;
   const patientFolder = getSafePatientPath(patientName);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
-  const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${subfolderPath}${filename}`;
+  const finalFilename = getSafeFilename(filename);
+  const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${subfolderPath}${finalFilename}`;
 
   const { data, error } = await supabase.storage.from(BUCKET_NAME).createSignedUrl(filePath, expiresIn);
   if (error) {
@@ -216,8 +222,10 @@ export async function renamePatientFileInSupabase(patientName: string, oldFilena
   const userId = session.user.id;
   const patientFolder = getSafePatientPath(patientName);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
-  const oldPath = oldFilename.includes('/') ? oldFilename : `${userId}/${patientFolder}/${subfolderPath}${oldFilename}`;
-  const newPath = newFilename.includes('/') ? newFilename : `${userId}/${patientFolder}/${subfolderPath}${newFilename}`;
+  const finalOldFilename = getSafeFilename(oldFilename);
+  const finalNewFilename = getSafeFilename(newFilename);
+  const oldPath = oldFilename.includes('/') ? oldFilename : `${userId}/${patientFolder}/${subfolderPath}${finalOldFilename}`;
+  const newPath = newFilename.includes('/') ? newFilename : `${userId}/${patientFolder}/${subfolderPath}${finalNewFilename}`;
 
   const { error } = await supabase.storage.from(BUCKET_NAME).move(oldPath, newPath);
   if (error) {
