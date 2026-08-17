@@ -79,7 +79,6 @@ const NAV_ITEMS = [
   { id: 'crm'       as AppView, label: 'Pacientes', icon: Users,           section: 'principal' },
   { id: 'calendar'  as AppView, label: 'Agenda',    icon: Calendar,        section: 'principal' },
   { id: '3d-planning' as AppView, label: 'Arcada 3D', icon: Layers,        section: 'principal' },
-  { id: 'agent-center' as AppView, label: 'Copiloto Hermes', icon: Bot,          section: 'principal' },
   { id: 'settings'  as AppView, label: 'Ajustes',   icon: Settings,        section: 'principal' },
 ];
 

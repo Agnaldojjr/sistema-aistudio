@@ -117,35 +117,70 @@ export default async (req: Request) => {
     // Normaliza a rota para identificar a sub-rota requisitada
     const subRoute = pathname.replace(/^\/api\/crm/, "").replace(/^\/\.netlify\/functions\/crm/, "");
 
-    // 1. GET /patients -> Busca paciente por telefone
+    // 1. GET /patients -> Busca paciente por telefone ou nome
     if (subRoute === "/patients" && req.method === "GET") {
-      const phone = url.searchParams.get("phone");
-      if (!phone) {
-        return jsonResponse({ error: "Parâmetro 'phone' é obrigatório." }, 400);
+      const search = url.searchParams.get("search") || url.searchParams.get("phone") || url.searchParams.get("name");
+      if (!search) {
+        return jsonResponse({ error: "Parâmetro 'search', 'phone' ou 'name' é obrigatório." }, 400);
       }
 
       const userId = getTargetUserId();
       const db = await getCRMDatabase(userId);
 
-      const cleanSearchPhone = phone.replace(/\D/g, "");
-      if (cleanSearchPhone.length < 8) {
-        return jsonResponse({ error: "Número de telefone muito curto." }, 400);
-      }
+      const cleanSearchPhone = search.replace(/\D/g, "");
+      const isPhoneSearch = cleanSearchPhone.length >= 8;
+      const lowerSearch = search.toLowerCase();
 
-      const patient = db.patients.find((p: any) => {
+      const patients = db.patients.filter((p: any) => {
         const pPhone = (p.phone || "").replace(/\D/g, "");
         const pMobile = (p.mobile || "").replace(/\D/g, "");
-        return (
+        const pName = (p.name || "").toLowerCase();
+        
+        const matchesPhone = isPhoneSearch && (
           (pPhone && (pPhone.includes(cleanSearchPhone) || cleanSearchPhone.includes(pPhone))) ||
           (pMobile && (pMobile.includes(cleanSearchPhone) || cleanSearchPhone.includes(pMobile)))
         );
+        
+        const matchesName = pName.includes(lowerSearch);
+        
+        return matchesPhone || matchesName;
       });
 
-      if (!patient) {
+      if (patients.length === 0) {
         return jsonResponse({ error: "Paciente não encontrado." }, 404);
       }
 
-      return jsonResponse({ patient });
+      return jsonResponse({ patients });
+    }
+
+    // 1.5. POST /patients -> Cria um novo paciente
+    if (subRoute === "/patients" && req.method === "POST") {
+      const { name, phone, mobile, cpf, email } = await req.json();
+
+      if (!name) {
+        return jsonResponse({ error: "O campo name é obrigatório." }, 400);
+      }
+
+      const userId = getTargetUserId();
+      const db = await getCRMDatabase(userId);
+
+      const newPatient = {
+        id: crypto.randomUUID(),
+        name,
+        phone: phone || "",
+        mobile: mobile || "",
+        cpf: cpf || "",
+        email: email || "",
+        createdAt: new Date().toISOString()
+      };
+
+      db.patients.push(newPatient);
+      await saveCRMDatabase(userId, db);
+
+      return jsonResponse({
+        message: "Paciente cadastrado com sucesso.",
+        patient: newPatient
+      }, 201);
     }
 
     // 2. GET /appointments/slots -> Consulta horários livres
@@ -222,16 +257,13 @@ export default async (req: Request) => {
       }, 201);
     }
 
-    // 4. PUT /appointments/:id/status -> Confirmação ou Cancelamento
+    // 4. PUT /appointments/:id -> Atualização de Agendamento (Status, Data, Hora)
+    const appointmentMatch = subRoute.match(/^\/appointments\/([^\/]+)$/);
     const statusMatch = subRoute.match(/^\/appointments\/([^\/]+)\/status$/);
-    if (statusMatch && req.method === "PUT") {
-      const id = statusMatch[1];
-      const { status } = await req.json();
-
-      const validStatuses = ["Agendado", "Confirmado", "Atendido", "Faltou", "Cancelado"];
-      if (!status || !validStatuses.includes(status)) {
-        return jsonResponse({ error: `Status inválido. Deve ser um de: ${validStatuses.join(", ")}` }, 400);
-      }
+    
+    if ((appointmentMatch || statusMatch) && req.method === "PUT") {
+      const id = (appointmentMatch ? appointmentMatch[1] : statusMatch![1]);
+      const updates = await req.json();
 
       const userId = getTargetUserId();
       const db = await getCRMDatabase(userId);
@@ -241,12 +273,27 @@ export default async (req: Request) => {
         return jsonResponse({ error: "Agendamento não encontrado." }, 404);
       }
 
-      db.appointments[appointmentIndex].status = status;
+      const app = db.appointments[appointmentIndex];
+
+      if (updates.status) {
+        const validStatuses = ["Agendado", "Confirmado", "Atendido", "Faltou", "Cancelado"];
+        if (!validStatuses.includes(updates.status)) {
+          return jsonResponse({ error: `Status inválido. Deve ser um de: ${validStatuses.join(", ")}` }, 400);
+        }
+        app.status = updates.status;
+      }
+      
+      if (updates.date) app.date = updates.date;
+      if (updates.time) app.time = updates.time;
+      if (updates.dentist) app.dentist = updates.dentist;
+      if (updates.observations) app.observations = updates.observations;
+
+      db.appointments[appointmentIndex] = app;
       await saveCRMDatabase(userId, db);
 
       return jsonResponse({
-        message: `Agendamento atualizado para '${status}' com sucesso.`,
-        appointment: db.appointments[appointmentIndex]
+        message: "Agendamento atualizado com sucesso.",
+        appointment: app
       });
     }
 
@@ -265,12 +312,65 @@ export default async (req: Request) => {
 
       const history = (db.clinical_history || []).filter((h: any) => h.patientId === id);
       const appointments = (db.appointments || []).filter((app: any) => app.patientId === id);
+      const patientBudgets = patient.budgets || [];
 
       return jsonResponse({
         patient: { id: patient.id, name: patient.name },
         clinical_history: history,
-        appointments: appointments
+        appointments: appointments,
+        budgets: patientBudgets
       });
+    }
+
+    // 6. POST /proposals -> Cria um orçamento (proposta)
+    if (subRoute === "/proposals" && req.method === "POST") {
+      const { patientId, proceduresText, discountPercent, installments, totalValue } = await req.json();
+
+      if (!patientId || !proceduresText) {
+        return jsonResponse({ error: "Os campos patientId e proceduresText são obrigatórios." }, 400);
+      }
+
+      const userId = getTargetUserId();
+      const db = await getCRMDatabase(userId);
+
+      const patientIndex = db.patients.findIndex((p: any) => p.id === patientId);
+      if (patientIndex === -1) {
+        return jsonResponse({ error: "Paciente não encontrado." }, 404);
+      }
+
+      const patient = db.patients[patientIndex];
+      const newBudget = {
+        id: crypto.randomUUID(),
+        versionNumber: (patient.budgets?.length || 0) + 1,
+        versionLabel: `Orçamento IA ${(patient.budgets?.length || 0) + 1}`,
+        createdAt: new Date().toISOString(),
+        filename: `Orcamento_${patient.name.replace(/\s+/g, '_')}_IA.pdf`,
+        status: "Aberto (paciente não pagou)",
+        totalGross: totalValue || 0,
+        totalNet: totalValue ? (totalValue * (1 - (discountPercent || 0)/100)) : 0,
+        proposal: {
+          patientName: patient.name,
+          notes: proceduresText,
+          discountPercent: discountPercent || 0,
+          pixDiscountLabel: "Desconto padrão",
+          installments: installments || 1,
+          installmentsLabel: `Parcelado em ${installments || 1}x`,
+          customDiscountAmount: 0,
+          showTotalBySection: false
+        },
+        sections: [] // Simplified structure
+      };
+
+      if (!patient.budgets) patient.budgets = [];
+      patient.budgets.push(newBudget);
+      db.patients[patientIndex] = patient;
+      
+      await saveCRMDatabase(userId, db);
+
+      return jsonResponse({
+        message: "Orçamento criado com sucesso.",
+        budget: newBudget
+      }, 201);
     }
 
     return jsonResponse({ error: "Rota não encontrada no CRM." }, 404);
