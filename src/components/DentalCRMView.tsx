@@ -1296,7 +1296,7 @@ export default function DentalCRMView({
     return (files || []).filter(f => f.name && !f.name.startsWith('.'));
   };
 
-  const syncGoogleSupabaseDataForPatient = async (patientName: string) => {
+  const syncGoogleSupabaseDataForPatient = async (patient: any) => {
     setSupabaseError(null);
     setSupabaseFolderId(null);
     setSupabaseProposals([]);
@@ -1306,7 +1306,7 @@ export default function DentalCRMView({
       setIsLoadingSupabaseProposals(true);
       setIsLoadingSupabaseImages(true);
       
-      const folderId = patientName;
+      const folderId = patient?.id || "Unknown";
       setSupabaseFolderId(folderId);
       
       // Load proposals
