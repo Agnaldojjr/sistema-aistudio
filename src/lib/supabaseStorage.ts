@@ -21,16 +21,16 @@ function getSafeFilename(filename: string): string {
 /**
  * Faz o upload de um arquivo para o bucket do Supabase
  */
-export async function uploadPatientFileToSupabase(patientName: string, file: File | Blob, filename: string, subfolder?: string) {
+export async function uploadPatientFileToSupabase(patientIdentifier: string, file: File | Blob, filename: string, subfolder?: string) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
   if (authErr || !session) throw new Error('Usuário não autenticado');
   
   const userId = session.user.id;
-  const patientFolder = getSafePatientPath(patientName);
+  const targetFolder = getSafePatientPath(patientIdentifier);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
   
   const finalFilename = getSafeFilename(filename);
-  const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${subfolderPath}${finalFilename}`;
+  const filePath = filename.includes('/') ? filename : `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
 
   const { data, error } = await supabase.storage
     .from(BUCKET_NAME)
@@ -49,14 +49,14 @@ export async function uploadPatientFileToSupabase(patientName: string, file: Fil
 /**
  * Lista todos os arquivos de um paciente (incluindo subpastas se aplicável)
  */
-export async function listPatientFilesFromSupabase(patientName: string, subfolder?: string) {
+export async function listPatientFilesFromSupabase(patientId: string, fallbackPatientName?: string, subfolder?: string) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
   if (authErr || !session) throw new Error('Usuário não autenticado');
   
   const userId = session.user.id;
-  const patientFolder = getSafePatientPath(patientName);
-  const basePath = `${userId}/${patientFolder}`;
-  const path = subfolder ? `${basePath}/${subfolder.replace(/^\/|\/$/g, '')}` : basePath;
+  const idPath = getSafePatientPath(patientId);
+  const basePath = `${userId}/${idPath}`;
+  let path = subfolder ? `${basePath}/${subfolder.replace(/^\/|\/$/g, '')}` : basePath;
 
   const fetchFilesInPath = async (targetPath: string, subPrefix: string = '') => {
     const { data, error } = await supabase.storage
@@ -75,10 +75,37 @@ export async function listPatientFilesFromSupabase(patientName: string, subfolde
 
   let rawFiles = await fetchFilesInPath(path, subfolder || '');
 
-  // Se estiver listando a raiz sem subpasta específica, buscar também na subpasta 'Orçamentos'
   if (!subfolder) {
     const subfolderFiles = await fetchFilesInPath(`${basePath}/Orcamentos`, 'Orcamentos');
     rawFiles = [...rawFiles, ...subfolderFiles];
+  }
+
+  // --- TELEMETRY FALLBACK ---
+  if (fallbackPatientName) {
+    const legacyFolder = getSafePatientPath(fallbackPatientName);
+    if (legacyFolder !== idPath) {
+      const legacyBasePath = `${userId}/${legacyFolder}`;
+      const legacyPath = subfolder ? `${legacyBasePath}/${subfolder.replace(/^\/|\/$/g, '')}` : legacyBasePath;
+      
+      let fallbackFiles = await fetchFilesInPath(legacyPath, subfolder || '');
+      if (!subfolder) {
+        const fallbackSub = await fetchFilesInPath(`${legacyBasePath}/Orcamentos`, 'Orcamentos');
+        fallbackFiles = [...fallbackFiles, ...fallbackSub];
+      }
+      
+      if (fallbackFiles.length > 0) {
+        console.warn(`[TELEMETRIA-MIGRACAO] Fallback acionado: O paciente ID ${patientId} possui arquivos na pasta legada (${legacyFolder}).`);
+        
+        // Deduplicar: só adiciona o fallback se não existir um arquivo com o mesmo nome na pasta ID
+        const existingKeys = new Set(rawFiles.map(f => f.storagePath.replace(`${userId}/${idPath}/`, '')));
+        const uniqueFallback = fallbackFiles.filter(f => {
+          const legacyKey = f.storagePath.replace(`${userId}/${legacyFolder}/`, '');
+          return !existingKeys.has(legacyKey);
+        });
+        
+        rawFiles = [...rawFiles, ...uniqueFallback];
+      }
+    }
   }
 
   if (rawFiles.length > 0) {
@@ -156,15 +183,15 @@ export async function listPatientFilesFromSupabase(patientName: string, subfolde
 /**
  * Deleta um arquivo específico do paciente
  */
-export async function deletePatientFileFromSupabase(patientName: string, filename: string, subfolder?: string) {
+export async function deletePatientFileFromSupabase(patientIdentifier: string, filename: string, subfolder?: string) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
   if (authErr || !session) throw new Error('Usuário não autenticado');
   
   const userId = session.user.id;
-  const patientFolder = getSafePatientPath(patientName);
+  const targetFolder = getSafePatientPath(patientIdentifier);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
   const finalFilename = getSafeFilename(filename);
-  const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${subfolderPath}${finalFilename}`;
+  const filePath = filename.includes('/') ? filename : `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
 
   const { error } = await supabase.storage
     .from(BUCKET_NAME)
@@ -196,16 +223,15 @@ export async function downloadFileAsDataUrlFromSupabase(filePath: string): Promi
   });
 }
 
-
-export async function getPatientFileUrlFromSupabase(patientName: string, filename: string, expiresIn: number = 3600, subfolder?: string) {
+export async function getPatientFileUrlFromSupabase(patientIdentifier: string, filename: string, expiresIn: number = 3600, subfolder?: string) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
   if (authErr || !session) throw new Error('Usuário não autenticado');
   
   const userId = session.user.id;
-  const patientFolder = getSafePatientPath(patientName);
+  const targetFolder = getSafePatientPath(patientIdentifier);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
   const finalFilename = getSafeFilename(filename);
-  const filePath = filename.includes('/') ? filename : `${userId}/${patientFolder}/${subfolderPath}${finalFilename}`;
+  const filePath = filename.includes('/') ? filename : `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
 
   const { data, error } = await supabase.storage.from(BUCKET_NAME).createSignedUrl(filePath, expiresIn);
   if (error) {
@@ -215,17 +241,17 @@ export async function getPatientFileUrlFromSupabase(patientName: string, filenam
   return data?.signedUrl;
 }
 
-export async function renamePatientFileInSupabase(patientName: string, oldFilename: string, newFilename: string, subfolder?: string) {
+export async function renamePatientFileInSupabase(patientIdentifier: string, oldFilename: string, newFilename: string, subfolder?: string) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
   if (authErr || !session) throw new Error('Usuário não autenticado');
   
   const userId = session.user.id;
-  const patientFolder = getSafePatientPath(patientName);
+  const targetFolder = getSafePatientPath(patientIdentifier);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
   const finalOldFilename = getSafeFilename(oldFilename);
   const finalNewFilename = getSafeFilename(newFilename);
-  const oldPath = oldFilename.includes('/') ? oldFilename : `${userId}/${patientFolder}/${subfolderPath}${finalOldFilename}`;
-  const newPath = newFilename.includes('/') ? newFilename : `${userId}/${patientFolder}/${subfolderPath}${finalNewFilename}`;
+  const oldPath = oldFilename.includes('/') ? oldFilename : `${userId}/${targetFolder}/${subfolderPath}${finalOldFilename}`;
+  const newPath = newFilename.includes('/') ? newFilename : `${userId}/${targetFolder}/${subfolderPath}${finalNewFilename}`;
 
   const { error } = await supabase.storage.from(BUCKET_NAME).move(oldPath, newPath);
   if (error) {
