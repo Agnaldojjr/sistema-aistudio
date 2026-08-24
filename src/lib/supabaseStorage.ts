@@ -184,7 +184,7 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
     const errorLog = JSON.stringify({
       patientId, fallbackPatientName, idPath, userId, msg: "Zero files found for both paths"
     });
-    await supabase.storage.from(BUCKET_NAME).upload(`logs/${Date.now()}_${idPath}.json`, errorLog);
+    await supabase.storage.from(BUCKET_NAME).upload(`${userId}/telemetry_logs_${Date.now()}_${idPath}.json`, errorLog);
   } catch(e) {}
 
   return [];
