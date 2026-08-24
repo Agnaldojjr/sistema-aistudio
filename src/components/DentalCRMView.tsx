@@ -755,7 +755,7 @@ export default function DentalCRMView({
 
       const pdfBlob = doc.output('blob');
       const filename = `Anamnese_${patientName.replace(/\s+/g, '_')}_${date.replace(/\//g, '-')}.pdf`;
-      await uploadPatientFileToSupabase(patientName, pdfBlob, filename);
+      await uploadPatientFileToSupabase(selectedPatient?.id || patientName, pdfBlob, filename);
     } catch (err) {
       console.error("Erro ao salvar PDF de anamnese no Supabase:", err);
     }
@@ -1278,7 +1278,7 @@ export default function DentalCRMView({
     }
 
     try {
-      await uploadPatientFileToSupabase(selectedPatient!.name, new Blob([JSON.stringify(updatedData)], {type: "application/json"}), selectedProposalId);
+      await uploadPatientFileToSupabase(selectedPatient!.id, new Blob([JSON.stringify(updatedData)], {type: "application/json"}), selectedProposalId);
       // Wait a tiny bit for states to batch, then save context
       setTimeout(() => {
         saveContextToSupabase();

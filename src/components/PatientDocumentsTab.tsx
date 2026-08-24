@@ -941,7 +941,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
           // Save to Supabase Storage
           const jsonStr = JSON.stringify(stateToSave);
           const fileBlob = new Blob([jsonStr], { type: 'application/json' });
-          await uploadPatientFileToSupabase(patientName, fileBlob, 'orcamento_imported.json');
+          await uploadPatientFileToSupabase((pd as any)?.id || patientName, fileBlob, 'orcamento_imported.json');
 
           // Handle conditional calendar event
           let isScheduled = false;
@@ -1369,7 +1369,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
 
       const jsonStr = JSON.stringify(mockTreatmentState);
       const fileBlob = new Blob([jsonStr], { type: 'application/json' });
-      await uploadPatientFileToSupabase(patName, fileBlob, 'orcamento_quickaction.json');
+      await uploadPatientFileToSupabase((pd as any)?.id || patName, fileBlob, 'orcamento_quickaction.json');
       
       setDriveSyncStatuses(prev => ({ ...prev, [patName]: 'synced' }));
       

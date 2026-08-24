@@ -129,7 +129,7 @@ export default function MobileWorkspace({
       
       const jsonStr = JSON.stringify(stateToSave);
       const fileBlob = new Blob([jsonStr], { type: 'application/json' });
-      await uploadPatientFileToSupabase(formattedName, fileBlob, 'orcamento_mobile.json');
+      await uploadPatientFileToSupabase((proposal.patientData as any)?.id || formattedName, fileBlob, 'orcamento_mobile.json');
 
       // 3. Set active patient in flow
       setProposal(prev => ({
@@ -369,7 +369,7 @@ export default function MobileWorkspace({
               if (blob) {
                 try {
                   const filename = `${targetSectionId}_capture_${Date.now()}.jpg`;
-                  await uploadPatientFileToSupabase(pName, blob, filename);
+                  await uploadPatientFileToSupabase((proposal.patientData as any)?.id || pName, blob, filename);
                   console.log(`Mobile webcam capture saved to patient ${pName} on Supabase`);
                 } catch (err) {
                   console.warn("Failed to upload mobile webcam snapshot to Supabase:", err);
@@ -403,7 +403,7 @@ export default function MobileWorkspace({
         const pName = proposal.patientName;
         if (pName) {
           const filename = `${targetSectionId}_upload_${Date.now()}_${file.name}`;
-          uploadPatientFileToSupabase(pName, file, filename).then(() => {
+          uploadPatientFileToSupabase((proposal.patientData as any)?.id || pName, file, filename).then(() => {
             console.log(`Mobile upload saved to patient ${pName} on Supabase`);
           }).catch(err => {
             console.warn("Failed to upload mobile image upload to Supabase:", err);
@@ -444,7 +444,7 @@ export default function MobileWorkspace({
       // 2. Upload to Supabase
       const d = format(new Date(), 'yyyy-MM-dd_HH-mm');
       const filename = `${sectionId}_capture_${d}.jpeg`;
-      await uploadPatientFileToSupabase(pName, blob, filename);
+      await uploadPatientFileToSupabase((proposal.patientData as any)?.id || pName, blob, filename);
 
       setSyncsSuccess(prev => ({ ...prev, [sectionId]: true }));
       setTimeout(() => {

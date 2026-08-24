@@ -6,7 +6,7 @@ const BUCKET_NAME = 'patient_files';
  * Função utilitária para garantir um formato seguro de nome de pasta
  */
 function getSafePatientPath(patientName: string) {
-  return (patientName || 'Anonimo').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
+  return (patientName || 'Anonimo').replace(/[^a-zA-Z0-9 _-]/g, '').trim().replace(/\s+/g, '_');
 }
 
 /**

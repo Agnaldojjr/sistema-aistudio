@@ -1059,7 +1059,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       const safePatientName = patientName || 'Paciente_Anonimo';
       const cleanFileName = `Orcamento_${safePatientName.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
       
-      await uploadPatientFileToSupabase(safePatientName, pdfBlob, cleanFileName, 'Orcamentos');
+      await uploadPatientFileToSupabase(selectedPatient?.id || safePatientName, pdfBlob, cleanFileName, 'Orcamentos');
       log(`✅ Sucesso! PDF salvo na pasta de Documentos no Supabase de "${safePatientName}".`);
 
       log("🔗 3/5 - Configurando permissões de leitura no Supabase...");
@@ -1165,7 +1165,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         }
       }
       
-      await uploadPatientFileToSupabase(patientName, fileBlob, versionFilename, 'Orcamentos');
+      await uploadPatientFileToSupabase(selectedPatient?.id || patientName, fileBlob, versionFilename, 'Orcamentos');
       
       const res = { id: `Orcamentos/${versionFilename}` };
       if (res && res.id && setCurrentFileId) {

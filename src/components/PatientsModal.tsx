@@ -254,10 +254,10 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
             setIsUploading(true);
             const blob = dataURLtoBlob(dataUrl);
             const filename = `foto-${new Date().getTime()}.jpg`;
-            await uploadPatientFileToSupabase(selectedPatient.name, blob, filename);
+            await uploadPatientFileToSupabase(selectedPatient.id, blob, filename);
             
             // Refresh patient images list
-            const allFiles = await listPatientFilesFromSupabase(selectedPatient.name);
+            const allFiles = await listPatientFilesFromSupabase(selectedPatient.id, selectedPatient.name);
             setPatientImages(allFiles.filter(f => f.mimeType.startsWith('image/')));
           } catch (err: any) {
             alert('Erro ao enviar foto para o Supabase: ' + err.message);
@@ -291,10 +291,10 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
       
       const blob = dataURLtoBlob(editedImage);
       const filename = `edited-${new Date().getTime()}.jpg`;
-      await uploadPatientFileToSupabase(selectedPatient.name, blob, filename);
+      await uploadPatientFileToSupabase(selectedPatient.id, blob, filename);
             
       // Refresh patient images list
-      const allFiles = await listPatientFilesFromSupabase(selectedPatient.name);
+      const allFiles = await listPatientFilesFromSupabase(selectedPatient.id, selectedPatient.name);
       setPatientImages(allFiles.filter(f => f.mimeType.startsWith('image/')));
     } catch (err: any) {
       alert('Erro ao enviar imagem editada para o Supabase: ' + err.message);
@@ -443,13 +443,13 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
       setWhatsappMessage(`Olá, ${selectedPatient.name}. Gostaríamos de confirmar sua próxima consulta com ${clinicSettings.doctorName} às [HORÁRIO].\n\n📍 Nosso endereço é: ${clinicSettings.address}.\n(Ref: ${clinicSettings.referencePoint})\n\nPor favor, confirme sua presença respondendo esta mensagem. Qualquer dúvida, estamos à disposição.`);
       
       setLoadingImages(true);
-      listPatientFilesFromSupabase(selectedPatient.name)
+      listPatientFilesFromSupabase(selectedPatient.id, selectedPatient.name)
         .then(files => setPatientImages(files.filter(f => f.mimeType.startsWith('image/'))))
         .catch(err => console.error("Error loading images", err))
         .finally(() => setLoadingImages(false));
 
       setLoadingProposals(true);
-      listPatientFilesFromSupabase(selectedPatient.name)
+      listPatientFilesFromSupabase(selectedPatient.id, selectedPatient.name)
         .then(files => {
           const jsonFiles = files.filter(f => f.name.endsWith('.json'));
           setProposals(jsonFiles);

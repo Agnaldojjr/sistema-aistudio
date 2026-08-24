@@ -106,7 +106,7 @@ export default function PhotoEditor({
     setGalleryError(null);
     try {
       const folderName = driveFolderId || patientName;
-      const imgs = await listPatientFilesFromSupabase(folderName);
+      const imgs = await listPatientFilesFromSupabase(folderName, folderName);
       const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
       const filteredImgs = (imgs || []).filter(f => 
         imageExtensions.some(ext => f.name.toLowerCase().endsWith(ext))

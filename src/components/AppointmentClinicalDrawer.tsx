@@ -164,11 +164,11 @@ export default function AppointmentClinicalDrawer({
     try {
       for (const file of Array.from(files)) {
         const filename = `foto_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-        await uploadPatientFileToSupabase(patientName, file, filename);
+        await uploadPatientFileToSupabase(patient?.id || patientName, file, filename);
       }
 
       // Refresh photo list
-      const updatedFiles = await listPatientFilesFromSupabase(patientName);
+      const updatedFiles = await listPatientFilesFromSupabase(patient?.id || patientName, patient?.name || patientName);
       setPhotos(updatedFiles);
       if (onRefreshData) onRefreshData();
     } catch (err: any) {
