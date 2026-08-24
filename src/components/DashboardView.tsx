@@ -176,7 +176,7 @@ export default function DashboardView({
   const filteredPatients = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
-    return realPatients.filter((p: any) => p.name?.toLowerCase().includes(q) || p.appProperties?.phone?.includes(q));
+    return realPatients.filter((p: any) => p.name?.toLowerCase().includes(q) || p.mobile?.includes(q) || p.phone?.includes(q) || p.appProperties?.phone?.includes(q));
   }, [searchQuery, realPatients]);
 
   const filteredAppointments = useMemo(() => {
@@ -955,7 +955,7 @@ export default function DashboardView({
                            </div>
                            <div className="truncate">
                              <p className="text-sm font-bold text-zinc-800 truncate">{p.name}</p>
-                             <p className="text-xs text-zinc-500 truncate">{p.appProperties?.phone || 'Sem telefone'}</p>
+                             <p className="text-xs text-zinc-500 truncate">{p.mobile || p.phone || p.appProperties?.phone || 'Sem telefone'}</p>
                            </div>
                          </button>
                       ))
