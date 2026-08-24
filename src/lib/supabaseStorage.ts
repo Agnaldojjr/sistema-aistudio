@@ -117,21 +117,24 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
 
     if (signedUrlsError) {
       console.error('Erro ao gerar URLs assinadas:', signedUrlsError);
-    } else {
-      const fileObjects = rawFiles.map((f, i) => ({
-        id: f.storagePath,
-        name: f.displayName,
-        thumbnailLink: signedUrlsData?.[i]?.signedUrl || null,
-        createdTime: f.created_at,
-        modifiedTime: f.updated_at || f.created_at,
-        mimeType: f.metadata?.mimetype || (f.name.endsWith('.pdf') ? 'application/pdf' : f.name.endsWith('.json') ? 'application/json' : 'application/octet-stream'),
-        subfolder: f.subfolder
-      }));
+      // TELEMETRIA: Não retorne array vazio. Retorne os arquivos sem thumbnail, 
+      // para descobrirmos se o erro é aqui (os arquivos aparecerão sem imagem).
+    }
+    
+    const fileObjects = rawFiles.map((f, i) => ({
+      id: f.storagePath,
+      name: f.displayName,
+      thumbnailLink: signedUrlsData?.[i]?.signedUrl || null,
+      createdTime: f.created_at,
+      modifiedTime: f.updated_at || f.created_at,
+      mimeType: f.metadata?.mimetype || (f.name.endsWith('.pdf') ? 'application/pdf' : f.name.endsWith('.json') ? 'application/json' : 'application/octet-stream'),
+      subfolder: f.subfolder
+    }));
 
-      const enrichedFiles = await Promise.all(fileObjects.map(async (file) => {
-        if (file.name.toLowerCase().endsWith('.json') && file.thumbnailLink) {
-          try {
-            const r = await fetch(file.thumbnailLink);
+    const enrichedFiles = await Promise.all(fileObjects.map(async (file) => {
+      if (file.name.toLowerCase().endsWith('.json') && file.thumbnailLink) {
+        try {
+          const r = await fetch(file.thumbnailLink);
             if (r.ok) {
               const fileData = await r.json();
               
@@ -174,8 +177,15 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
       }));
 
       return enrichedFiles;
-    }
   }
+
+  // TELEMETRIA: Se chegou aqui, retornou 0 arquivos
+  try {
+    const errorLog = JSON.stringify({
+      patientId, fallbackPatientName, idPath, userId, msg: "Zero files found for both paths"
+    });
+    await supabase.storage.from(BUCKET_NAME).upload(`logs/${Date.now()}_${idPath}.json`, errorLog);
+  } catch(e) {}
 
   return [];
 }
