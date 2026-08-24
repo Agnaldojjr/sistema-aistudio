@@ -659,6 +659,9 @@ export default function App() {
   if (isMobileOptimized) {
     return (
       <div className="app-shell">
+        <div style={{ background: 'red', color: 'white', padding: '10px', textAlign: 'center', fontWeight: 'bold', zIndex: 9999, position: 'relative' }}>
+          ATENÇÃO: Você está na versão nova (Hotfix 4). Se você está lendo isso, a atualização funcionou!
+        </div>
         <Sidebar
           currentView={currentAppView}
           onChangeView={setCurrentAppView}
