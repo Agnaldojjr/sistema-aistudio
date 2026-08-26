@@ -105,13 +105,33 @@ function extractPhone(text: string): string {
 
 function isPatientAppointment(summary: string, description: string): boolean {
   const lowerSummary = (summary || '').toLowerCase();
-  const normalizedSummary = lowerSummary.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const normalizedSummary = lowerSummary.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  
   const blockedKeywords = ['reuniao', 'almoco', 'particular', 'bloqueio', 'compromisso', 'ferias', 'folga', 'curso', 'palestra', 'personal', 'maintenance', 'manutencao'];
   for (const kw of blockedKeywords) {
     if (normalizedSummary.includes(kw)) {
       return false;
     }
   }
+
+  // Check if it's purely a generic dental appointment title (no patient name included)
+  const genericTerms = [
+    'consulta', 'de', 'limpeza', 'avaliacao', 'retorno', 'orcamento', 'emergencia', 
+    'ortodontia', 'aparelho', 'revisao', 'procedimento', 'cirurgia', 'extracao', 
+    'clareamento', 'restauracao', 'canal', 'endodontia', 'periodontia', 'profilaxia', 
+    'implante', 'protese', 'botox', 'harmonizacao', 'facial', 'lente', 'resina', 
+    'porcelana', 'lentes', 'facetas', 'dr', 'dra', 'paciente', 'atendimento', 
+    'exame', 'raio-x', 'raiox', 'panoramica', 'periapical', 'tomografia', 'e', 'ou', 'com'
+  ];
+  
+  const words = normalizedSummary.split(/[\s,.-]+/).filter(w => w.length > 0);
+  if (words.length > 0) {
+    const hasOnlyGenericTerms = words.every(word => genericTerms.includes(word));
+    if (hasOnlyGenericTerms) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -326,12 +346,26 @@ export default function DashboardView({
             }
 
             if (!patient) {
-              const cleanEventSummary = eventSummary.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+              const cleanEventSummary = eventSummary.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+              
+              let assumedName = cleanEventSummary;
+              const prefixes = ["consulta com ", "consulta de ", "consulta ", "retorno ", "avaliacao ", "manutencao ", "paciente ", "dr. ", "dra. ", "dr ", "dra "];
+              for (const pref of prefixes) {
+                if (assumedName.startsWith(pref)) {
+                  assumedName = assumedName.substring(pref.length).trim();
+                  break;
+                }
+              }
+
               patient = crmData.patients.find((p: any) => {
-                const pNameClean = (p.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                return pNameClean === cleanEventSummary || 
-                       pNameClean.includes(cleanEventSummary) || 
-                       cleanEventSummary.includes(pNameClean);
+                const pNameClean = (p.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                if (!pNameClean || pNameClean.length < 3) return false;
+
+                if (pNameClean === assumedName || pNameClean === cleanEventSummary) return true;
+                if (pNameClean.startsWith(assumedName + " ") || pNameClean.startsWith(cleanEventSummary + " ")) return true;
+                if (assumedName.startsWith(pNameClean + " ") || cleanEventSummary.startsWith(pNameClean + " ")) return true;
+
+                return false;
               });
             }
 
