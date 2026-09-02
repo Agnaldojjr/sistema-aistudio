@@ -300,10 +300,40 @@ export default function DentalCRMView({
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
     
+    // Validate file type
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+      alert('Por favor, selecione uma imagem ou arquivo PDF válido.');
+      e.target.value = '';
+      return;
+    }
+    
     setIsImportingBudget(true);
     try {
-      // Compress the image before sending to avoid large payloads
-      const dataUrl = await compressFileToDataUrl(file, 1200, 0.8);
+      let dataUrl = '';
+      
+      if (file.type.startsWith('image/')) {
+        try {
+          // Compress the image before sending to avoid large payloads
+          dataUrl = await compressFileToDataUrl(file, 1200, 0.8);
+        } catch (compressError) {
+          console.warn("Compression failed, using original file", compressError);
+          // Fallback to reading file without compression if library fails
+          dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        }
+      } else {
+        // It's a PDF, we can't compress it as an image. Just read as Base64.
+        dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
       
       const response = await fetch('/api/extract-budget-vision', {
         method: 'POST',

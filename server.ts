@@ -914,13 +914,15 @@ ${doctorName}`;
         throw new Error("GEMINI_API_KEY não configurada no servidor.");
       }
 
-      // Remove header from base64 if present (e.g. data:image/png;base64,...)
-      const base64Data = imageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
+      // Extract mimetype dynamically to support PDF
+      const mimeMatch = imageBase64.match(/^data:(.*?);base64,/);
+      const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+      const base64Data = imageBase64.replace(/^data:.*?;base64,/, "");
 
-      const prompt = `Você é um assistente odontológico especializado em analisar orçamentos antigos a partir de imagens.
-Extraia a lista de dentes e procedimentos desta imagem de orçamento odontológico.
+      const prompt = `Você é um assistente odontológico especializado em analisar orçamentos antigos a partir de imagens ou documentos.
+Extraia a lista de dentes e procedimentos deste orçamento odontológico.
 Ignore os valores financeiros, datas ou status antigos, pois o sistema aplicará os valores atualizados automaticamente.
-Caso a imagem indique que toda a arcada ou múltiplos dentes compartilham o mesmo procedimento (ex: Limpeza), extraia isso adequadamente.
+Caso o documento indique que toda a arcada ou múltiplos dentes compartilham o mesmo procedimento (ex: Limpeza), extraia isso adequadamente.
 Se não houver numeração de dente especificada, coloque o dente como null.
 Retorne APENAS um array JSON no formato solicitado.`;
 
@@ -935,7 +937,7 @@ Retorne APENAS um array JSON no formato solicitado.`;
               {
                 inlineData: {
                   data: base64Data,
-                  mimeType: "image/jpeg"
+                  mimeType: mimeType
                 }
               }
             ]
