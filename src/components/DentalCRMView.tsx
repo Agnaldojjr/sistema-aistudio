@@ -271,6 +271,8 @@ export default function DentalCRMView({
   const [avulsoProcName, setAvulsoProcName] = useState('');
   const [avulsoProcPrice, setAvulsoProcPrice] = useState<number | string>('');
 
+  const [isImportingBudget, setIsImportingBudget] = useState(false);
+
   // Batch Photos State
   const [showBatchPhotoModal, setShowBatchPhotoModal] = useState(false);
   const [batchGalleryPhotos, setBatchGalleryPhotos] = useState<any[]>([]);
@@ -292,6 +294,112 @@ export default function DentalCRMView({
       } finally {
         setLoadingBatchGallery(false);
       }
+    }
+  };
+  const handleImportBudget = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    setIsImportingBudget(true);
+    try {
+      // Compress the image before sending to avoid large payloads
+      const dataUrl = await compressFileToDataUrl(file, 1200, 0.8);
+      
+      const response = await fetch('/api/extract-budget-vision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: dataUrl })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Falha ao processar a imagem do orçamento.');
+      }
+      
+      const { items } = await response.json();
+      
+      // Process items and map to activeSections
+      let newSections = [...(activeSections || [])];
+      
+      // Ensure upper and lower exist
+      if (!newSections.find(s => s.id === 'upper')) {
+        newSections.push({ id: 'upper', title: 'Arcada Superior', subtitle: 'Dentes Posteriores e Anteriores Superiores', image: null, markers: [] });
+      }
+      if (!newSections.find(s => s.id === 'lower')) {
+        newSections.push({ id: 'lower', title: 'Arcada Inferior', subtitle: 'Dentes Posteriores e Anteriores Inferiores', image: null, markers: [] });
+      }
+      
+      items.forEach((item: any) => {
+        if (!item.procedureName) return;
+        
+        let proc = procedures?.find((p: any) => p.name.toLowerCase().includes(item.procedureName.toLowerCase()) || item.procedureName.toLowerCase().includes(p.name.toLowerCase()));
+        
+        if (!proc) {
+           proc = {
+             id: 'imp-' + Date.now() + Math.random().toString(36).substr(2, 5),
+             name: item.procedureName + " (Importado)",
+             price: 0,
+             color: '#8B0000'
+           };
+           if (setProcedures) {
+             setProcedures((prev: any) => {
+               // Prevent duplicates in rapid succession
+               if (prev.find((p: any) => p.name === proc.name)) return prev;
+               return [...prev, proc];
+             });
+           }
+        }
+        
+        const tooth = item.toothNumber;
+        let targetSectionId = 'upper'; // fallback
+        
+        if (tooth) {
+           if ((tooth >= 31 && tooth <= 38) || (tooth >= 41 && tooth <= 48)) {
+             targetSectionId = 'lower';
+           }
+        }
+        
+        const sectionIdx = newSections.findIndex(s => s.id === targetSectionId);
+        if (sectionIdx !== -1) {
+           let marker = newSections[sectionIdx].markers.find((m: any) => m.toothNumber === tooth);
+           if (!marker && tooth) {
+             marker = { id: `${targetSectionId}-${tooth}`, toothNumber: tooth, x: 50, y: 50, procedures: [], procedureInstances: [] };
+             newSections[sectionIdx].markers.push(marker);
+           } else if (!marker && !tooth) {
+             marker = { id: `${targetSectionId}-gen-${Date.now()}-${Math.random()}`, toothNumber: 0, x: 50, y: 50, procedures: [], procedureInstances: [] };
+             newSections[sectionIdx].markers.push(marker);
+           }
+           
+           if (marker && proc) {
+             if (!marker.procedures) marker.procedures = [];
+             if (!marker.procedures.includes(proc.id)) {
+               marker.procedures.push(proc.id);
+             }
+             if (!marker.procedureInstances) marker.procedureInstances = [];
+             marker.procedureInstances.push({
+               id: `inst-${marker.id}-${proc.id}-${Date.now()}-${Math.random()}`,
+               procedureId: proc.id,
+               name: proc.name,
+               price: proc.price,
+               includeFinancial: true,
+               status: 'A realizar',
+               date: '',
+               dentist: '',
+               faces: [],
+               observation: ''
+             });
+           }
+        }
+      });
+      
+      setActiveSections(newSections);
+      alert('Orçamento importado com sucesso!');
+      
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao importar orçamento. Verifique se o formato da imagem é válido e se a API está online.');
+    } finally {
+      setIsImportingBudget(false);
+      e.target.value = '';
     }
   };
 
@@ -5220,6 +5328,13 @@ export default function DentalCRMView({
                                 <Plus className="w-3.5 h-3.5" />
                                 Procedimento Avulso
                               </button>
+                              
+                              <label className={`px-3 py-1 bg-indigo-600 text-white text-xs font-bold rounded-lg transition-colors border-2 border-indigo-600 hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm cursor-pointer select-none ${isImportingBudget ? 'opacity-50 cursor-not-allowed' : ''}`} title="Importar orçamento de outro sistema via IA">
+                                {isImportingBudget ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                                {isImportingBudget ? 'Importando...' : '🪄 Importar Orçamento'}
+                                <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleImportBudget} disabled={isImportingBudget} />
+                              </label>
+
                               <button
                                 type="button"
                                 onClick={handleOpenBatchPhotos}

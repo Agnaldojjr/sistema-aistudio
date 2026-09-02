@@ -900,6 +900,72 @@ ${doctorName}`;
     }
   });
 
+  app.post("/api/extract-budget-vision", async (req, res) => {
+    try {
+      const { imageBase64 } = req.body;
+
+      if (!imageBase64) {
+        return res.status(400).json({ error: "Imagem é obrigatória (base64)." });
+      }
+
+      // Check for Gemini API key
+      const geminiKey = process.env.GEMINI_API_KEY;
+      if (!geminiKey) {
+        throw new Error("GEMINI_API_KEY não configurada no servidor.");
+      }
+
+      // Remove header from base64 if present (e.g. data:image/png;base64,...)
+      const base64Data = imageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
+
+      const prompt = `Você é um assistente odontológico especializado em analisar orçamentos antigos a partir de imagens.
+Extraia a lista de dentes e procedimentos desta imagem de orçamento odontológico.
+Ignore os valores financeiros, datas ou status antigos, pois o sistema aplicará os valores atualizados automaticamente.
+Caso a imagem indique que toda a arcada ou múltiplos dentes compartilham o mesmo procedimento (ex: Limpeza), extraia isso adequadamente.
+Se não houver numeração de dente especificada, coloque o dente como null.
+Retorne APENAS um array JSON no formato solicitado.`;
+
+      // Use @google/genai SDK
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  data: base64Data,
+                  mimeType: "image/jpeg"
+                }
+              }
+            ]
+          }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                toothNumber: { type: "INTEGER", description: "Número do dente em notação FDI (ex: 18, 23, 44). Se for procedimento geral, retornar null.", nullable: true },
+                procedureName: { type: "STRING", description: "Nome completo do procedimento odontológico extraído." }
+              },
+              required: ["procedureName"]
+            }
+          }
+        }
+      });
+
+      const parsed = JSON.parse(response.text || "[]");
+      res.json({ items: parsed });
+
+    } catch (error: any) {
+      console.error("Gemini API Error (extract-budget-vision):", error);
+      res.status(500).json({ error: "Erro ao extrair orçamento da imagem.", details: error.message || String(error) });
+    }
+  });
+
   app.post("/api/ai/suggest-plan", async (req, res) => {
     try {
       const { notes } = req.body;
