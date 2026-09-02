@@ -1083,6 +1083,43 @@ export default function DentalCRMView({
     }
   }, [selectedProposalId, driveFolderId]);
 
+  // OPTION C: OFFLINE-FIRST LOCAL SAVE - Sincronização em Background
+  useEffect(() => {
+    const syncOfflineBudgets = async () => {
+      const syncQueueStr = localStorage.getItem('ag_offline_budgets');
+      if (!syncQueueStr) return;
+      const syncQueue = JSON.parse(syncQueueStr);
+      if (syncQueue.length === 0) return;
+
+      let remainingQueue = [...syncQueue];
+      let hasUpdates = false;
+
+      for (const item of syncQueue) {
+        try {
+          const fileBlob = new Blob([item.data], { type: 'application/json' });
+          const { uploadPatientFileToSupabase } = await import('../lib/supabaseStorage');
+          await uploadPatientFileToSupabase(item.patientId || item.patientName, fileBlob, item.id, 'Orcamentos');
+          console.log(`✅ Sincronizado offline budget: ${item.id}`);
+          remainingQueue = remainingQueue.filter(q => q.id !== item.id);
+          hasUpdates = true;
+        } catch (err) {
+          console.warn(`⏳ Ainda falhando ao sincronizar ${item.id}. Mantendo na fila local.`, err);
+        }
+      }
+
+      if (hasUpdates) {
+        localStorage.setItem('ag_offline_budgets', JSON.stringify(remainingQueue));
+      }
+    };
+
+    syncOfflineBudgets();
+    
+    // Tenta sincronizar a cada 1 minuto caso a aba fique aberta
+    const interval = setInterval(syncOfflineBudgets, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+
   // Helper to extract procedure instances from a saved proposal JSON
   const getProcedureInstancesFromProposal = (proposalData: any, proposalId: string = '', proposalName: string = '') => {
     if (!proposalData || !proposalData.sections) return [];

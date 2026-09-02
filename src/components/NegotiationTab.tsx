@@ -1165,11 +1165,42 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         }
       }
       
-      await uploadPatientFileToSupabase(selectedPatient?.id || patientName, fileBlob, versionFilename, 'Orcamentos');
+      // OPTION C: OFFLINE-FIRST LOCAL SAVE
+      const syncQueueStr = localStorage.getItem('ag_offline_budgets') || '[]';
+      const syncQueue = JSON.parse(syncQueueStr);
+      const offlineItem = {
+         id: versionFilename,
+         patientId: selectedPatient?.id || patientName,
+         patientName: patientName,
+         data: jsonStr,
+         timestamp: Date.now()
+      };
       
-      const res = { id: `Orcamentos/${versionFilename}` };
-      if (res && res.id && setCurrentFileId) {
-        setCurrentFileId(res.id);
+      const existingIdx = syncQueue.findIndex((q: any) => q.id === versionFilename);
+      if (existingIdx > -1) syncQueue[existingIdx] = offlineItem;
+      else syncQueue.push(offlineItem);
+      
+      localStorage.setItem('ag_offline_budgets', JSON.stringify(syncQueue));
+
+      try {
+        await uploadPatientFileToSupabase(selectedPatient?.id || patientName, fileBlob, versionFilename, 'Orcamentos');
+        
+        // Remove from local queue if successful
+        const updatedQueue = JSON.parse(localStorage.getItem('ag_offline_budgets') || '[]').filter((q: any) => q.id !== versionFilename);
+        localStorage.setItem('ag_offline_budgets', JSON.stringify(updatedQueue));
+        
+        const res = { id: `Orcamentos/${versionFilename}` };
+        if (res && res.id && setCurrentFileId) {
+          setCurrentFileId(res.id);
+        }
+        setSaveSuccessMsg('Salvo na nuvem com sucesso!');
+      } catch (err: any) {
+        console.warn('Falha ao salvar na nuvem (offline ou erro). Salvo localmente.', err);
+        const res = { id: `Orcamentos/${versionFilename}` };
+        if (res && res.id && setCurrentFileId) {
+          setCurrentFileId(res.id);
+        }
+        setSaveSuccessMsg('Salvo offline. O sistema sincronizará quando houver internet.');
       }
 
       // Integracao com o financeiro
