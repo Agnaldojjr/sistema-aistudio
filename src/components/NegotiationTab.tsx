@@ -1063,7 +1063,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       log(`✅ Sucesso! PDF salvo na pasta de Documentos no Supabase de "${safePatientName}".`);
 
       log("🔗 3/5 - Configurando permissões de leitura no Supabase...");
-      const pdfLink = await getPatientFileUrlFromSupabase(safePatientName, cleanFileName, 315360000, 'Orcamentos');
+      const pdfLink = await getPatientFileUrlFromSupabase(selectedPatient?.id || safePatientName, cleanFileName, 315360000, 'Orcamentos');
       if (!pdfLink) {
         throw new Error("Não foi possível obter a URL pública do PDF do Supabase.");
       }
