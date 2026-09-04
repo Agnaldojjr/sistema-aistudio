@@ -20,25 +20,34 @@ export default async function handler(req: any, res: any) {
     4. Não inventar valores em dinheiro, o valor já estará no PDF.
     `;
 
-    const deepseekKey = process.env.DEEPSEEK_API_KEY;
-    if (!deepseekKey) {
-      throw new Error("DEEPSEEK_API_KEY não configurada no servidor.");
-    }
+    let responseText = "";
 
-    const aiResponse = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${deepseekKey}`
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: [{ role: "user", content: prompt }]
-      })
-    });
-    
-    const data = await aiResponse.json();
-    const responseText = data.choices?.[0]?.message?.content || "Erro ao gerar script com AI.";
+    if (process.env.GEMINI_API_KEY) {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: prompt,
+        config: { temperature: 0.7 }
+      });
+      responseText = response.text || "";
+    } else if (process.env.DEEPSEEK_API_KEY) {
+      const deepseekKey = process.env.DEEPSEEK_API_KEY;
+      const aiResponse = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${deepseekKey}`
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      const data = await aiResponse.json();
+      responseText = data.choices?.[0]?.message?.content || "Erro ao gerar script com AI.";
+    } else {
+      throw new Error("Nenhuma chave de IA configurada (GEMINI_API_KEY ou DEEPSEEK_API_KEY).");
+    }
 
     res.status(200).json({ message: responseText });
   } catch (error: any) {

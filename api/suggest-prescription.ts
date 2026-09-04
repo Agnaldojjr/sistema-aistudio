@@ -65,7 +65,7 @@ Não use markdown complexo, pode usar números ou traços.
 Procedimento realizado: ${procedure}`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.6-flash",
       contents: prompt,
       config: {
         temperature: 0.2,

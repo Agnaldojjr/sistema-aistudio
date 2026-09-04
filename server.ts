@@ -513,7 +513,7 @@ Histórico de Conversa:
 ${chatHistory}`;
 
       const geminiResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: prompt,
         config: { temperature: 0.1 }
       });
@@ -738,7 +738,7 @@ Não use markdown complexo, pode usar números ou traços.
 Procedimento realizado: ${procedure}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: prompt,
         config: {
           temperature: 0.2, // low temp for clinical stuff
@@ -781,7 +781,7 @@ Crie uma mensagem curta, calorosa e empática para WhatsApp, perguntando como o 
 A mensagem deve ser direta, amigável e pronta para ser enviada no WhatsApp. Não inclua saudações iniciais suas.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: prompt,
         config: {
           temperature: 0.7,
@@ -873,25 +873,35 @@ Atenciosamente,
 ${doctorName}`;
       }
 
-      const deepseekKey = process.env.DEEPSEEK_API_KEY;
-      if (!deepseekKey) {
-        throw new Error("DEEPSEEK_API_KEY não configurada no servidor.");
-      }
+      let responseText = "";
 
-      const aiResponse = await fetch("https://api.deepseek.com/chat/completions", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${deepseekKey}`
-        },
-        body: JSON.stringify({
-          model: "deepseek-chat",
-          messages: [{ role: "user", content: prompt }]
-        })
-      });
-      
-      const data = await aiResponse.json();
-      const responseText = data.choices?.[0]?.message?.content || "Erro ao gerar script com AI.";
+      if (process.env.GEMINI_API_KEY) {
+        const response = await ai.models.generateContent({
+          model: "gemini-3.6-flash",
+          contents: prompt,
+          config: { temperature: 0.7 }
+        });
+        responseText = response.text || "";
+      } else if (process.env.DEEPSEEK_API_KEY) {
+        const deepseekKey = process.env.DEEPSEEK_API_KEY;
+        const aiResponse = await fetch("https://api.deepseek.com/chat/completions", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${deepseekKey}`
+          },
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: [{ role: "user", content: prompt }]
+          })
+        });
+        const data = await aiResponse.json();
+        responseText = data.choices?.[0]?.message?.content || "";
+      } else if (process.env.NVIDIA_API_KEY) {
+        responseText = await callLLM(prompt, false);
+      } else {
+        throw new Error("Nenhuma chave de IA configurada (GEMINI_API_KEY, DEEPSEEK_API_KEY ou NVIDIA_API_KEY).");
+      }
 
       res.json({ message: responseText });
     } catch (error: any) {
@@ -928,7 +938,7 @@ Retorne APENAS um array JSON no formato solicitado.`;
 
       // Use @google/genai SDK
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: [
           {
             role: "user",
@@ -1004,7 +1014,7 @@ Retorne APENAS um array JSON no formato solicitado.`;
       `;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -1113,7 +1123,7 @@ Você DEVE responder em formato JSON estrito correspondente a esta estrutura:
 }`;
 
             const geminiResponse = await ai.models.generateContent({
-              model: "gemini-2.5-flash",
+              model: "gemini-3.6-flash",
               contents: prompt,
               config: {
                 responseMimeType: "application/json"
@@ -1252,9 +1262,9 @@ Você DEVE responder em formato JSON estrito correspondente a esta estrutura:
     }
 
     if (geminiKey) {
-      console.log("[LLM API] Chamando Gemini (gemini-2.5-flash)...");
+      console.log("[LLM API] Chamando Gemini (gemini-3.6-flash)...");
       try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
