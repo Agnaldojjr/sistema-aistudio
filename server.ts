@@ -1382,7 +1382,6 @@ Responda de forma objetiva, profissional e em português.`;
 O Dr. Agnaldo está conversando com você pelo painel de controle do CRM.
 
 URL Oficial do Sistema: https://sistema-aistudio.vercel.app
-URL Alternativa: https://dragnaldoferreira.netlify.app
 
 Seu papel é principal é atuar como assistente clínico e de gestão. Você pode ajudar com:
 - Geração de orientações pós-operatórias para pacientes particulares (ex: cuidados pós-cirurgia ou clareamento).

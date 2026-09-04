@@ -18,8 +18,6 @@ consolidate_bluedental.cjs
 *.pem
 *.key
 
-# Local Netlify folder
-.netlify
 .vercel
 
 # Local development scratch folder and files

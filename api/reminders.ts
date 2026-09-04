@@ -17,7 +17,7 @@ const supabaseAdmin = supabaseUrl && supabaseServiceKey
 // Helper para buscar a base do CRM no Supabase
 async function getCRMDatabase(userId: string) {
   if (!supabaseAdmin) {
-    throw new Error("Supabase Admin Client não configurado no Netlify.");
+    throw new Error("Supabase Admin Client não configurado no servidor.");
   }
   const { data, error } = await supabaseAdmin
     .from("clinic_data")
@@ -36,7 +36,7 @@ async function getCRMDatabase(userId: string) {
 // Helper para salvar a base do CRM no Supabase
 async function saveCRMDatabase(userId: string, crmData: any) {
   if (!supabaseAdmin) {
-    throw new Error("Supabase Admin Client não configurado no Netlify.");
+    throw new Error("Supabase Admin Client não configurado no servidor.");
   }
   const { error } = await supabaseAdmin
     .from("clinic_data")
@@ -59,7 +59,7 @@ async function sendWhatsAppTemplate(to: string, patientName: string, dentistName
   const templateName = process.env.WHATSAPP_TEMPLATE_NAME || "confirmacao_consulta";
 
   if (!token || !phoneId) {
-    console.warn("[Scheduled reminders] WhatsApp não está configurado no Netlify. Pulando envio.");
+    console.warn("[Scheduled reminders] WhatsApp não está configurado no servidor. Pulando envio.");
     return false;
   }
 
@@ -124,7 +124,7 @@ const handler = async (event: any) => {
   try {
     const userId = process.env.DEFAULT_USER_ID;
     if (!userId) {
-      console.log("[Scheduled reminders] DEFAULT_USER_ID não configurado no Netlify. Pulando.");
+      console.log("[Scheduled reminders] DEFAULT_USER_ID não configurado no servidor. Pulando.");
       return new Response("DEFAULT_USER_ID missing", { status: 500 });
     }
 

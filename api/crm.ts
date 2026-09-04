@@ -17,7 +17,7 @@ const supabaseAdmin = supabaseUrl && supabaseServiceKey
 // Helper para buscar a base do CRM no Supabase
 async function getCRMDatabase(userId: string) {
   if (!supabaseAdmin) {
-    throw new Error("Supabase Admin Client não configurado no Netlify (SUPABASE_SERVICE_ROLE_KEY ausente).");
+    throw new Error("Supabase Admin Client não configurado no servidor (SUPABASE_SERVICE_ROLE_KEY ausente).");
   }
   const { data, error } = await supabaseAdmin
     .from("clinic_data")
@@ -52,7 +52,7 @@ async function getCRMDatabase(userId: string) {
 // Helper para salvar a base do CRM no Supabase
 async function saveCRMDatabase(userId: string, crmData: any) {
   if (!supabaseAdmin) {
-    throw new Error("Supabase Admin Client não configurado no Netlify (SUPABASE_SERVICE_ROLE_KEY ausente).");
+    throw new Error("Supabase Admin Client não configurado no servidor (SUPABASE_SERVICE_ROLE_KEY ausente).");
   }
   const { error } = await supabaseAdmin
     .from("clinic_data")
@@ -72,7 +72,7 @@ async function saveCRMDatabase(userId: string, crmData: any) {
 function getTargetUserId() {
   const userId = process.env.DEFAULT_USER_ID;
   if (!userId) {
-    throw new Error("DEFAULT_USER_ID não configurado no Netlify.");
+    throw new Error("DEFAULT_USER_ID não configurado no servidor.");
   }
   return userId;
 }
@@ -115,7 +115,7 @@ export default async (req: Request) => {
     const pathname = url.pathname;
     
     // Normaliza a rota para identificar a sub-rota requisitada
-    const subRoute = pathname.replace(/^\/api\/crm/, "").replace(/^\/\.netlify\/functions\/crm/, "");
+    const subRoute = pathname.replace(/^\/api\/crm/, "");
 
     // 1. GET /patients -> Busca paciente por telefone ou nome
     if (subRoute === "/patients" && req.method === "GET") {

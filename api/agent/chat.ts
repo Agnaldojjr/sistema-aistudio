@@ -107,7 +107,6 @@ Caso precise rodar a varredura manualmente agora, você pode:
 O Dr. Agnaldo está conversando com você pela Central IA do sistema.
 
 URL Oficial do Sistema: https://sistema-aistudio.vercel.app
-URL Alternativa: https://dragnaldoferreira.netlify.app
 
 Seu papel é responder com palavras simples, claras e fáceis de entender ("palavras de leigo", sem jargões de programação excessivos) sobre o status do sistema, o que você andou analisando, corrigindo ou melhorando.
 

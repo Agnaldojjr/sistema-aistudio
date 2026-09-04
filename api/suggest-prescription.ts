@@ -38,7 +38,7 @@ export default async (req: Request) => {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "Chave GEMINI_API_KEY não configurada no Netlify." }), {
+      return new Response(JSON.stringify({ error: "Chave GEMINI_API_KEY não configurada no servidor." }), {
         status: 500,
         headers: {
           "Content-Type": "application/json",
