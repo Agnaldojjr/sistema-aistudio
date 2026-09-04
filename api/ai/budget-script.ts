@@ -51,7 +51,10 @@ export default async function handler(req: any, res: any) {
 
     res.status(200).json({ message: responseText });
   } catch (error: any) {
-    console.error("Pollinations API Error (budget-script):", error);
-    res.status(500).json({ error: "Erro ao gerar script de orçamento." });
+    console.error("Gemini API Error (budget-script):", error);
+    res.status(500).json({ 
+      error: "Erro ao gerar script de orçamento.", 
+      details: error?.message || String(error) 
+    });
   }
 }

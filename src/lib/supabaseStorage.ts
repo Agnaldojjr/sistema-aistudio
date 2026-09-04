@@ -245,7 +245,11 @@ export async function getPatientFileUrlFromSupabase(patientIdentifier: string, f
 
   const { data, error } = await supabase.storage.from(BUCKET_NAME).createSignedUrl(filePath, expiresIn);
   if (error) {
-    console.error('Erro ao obter URL:', error);
+    // Se o arquivo ainda não existe no storage, apenas retorna null sem poluir o console com erros vermelhos
+    if (error.message?.includes('Object not found') || (error as any).statusCode === '404' || (error as any).status === 404) {
+      return null;
+    }
+    console.warn('Aviso ao obter URL do Supabase:', error.message || error);
     return null;
   }
   return data?.signedUrl;
