@@ -42,14 +42,40 @@ CREATE TABLE IF NOT EXISTS public.public_anamnesis (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Garantir restrição UNIQUE para user_id (essencial para upsert e integridade)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'clinic_data_user_id_key'
+  ) THEN
+    ALTER TABLE public.clinic_data ADD CONSTRAINT clinic_data_user_id_key UNIQUE (user_id);
+  END IF;
+END $$;
+
 -- Regras de Segurança (RLS - Row Level Security)
 ALTER TABLE public.clinic_data ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.patients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.proposals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.public_anamnesis ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can manage their own clinic data" 
-  ON public.clinic_data FOR ALL USING (auth.uid() = user_id);
+-- Políticas granulares para clinic_data (com USING e WITH CHECK explícitos)
+DROP POLICY IF EXISTS "Users can manage their own clinic data" ON public.clinic_data;
+DROP POLICY IF EXISTS "Users can select their own clinic data" ON public.clinic_data;
+DROP POLICY IF EXISTS "Users can insert their own clinic data" ON public.clinic_data;
+DROP POLICY IF EXISTS "Users can update their own clinic data" ON public.clinic_data;
+
+CREATE POLICY "Users can select their own clinic data" 
+  ON public.clinic_data FOR SELECT 
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own clinic data" 
+  ON public.clinic_data FOR INSERT 
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own clinic data" 
+  ON public.clinic_data FOR UPDATE 
+  USING (auth.uid() = user_id) 
+  WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Anyone can insert anamnesis" 
   ON public.public_anamnesis FOR INSERT WITH CHECK (true);

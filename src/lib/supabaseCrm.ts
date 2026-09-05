@@ -54,11 +54,49 @@ export async function saveSupabaseCRMDatabase(dataToSave: any) {
       }
     }
   } catch (e: any) {
-    if (e.message.includes('abortada por segurança')) throw e;
+    if (e.message?.includes('abortada por segurança')) throw e;
     // Se houver outro erro (ex: offline), ignorar a checagem e seguir
   }
 
-  const { error } = await supabase
+  // Backup preventivo em localStorage
+  try {
+    localStorage.setItem('ag_crm_local_backup', JSON.stringify(dataToSave));
+  } catch (e) {
+    // Silencioso se quota excedida
+  }
+
+  let lastError: any = null;
+
+  // 1. Tentar UPDATE direto se a linha do usuário já existir (99% dos casos)
+  // O UPDATE não usa ON CONFLICT (não requer UNIQUE constraint) e não dispara regras de INSERT do RLS
+  try {
+    const { data: existing, error: checkError } = await supabase
+      .from('clinic_data')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!checkError && existing) {
+      const { error: updateError } = await supabase
+        .from('clinic_data')
+        .update({
+          crm_data: dataToSave,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
+
+      if (!updateError) {
+        return; // Sucesso via UPDATE
+      }
+      console.warn('Tentativa de UPDATE falhou, tentando upsert/insert...', updateError);
+      lastError = updateError;
+    }
+  } catch (err: any) {
+    console.warn('Verificação de registro existente falhou:', err);
+  }
+
+  // 2. Fallback: tentar UPSERT com onConflict
+  const { error: upsertError } = await supabase
     .from('clinic_data')
     .upsert({
       user_id: userId,
@@ -66,8 +104,27 @@ export async function saveSupabaseCRMDatabase(dataToSave: any) {
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id' });
 
-  if (error) {
-    console.error('Erro ao salvar CRM no Supabase:', error);
-    throw new Error('Falha ao salvar no banco de dados');
+  if (!upsertError) {
+    return; // Sucesso via UPSERT
   }
+  lastError = upsertError;
+
+  // 3. Fallback final: INSERT simples (para usuário novo cujo registro ainda não exista)
+  const { error: insertError } = await supabase
+    .from('clinic_data')
+    .insert({
+      user_id: userId,
+      crm_data: dataToSave,
+      updated_at: new Date().toISOString()
+    });
+
+  if (!insertError) {
+    return; // Sucesso via INSERT
+  }
+  lastError = insertError;
+
+  // Se todas as tentativas falharem, loga o erro técnico real e lança mensagem com detalhes
+  console.error('Erro ao salvar CRM no Supabase:', lastError);
+  const detailedMsg = lastError?.message || lastError?.details || lastError?.hint || (typeof lastError === 'object' ? JSON.stringify(lastError) : String(lastError));
+  throw new Error(`Falha ao salvar no banco de dados (${detailedMsg})`);
 }

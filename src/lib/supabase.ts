@@ -47,9 +47,28 @@ export const supabase = !isDemoMode
               const cached = localStorage.getItem('supabase_mock_clinic_data');
               const crm_data = cached ? JSON.parse(cached) : null;
               return { data: { crm_data }, error: null };
+            },
+            maybeSingle: async () => {
+              const cached = localStorage.getItem('supabase_mock_clinic_data');
+              const crm_data = cached ? JSON.parse(cached) : null;
+              return { data: cached ? { id: 'demo-id', crm_data } : null, error: null };
             }
           })
         }),
+        update: (data: any) => ({
+          eq: (column: string, value: any) => {
+            if (data && data.crm_data) {
+              localStorage.setItem('supabase_mock_clinic_data', JSON.stringify(data.crm_data));
+            }
+            return Promise.resolve({ data: null, error: null });
+          }
+        }),
+        insert: async (data: any) => {
+          if (data && data.crm_data) {
+            localStorage.setItem('supabase_mock_clinic_data', JSON.stringify(data.crm_data));
+          }
+          return { data: null, error: null };
+        },
         upsert: async (data: any, options: any) => {
           if (data && data.crm_data) {
             localStorage.setItem('supabase_mock_clinic_data', JSON.stringify(data.crm_data));

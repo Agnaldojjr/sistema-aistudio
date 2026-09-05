@@ -54,6 +54,28 @@ async function saveCRMDatabase(userId: string, crmData: any) {
   if (!supabaseAdmin) {
     throw new Error("Supabase Admin Client não configurado no servidor (SUPABASE_SERVICE_ROLE_KEY ausente).");
   }
+
+  // 1. Tenta UPDATE direto se o registro já existir
+  const { data: existing } = await supabaseAdmin
+    .from("clinic_data")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error: updateError } = await supabaseAdmin
+      .from("clinic_data")
+      .update({
+        crm_data: crmData,
+        updated_at: new Date().toISOString()
+      })
+      .eq("user_id", userId);
+
+    if (!updateError) return;
+    console.warn("Update direto em api/crm falhou, tentando upsert:", updateError);
+  }
+
+  // 2. Fallback: upsert
   const { error } = await supabaseAdmin
     .from("clinic_data")
     .upsert({
