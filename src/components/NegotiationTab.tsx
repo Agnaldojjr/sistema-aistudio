@@ -226,7 +226,7 @@ export default function NegotiationTab({
     return cached ? JSON.parse(cached) : [0, 0, 0, 0];
   });
 
-  const [boxMethods, setBoxMethods] = useState<('pix' | 'debito' | 'credito_vista' | 'credito_parcelado')[]>(() => {
+  const [boxMethods, setBoxMethods] = useState<('pix' | 'pix_5' | 'debito' | 'credito_vista' | 'credito_parcelado')[]>(() => {
     const cached = localStorage.getItem('ag_neg_box_methods');
     return cached ? JSON.parse(cached) : ['pix', 'credito_parcelado', 'credito_parcelado', 'credito_parcelado'];
   });
@@ -344,7 +344,7 @@ export default function NegotiationTab({
       let optionFeeDecimal = 0;
       let instCount = 1;
 
-      if (bMethod === 'pix') {
+      if (bMethod === 'pix' || bMethod === 'pix_5') {
         optionFeeDecimal = 0;
         instCount = 1;
       } else if (bMethod === 'debito') {
@@ -364,15 +364,19 @@ export default function NegotiationTab({
       
       const t0Ref = desiredNet / (1 - effectiveFeeDecimal);
 
-      const ch = r / (1 - effectiveFeeDecimal);
-      const taxa = ch - r;
-      const taxaAbsorvida = !isExceeded ? r * optionFeeDecimal : 0;
+      const isPixDiscount = bMethod === 'pix_5';
+      const pixDiscountVal = isPixDiscount ? (e === 0 ? desiredNet * 0.05 : r * 0.05) : 0;
+
+      const ch = isPixDiscount ? (r - pixDiscountVal) : (r / (1 - effectiveFeeDecimal));
+      const taxa = isPixDiscount ? 0 : (ch - r);
+      const taxaAbsorvida = (!isExceeded && !isPixDiscount && bMethod !== 'pix') ? r * optionFeeDecimal : 0;
       const instVal = instCount > 0 ? ch / instCount : 0;
       const t = e + ch;
 
-      const recebimentoLiquido = e + ch * (1 - optionFeeDecimal);
+      const recebimentoLiquido = isPixDiscount ? t : (e + ch * (1 - optionFeeDecimal));
 
       let label = bMethod.toUpperCase();
+      if (bMethod === 'pix_5') label = 'PIX (-5%)';
       if (bMethod === 'credito_parcelado') label = `CRÉDITO ${instCount}X`;
       if (bMethod === 'credito_vista') label = `CRÉDITO 1X`;
 
@@ -385,12 +389,13 @@ export default function NegotiationTab({
         entrada: e,
         restanteNet: r,
         cobradoCard: ch,
+        pixDiscountVal,
         valorTaxa: taxa,
         taxaAbsorvida: taxaAbsorvida,
         isExceeded,
         valorParcela: instVal,
         custoTotal: t,
-        economia: Math.max(0, t0Ref - t),
+        economia: isPixDiscount ? pixDiscountVal : Math.max(0, t0Ref - t),
         recebimentoLiquido: recebimentoLiquido,
         method: bMethod,
         installments: instCount
@@ -983,12 +988,13 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         if (sim.method !== 'credito_parcelado') {
           let methodText = "";
           if (sim.method === 'pix') methodText = "PIX";
+          else if (sim.method === 'pix_5') methodText = "PIX (com 5% de Desconto)";
           else if (sim.method === 'debito') methodText = "Débito";
           else methodText = "Crédito à vista (1x)";
 
           doc.text(`Opção Selecionada: À Vista no ${methodText}`, 20, currentY + 20);
-          if (sim.method === 'pix') {
-            doc.text(`Pagamento Único: ${formatCurrency(sim.entrada)} via Pix`, 20, currentY + 26);
+          if (sim.method === 'pix' || sim.method === 'pix_5') {
+            doc.text(`Pagamento Único: ${formatCurrency(sim.custoTotal)} via Pix`, 20, currentY + 26);
           } else {
             doc.text(`Pagamento Único: ${formatCurrency(sim.cobradoCard)} via Cartão`, 20, currentY + 26);
           }
@@ -1755,11 +1761,32 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                           }}
                           className="w-full bg-[#FAF8F5] border border-[#D5CBB3] rounded-lg p-1.5 text-xs font-semibold text-zinc-700 focus:outline-none focus:border-[#8B0000]"
                         >
-                          <option value="pix">PIX</option>
+                          <option value="pix">PIX (Integral)</option>
+                          <option value="pix_5">PIX (5% de Desconto)</option>
                           <option value="debito">Débito</option>
                           <option value="credito_vista">Crédito 1x</option>
                           <option value="credito_parcelado">Crédito Parcelado</option>
                         </select>
+
+                        {/* PIX DISCOUNT TOGGLE CHECKBOX */}
+                        {(boxMethods[index] === 'pix' || boxMethods[index] === 'pix_5') && (
+                          <label className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-emerald-800 cursor-pointer bg-emerald-50/80 hover:bg-emerald-100/80 px-2 py-1 rounded border border-emerald-200/70 transition-colors select-none">
+                            <input
+                              type="checkbox"
+                              checked={boxMethods[index] === 'pix_5'}
+                              onChange={(e) => {
+                                const isChecked = e.target.checked;
+                                setBoxMethods(prev => {
+                                  const next = [...prev];
+                                  next[index] = isChecked ? 'pix_5' : 'pix';
+                                  return next;
+                                });
+                              }}
+                              className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                            />
+                            <span>Aplicar 5% de desconto no PIX</span>
+                          </label>
+                        )}
                       </div>
 
                       {/* INSTALLMENTS SELECT */}
@@ -1801,27 +1828,46 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                       <strong className="text-zinc-700 font-mono">{formatCurrency(sim.restanteNet)}</strong>
                     </div>
 
-                    {/* Maquininha charged total */}
+                    {/* Maquininha charged total or PIX */}
                     <div className="py-1.5 flex justify-between items-center text-rose-900 bg-rose-50/20 px-1 rounded">
-                      <span className="text-rose-900/60 font-semibold text-[10px] uppercase">COBRADO CARTÃO:</span>
+                      <span className="text-rose-900/60 font-semibold text-[10px] uppercase">
+                        {sim.method === 'pix' || sim.method === 'pix_5' ? 'VALOR NO PIX:' : 'COBRADO CARTÃO:'}
+                      </span>
                       <strong className="text-rose-900 font-mono font-bold">{formatCurrency(sim.cobradoCard)}</strong>
                     </div>
 
-                    {/* Taxa repassada detail */}
-                    {sim.isExceeded ? (
-                      <div className="py-1 flex justify-between items-center border-b border-zinc-100/50">
-                        <span className="text-rose-600/80 font-bold text-[9.5px] uppercase">Taxa Repassada:</span>
-                        <strong className="text-rose-700 font-mono text-[10px] bg-rose-50 px-1 rounded">{formatCurrency(sim.valorTaxa)}</strong>
-                      </div>
-                    ) : (
-                      <div className="py-1 flex justify-between items-center border-b border-zinc-100/50">
-                        <span className="text-emerald-600/80 font-bold text-[9.5px] uppercase">Taxa Absorvida:</span>
-                        <strong className="text-emerald-700 font-mono text-[10px] bg-emerald-50 px-1 rounded">-{formatCurrency(sim.taxaAbsorvida)}</strong>
+                    {/* PIX Discount badge row */}
+                    {sim.pixDiscountVal > 0 && (
+                      <div className="py-1 flex justify-between items-center bg-emerald-50/70 border border-emerald-100 px-1 rounded">
+                        <span className="text-emerald-700 font-bold text-[9.5px] uppercase">Desconto PIX (5%):</span>
+                        <strong className="text-emerald-700 font-mono text-[10px]">-{formatCurrency(sim.pixDiscountVal)}</strong>
                       </div>
                     )}
 
+                    {/* Taxa repassada detail */}
+                    {sim.method !== 'pix' && sim.method !== 'pix_5' && (
+                      sim.isExceeded ? (
+                        <div className="py-1 flex justify-between items-center border-b border-zinc-100/50">
+                          <span className="text-rose-600/80 font-bold text-[9.5px] uppercase">Taxa Repassada:</span>
+                          <strong className="text-rose-700 font-mono text-[10px] bg-rose-50 px-1 rounded">{formatCurrency(sim.valorTaxa)}</strong>
+                        </div>
+                      ) : (
+                        <div className="py-1 flex justify-between items-center border-b border-zinc-100/50">
+                          <span className="text-emerald-600/80 font-bold text-[9.5px] uppercase">Taxa Absorvida:</span>
+                          <strong className="text-emerald-700 font-mono text-[10px] bg-emerald-50 px-1 rounded">-{formatCurrency(sim.taxaAbsorvida)}</strong>
+                        </div>
+                      )
+                    )}
+
                     {/* Parcellation value detail */}
-                    {sim.method !== 'credito_parcelado' ? (
+                    {sim.method === 'pix_5' ? (
+                      <div className="py-2 text-center bg-emerald-50/70 border border-emerald-200/70 rounded-lg my-1">
+                        <span className="text-[10px] text-emerald-700 uppercase tracking-wide block font-bold">Forma de Pagamento</span>
+                        <strong className="text-sm font-bold text-emerald-800 block font-mono mt-0.5">
+                          À Vista no PIX (-5%)
+                        </strong>
+                      </div>
+                    ) : sim.method !== 'credito_parcelado' ? (
                       <div className="py-2 text-center bg-zinc-50 border border-zinc-100/50 rounded-lg my-1">
                         <span className="text-[10px] text-zinc-400 uppercase tracking-wide block">Forma de Pagamento</span>
                         <strong className="text-sm font-bold text-[#8B0000] block font-mono mt-0.5">

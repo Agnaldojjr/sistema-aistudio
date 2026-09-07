@@ -120,7 +120,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
   const salesVolume = useReactiveLocalStorage<'under_3' | 'between_3_6'>('ag_neg_sales_volume', 'under_3');
   const cardBrand = useReactiveLocalStorage<'visa_master' | 'elo_amex'>('ag_neg_card_brand', 'visa_master');
   const boxEntradas = useReactiveLocalStorage<number[]>('ag_neg_box_entradas', [0, 0, 0, 0]);
-  const boxMethods = useReactiveLocalStorage<('pix' | 'debito' | 'credito_vista' | 'credito_parcelado')[]>('ag_neg_box_methods', ['pix', 'credito_parcelado', 'credito_parcelado', 'credito_parcelado']);
+  const boxMethods = useReactiveLocalStorage<('pix' | 'pix_5' | 'debito' | 'credito_vista' | 'credito_parcelado')[]>('ag_neg_box_methods', ['pix', 'credito_parcelado', 'credito_parcelado', 'credito_parcelado']);
   const boxInstallments = useReactiveLocalStorage<number[]>('ag_neg_box_installments', [1, 12, 12, 12]);
   const selectedPlanIndices = useReactiveLocalStorage<number[]>('ag_neg_selected_plans', [0]);
   const showInPatientScreen = useReactiveLocalStorage<boolean[]>('ag_neg_show_patient_sims', [true, false, false, false]);
@@ -177,7 +177,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
       let optionFeeDecimal = 0;
       let instCount = 0;
 
-      if (bMethod === 'pix') {
+      if (bMethod === 'pix' || bMethod === 'pix_5') {
         optionFeeDecimal = 0;
         instCount = 1;
       } else if (bMethod === 'debito') {
@@ -197,11 +197,15 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
       
       const t0Ref = desiredNet / (1 - effectiveFeeDecimal);
 
-      const ch = r / (1 - effectiveFeeDecimal);
+      const isPixDiscount = bMethod === 'pix_5';
+      const pixDiscountVal = isPixDiscount ? (e === 0 ? desiredNet * 0.05 : r * 0.05) : 0;
+
+      const ch = isPixDiscount ? (r - pixDiscountVal) : (r / (1 - effectiveFeeDecimal));
       const instVal = instCount > 0 ? ch / instCount : 0;
       const t = e + ch;
 
       let label = bMethod.toUpperCase();
+      if (bMethod === 'pix_5') label = 'PIX (-5%)';
       if (bMethod === 'credito_parcelado') label = `CRÉDITO ${instCount}X`;
       if (bMethod === 'credito_vista') label = `CRÉDITO 1X`;
 
@@ -210,6 +214,7 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
       if (i === 2) name = 'Simulação 2';
       if (i === 3) name = 'Oferta Paciente';
       if (i === 0 && bMethod === 'pix') name = 'À Vista no Pix';
+      if (i === 0 && bMethod === 'pix_5') name = 'À Vista no Pix (-5%)';
       if (i === 0 && bMethod === 'credito_parcelado') name = '100% no Cartão';
 
       return {
@@ -217,9 +222,10 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
         label,
         entrada: e,
         cobradoCard: ch,
+        pixDiscountVal,
         valorParcela: instVal,
         custoTotal: t,
-        economia: Math.max(0, t0Ref - t),
+        economia: isPixDiscount ? pixDiscountVal : Math.max(0, t0Ref - t),
         method: bMethod,
         installments: instCount
       };
@@ -616,17 +622,17 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
                           <>
                             <div className="py-2 flex justify-between items-center">
                               <span className="text-zinc-500 font-medium text-xs">
-                                {sim.method === 'pix' ? 'Pagamento PIX:' : 'Pagamento Único:'}
+                                {(sim.method === 'pix' || sim.method === 'pix_5') ? 'Pagamento PIX:' : 'Pagamento Único:'}
                               </span>
                               <strong className="text-[#896A39] font-mono font-bold text-sm bg-[#FAF8F5] border border-[#E6DEC9] px-2 py-0.5 rounded-md">
-                                {formatCurrency(sim.method === 'pix' ? sim.entrada : sim.cobradoCard)}
+                                {formatCurrency(sim.custoTotal)}
                               </strong>
                             </div>
 
                             <div className="py-3 text-center bg-zinc-50 border border-zinc-100 rounded-xl my-2">
                               <span className="text-xs text-zinc-400 uppercase tracking-wide block font-semibold mb-1">Forma de Pagamento</span>
-                              <strong className="text-sm font-bold text-[#4E1119] block font-mono">
-                                Pagamento Único à Vista
+                              <strong className={`text-sm font-bold block font-mono ${sim.method === 'pix_5' ? 'text-emerald-800' : 'text-[#4E1119]'}`}>
+                                {sim.method === 'pix_5' ? 'À Vista no PIX (5% de Desconto)' : 'Pagamento Único à Vista'}
                               </strong>
                             </div>
                           </>
