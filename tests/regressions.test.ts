@@ -26,28 +26,6 @@ test.describe('Testes de Regressão (Histórico de Bugs Resolvidos)', () => {
     await page.waitForLoadState('load');
   });
 
-  // =========================================================
-  // Regressão 1: Arcada 3D - Dentes desaparecendo ou canvas em branco
-  // =========================================================
-  test('Arcada 3D não deve quebrar ou ficar em branco (Prevenção de regressão 3D)', async ({ page }) => {
-    // Tenta acessar a Arcada 3D
-    await page.locator('button:has-text("Arcada 3D"), a:has-text("Arcada 3D")').first().click();
-    await page.waitForTimeout(3000); // 3D load time
-
-    // Como nenhum paciente está selecionado no mock inicial, o canvas não deve aparecer,
-    // mas sim uma mensagem orientando a selecionar o paciente, e não deve haver crash.
-    await expect(page.locator('body')).toContainText(/Selecione um paciente|3D|Arcada/i, { timeout: 10000 });
-
-    // Não deve haver erros de carregamento de GLB/GLTF ou WebGL
-    const webglErrors = consoleErrors.filter(e => 
-      e.includes('WebGL') || 
-      e.includes('THREE') || 
-      e.includes('.glb') || 
-      e.includes('.gltf') ||
-      e.includes('Failed to load resource')
-    );
-    expect(webglErrors).toEqual([]);
-  });
 
   // =========================================================
   // Regressão 2: CRM - Prevenção de Duplicidade de Leads/Pacientes

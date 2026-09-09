@@ -513,7 +513,7 @@ Histórico de Conversa:
 ${chatHistory}`;
 
       const geminiResponse = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: { temperature: 0.1 }
       });
@@ -738,7 +738,7 @@ Não use markdown complexo, pode usar números ou traços.
 Procedimento realizado: ${procedure}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           temperature: 0.2, // low temp for clinical stuff
@@ -781,7 +781,7 @@ Crie uma mensagem curta, calorosa e empática para WhatsApp, perguntando como o 
 A mensagem deve ser direta, amigável e pronta para ser enviada no WhatsApp. Não inclua saudações iniciais suas.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           temperature: 0.7,
@@ -877,7 +877,7 @@ ${doctorName}`;
 
       if (process.env.GEMINI_API_KEY) {
         const response = await ai.models.generateContent({
-          model: "gemini-3.6-flash",
+          model: "gemini-2.5-flash",
           contents: prompt,
           config: { temperature: 0.7 }
         });
@@ -938,7 +938,7 @@ Retorne APENAS um array JSON no formato solicitado.`;
 
       // Use @google/genai SDK
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: [
           {
             role: "user",
@@ -1014,7 +1014,7 @@ Retorne APENAS um array JSON no formato solicitado.`;
       `;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -1123,7 +1123,7 @@ Você DEVE responder em formato JSON estrito correspondente a esta estrutura:
 }`;
 
             const geminiResponse = await ai.models.generateContent({
-              model: "gemini-3.6-flash",
+              model: "gemini-2.5-flash",
               contents: prompt,
               config: {
                 responseMimeType: "application/json"
@@ -1262,9 +1262,9 @@ Você DEVE responder em formato JSON estrito correspondente a esta estrutura:
     }
 
     if (geminiKey) {
-      console.log("[LLM API] Chamando Gemini (gemini-3.6-flash)...");
+      console.log("[LLM API] Chamando Gemini (gemini-2.5-flash)...");
       try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

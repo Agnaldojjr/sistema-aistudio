@@ -3276,7 +3276,7 @@ export default function DentalCRMView({
             Gestão de Pacientes
           </h2>
           <p className="text-sm text-zinc-500 mt-1 ml-10">
-            {patients.length} paciente{patients.length !== 1 ? 's' : ''} cadastrado{patients.length !== 1 ? 's' : ''} · Sincronizado com Supabase
+            {patients.length === 0 ? 'Nenhum paciente cadastrado' : `${patients.length} paciente${patients.length !== 1 ? 's' : ''} cadastrado${patients.length !== 1 ? 's' : ''}`} · Sincronizado com Supabase
           </p>
         </div>
 
@@ -6385,8 +6385,15 @@ export default function DentalCRMView({
 
               </div>
             ) : (
-              <div className="bg-[#FAF8F5] border-2 border-dashed border-[#C09553]/30 p-16 rounded-2xl text-center shadow-xs text-zinc-450 text-xs">
-                Selecione um paciente na lista de CRM à esquerda para carregar o prontuário completo, detalhes cadastrais e as abas de evolução históricas consolidadas.
+              <div className="bg-[#FAF8F5] border-2 border-dashed border-[#C09553]/30 p-16 rounded-2xl text-center shadow-xs text-zinc-500 text-xs">
+                {patients.length === 0 ? (
+                  <div className="space-y-1">
+                    <p className="font-semibold text-zinc-700">Nenhum paciente cadastrado</p>
+                    <p className="text-zinc-400">Cadastre um novo paciente pelo botão acima ou importe uma planilha para começar.</p>
+                  </div>
+                ) : (
+                  'Selecione um paciente na lista de CRM à esquerda para carregar o prontuário completo, detalhes cadastrais e as abas de evolução históricas consolidadas.'
+                )}
               </div>
             )}
           </div>

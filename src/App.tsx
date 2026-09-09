@@ -40,11 +40,9 @@ import ClinicalAttendanceManager from './components/ClinicalAttendanceManager';
 import MobileWorkspace from './components/MobileWorkspace';
 import DentalCRMView from './components/DentalCRMView';
 import PatientAnamnesisForm from './components/PatientAnamnesisForm';
-import SentinelDashboard from './components/SentinelDashboard';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from './types';
 import { DEFAULT_PROCEDURES, DEMO_SVG_PLACEHOLDERS, DEFAULT_CLINIC_SETTINGS, INITIAL_PROPOSAL, INITIAL_SECTIONS } from './constants';
 import { initAuth, googleSignIn, logout } from './firebase';
-import TreatmentPlanning3D from './TreatmentPlanning3D';
 import FinancialView from './components/FinancialView';
 
 import type { User } from '@supabase/supabase-js';
@@ -71,7 +69,7 @@ const AFLogoSVG = ({ className = '', light = false }: { className?: string; ligh
 // ─── Initial State ─────────────────────────────────────────────────────────
 
 // ─── Navigation Config ──────────────────────────────────────────────────────
-type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings' | '3d-planning' | 'financeiro' | 'agent-center';
+type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings' | 'financeiro';
 
 const NAV_ITEMS = [
   { id: 'dashboard' as AppView, label: 'Painel', icon: LayoutDashboard, section: 'principal' },
@@ -209,8 +207,6 @@ function TopBar({ currentView, proposal, onChangeView, onOpenMobileMenu, isMobil
     crm: 'Gestão de Pacientes',
     calendar: 'Agenda',
     settings: 'Configurações',
-    '3d-planning': 'Planejamento 3D',
-    'agent-center': 'Copiloto Hermes',
   };
 
   return (
@@ -329,20 +325,6 @@ function LoginScreen({ onLogin, isLoggingIn }: { onLogin: () => void; isLoggingI
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const isPresentationWindow = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'presentation';
-
-  if (isPresentationWindow) {
-    const cachedProcedures = typeof window !== 'undefined' ? localStorage.getItem('agnaldo_dent_procedures') : null;
-    const initialProcedures = cachedProcedures ? JSON.parse(cachedProcedures) : [];
-    return (
-      <div className="w-screen h-screen overflow-hidden bg-slate-950 text-slate-200">
-        <PatientProvider>
-          <TreatmentPlanning3D procedures={initialProcedures} />
-        </PatientProvider>
-      </div>
-    );
-  }
-
   // --- AUTH STATE ---
   const [needsAuth, setNeedsAuth] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -370,7 +352,7 @@ export default function App() {
     const pathname = window.location.pathname;
     const segments = pathname.split('/').filter(Boolean);
     const primaryView = segments[0] as AppView;
-    const validViews: AppView[] = ['dashboard', 'calendar', 'crm', 'settings', '3d-planning', 'financeiro', 'agent-center'];
+    const validViews: AppView[] = ['dashboard', 'calendar', 'crm', 'settings', 'financeiro'];
     
     if (validViews.includes(primaryView)) {
       let tab = 'registration';
@@ -451,21 +433,6 @@ export default function App() {
     document.body.className = currentTheme === 'padrao' ? '' : `theme-${currentTheme}`;
   }, [currentTheme]);
 
-  useEffect(() => {
-    return () => {
-      if (currentAppView === '3d-planning') {
-        try {
-          const canvas = document.querySelector('canvas');
-          if (canvas) {
-            const imgData = canvas.toDataURL('image/png');
-            localStorage.setItem('agnaldo_dent_3d_screenshot', imgData);
-          }
-        } catch (e) {
-          console.error('Erro ao capturar screenshot da arcada 3D:', e);
-        }
-      }
-    };
-  }, [currentAppView]);
 
   // Sincronizar estado do app com a URL
   useEffect(() => {
@@ -645,9 +612,6 @@ export default function App() {
     return <PatientAnamnesisForm />;
   }
 
-  if (urlMode === 'sentinel') {
-    return <SentinelDashboard />;
-  }
 
   // --- RENDER: Login Screen ---
   if (needsAuth) {
@@ -820,19 +784,6 @@ export default function App() {
           </main>
         )}
 
-        {/* ── 3D Planning Module (Sprint 1) ────────────────────── */}
-        {currentAppView === '3d-planning' && (
-          <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 w-full animate-fade-in-up">
-            <TreatmentPlanning3D procedures={procedures} onOpenProcedureManager={() => setShowProcedureManager(true)} />
-          </main>
-        )}
-
-        {/* ── Central IA ────────────────────────────────────────── */}
-        {currentAppView === 'agent-center' && (
-          <main className="flex-1 w-full animate-fade-in-up">
-            <SentinelDashboard />
-          </main>
-        )}
 
         {/* Footer */}
         <footer className="bg-white border-t border-[#E6DEC9] py-4 px-6 print:hidden mt-auto">

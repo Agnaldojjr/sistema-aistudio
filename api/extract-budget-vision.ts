@@ -40,7 +40,7 @@ Se não houver numeração de dente especificada, coloque o dente como null.
 Retorne APENAS um array JSON no formato solicitado.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-2.5-flash",
       contents: [
         {
           role: "user",

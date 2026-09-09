@@ -196,9 +196,9 @@ async function callLLM(prompt: string, jsonMode: boolean = false): Promise<strin
   }
 
   if (geminiKey) {
-    console.log("[LLM API] Chamando Gemini (gemini-3.6-flash)...");
+    console.log("[LLM API] Chamando Gemini (gemini-2.5-flash)...");
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

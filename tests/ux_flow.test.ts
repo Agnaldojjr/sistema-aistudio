@@ -49,8 +49,6 @@ test.describe('Fluxos de Experiência do Usuário (UX)', () => {
       { text: 'Financeiro', expectContent: ['Financeiro', 'Receita'] },
       { text: 'Pacientes', expectContent: ['Pacientes', 'Cadastrar'] },
       { text: 'Agenda', expectContent: ['Agenda', 'Calendário'] },
-      { text: 'Arcada 3D', expectContent: ['3D', 'Arcada'] },
-      { text: 'Copiloto Hermes', expectContent: ['Copiloto', 'Agente', 'Hermes'] },
       { text: 'Ajustes', expectContent: ['Configurações', 'Ajustes'] },
     ];
 
@@ -153,67 +151,6 @@ test.describe('Fluxos de Experiência do Usuário (UX)', () => {
     expect(critical).toEqual([]);
   });
 
-  // =========================================================
-  // 6. ARCADA 3D - Canvas/WebGL renderiza sem crash
-  // =========================================================
-  test('Arcada 3D: canvas/modelo 3D é renderizado e exibe elementos visuais', async ({ page }) => {
-    await page.locator('button:has-text("Arcada 3D"), a:has-text("Arcada 3D")').first().click();
-    await page.waitForTimeout(3000); // 3D precisa de mais tempo para carregar modelos GLB
-
-    // Deve existir pelo menos um canvas (Three.js/R3F) ou elemento 3D
-    const canvas = page.locator('canvas');
-    const canvasCount = await canvas.count();
-    
-    if (canvasCount > 0) {
-      await expect(canvas.first()).toBeVisible();
-      // Verifica que o canvas tem dimensões válidas (não zeradas)
-      const box = await canvas.first().boundingBox();
-      expect(box).not.toBeNull();
-      if (box) {
-        expect(box.width).toBeGreaterThan(100);
-        expect(box.height).toBeGreaterThan(100);
-      }
-    }
-
-    // Verifica erros de WebGL ou carregamento de modelo 3D
-    const critical = consoleErrors.filter(e => 
-      e.includes('TypeError') || 
-      e.includes('Cannot read') || 
-      e.includes('WebGL') ||
-      e.includes('THREE') ||
-      e.includes('Failed to load') ||
-      e.includes('404') ||
-      e.includes('.glb') ||
-      e.includes('.gltf')
-    );
-    if (critical.length > 0) {
-      console.log('Erros na aba 3D:', critical);
-    }
-    expect(critical).toEqual([]);
-  });
-
-  // =========================================================
-  // 7. CENTRAL IA - Chat e painel de relatórios
-  // =========================================================
-  test('Central IA: painel carrega e campo de chat é funcional', async ({ page }) => {
-    await page.locator('button:has-text("Central IA"), a:has-text("Central IA")').first().click();
-    await page.waitForTimeout(1000);
-
-    // Deve exibir as abas do painel
-    const body = await page.locator('body').innerText();
-    const hasSentinelContent = body.includes('Auditoria') || body.includes('Conversar') || 
-                               body.includes('Agente') || body.includes('Sentinela');
-    expect(hasSentinelContent).toBe(true);
-
-    // Deve ter um campo de input para chat
-    const chatInput = page.locator('input[placeholder*="Pergunte"], input[placeholder*="agente"], textarea').first();
-    if (await chatInput.count() > 0) {
-      await expect(chatInput).toBeVisible();
-    }
-
-    const critical = consoleErrors.filter(e => e.includes('TypeError') || e.includes('Cannot read'));
-    expect(critical).toEqual([]);
-  });
 
   // =========================================================
   // 8. FINANCEIRO - Tela de finanças

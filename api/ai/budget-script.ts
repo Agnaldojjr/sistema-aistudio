@@ -25,7 +25,7 @@ export default async function handler(req: any, res: any) {
     if (process.env.GEMINI_API_KEY) {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: { temperature: 0.7 }
       });
