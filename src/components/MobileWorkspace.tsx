@@ -29,6 +29,7 @@ import { createCalendarEvent } from '../lib/calendar';
 import { uploadPatientFileToSupabase } from '../lib/supabaseStorage';
 import { compressImage, compressFileToDataUrl } from '../lib/imageUtils';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from '../types';
+import { getDefaultToothCoordinates } from '../constants';
 import { format, parseISO, addMinutes } from 'date-fns';
 
 interface MobileWorkspaceProps {
@@ -350,10 +351,17 @@ export default function MobileWorkspace({
             // Locate section and update image
             const targetSection = sections.find((s) => s.id === targetSectionId);
             if (targetSection) {
+              const updatedMarkers = (targetSection.markers || []).map((m) => {
+                if (!m.x || !m.y || (m.x === 50 && (m.y === 50 || m.y === 60))) {
+                  const defaultPos = getDefaultToothCoordinates(m.toothNumber, targetSection.id);
+                  return { ...m, ...defaultPos };
+                }
+                return m;
+              });
               onUpdateSection({
                 ...targetSection,
                 image: dataUrl,
-                markers: [] // Reset markers for new placement
+                markers: updatedMarkers,
               });
             }
 
@@ -392,10 +400,17 @@ export default function MobileWorkspace({
         const targetSectionId = activeCameraSection === 'smile' ? 'smile' : activeCameraSection;
         const targetSection = sections.find((s) => s.id === targetSectionId);
         if (targetSection) {
+          const updatedMarkers = (targetSection.markers || []).map((m) => {
+            if (!m.x || !m.y || (m.x === 50 && (m.y === 50 || m.y === 60))) {
+              const defaultPos = getDefaultToothCoordinates(m.toothNumber, targetSection.id);
+              return { ...m, ...defaultPos };
+            }
+            return m;
+          });
           onUpdateSection({
             ...targetSection,
             image: dataUrl,
-            markers: []
+            markers: updatedMarkers,
           });
         }
 
@@ -464,7 +479,6 @@ export default function MobileWorkspace({
       onUpdateSection({
         ...targetSection,
         image: null,
-        markers: []
       });
     }
   };

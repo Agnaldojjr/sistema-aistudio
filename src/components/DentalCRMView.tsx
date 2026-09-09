@@ -62,6 +62,7 @@ import { compressFileToDataUrl, compressImage } from '../lib/imageUtils';
 import ImageMarkupEditor from './ImageMarkupEditor';
 import { AIAssistedWhatsApp } from './AIAssistedWhatsApp';
 import { usePatientContext } from '../context/PatientContext';
+import { getDefaultToothCoordinates } from '../constants';
 
 // --- ZOD SCHEMAS FOR HISTORICAL IMPORT CONTENT VALIDATION ---
 const lenientString = z.preprocess((val) => (val !== undefined && val !== null) ? String(val) : val, z.string()).optional().nullable();
@@ -393,7 +394,8 @@ export default function DentalCRMView({
         if (sectionIdx !== -1) {
            let marker = newSections[sectionIdx].markers.find((m: any) => m.toothNumber === tooth);
            if (!marker && tooth) {
-             marker = { id: `${targetSectionId}-${tooth}`, toothNumber: tooth, x: 50, y: 50, procedures: [], procedureInstances: [] };
+             const defPos = getDefaultToothCoordinates(tooth, targetSectionId);
+             marker = { id: `${targetSectionId}-${tooth}`, toothNumber: tooth, x: defPos.x, y: defPos.y, procedures: [], procedureInstances: [] };
              newSections[sectionIdx].markers.push(marker);
            } else if (!marker && !tooth) {
              marker = { id: `${targetSectionId}-gen-${Date.now()}-${Math.random()}`, toothNumber: 0, x: 50, y: 50, procedures: [], procedureInstances: [] };

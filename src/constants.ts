@@ -71,6 +71,92 @@ export const TEETH_BY_SECTION = {
   },
 };
 
+/**
+ * Coordenadas anatômicas padrão para posicionar os dentes ao longo da arcada
+ * garantindo que as bolinhas não fiquem sobrepostas (50, 50) e apareçam distribuídas sobre a foto.
+ */
+export function getDefaultToothCoordinates(toothNumber: number, sectionId: string = 'upper'): { x: number; y: number } {
+  if (!toothNumber) return { x: 50, y: 50 };
+
+  if (sectionId === 'upper' || (sectionId.startsWith('extra') && toothNumber >= 11 && toothNumber <= 28)) {
+    const upperMap: Record<number, { x: number; y: number }> = {
+      18: { x: 18, y: 78 },
+      17: { x: 21, y: 64 },
+      16: { x: 24, y: 52 },
+      15: { x: 28, y: 40 },
+      14: { x: 33, y: 31 },
+      13: { x: 39, y: 24 },
+      12: { x: 45, y: 20 },
+      11: { x: 49, y: 19 },
+      21: { x: 53, y: 19 },
+      22: { x: 57, y: 20 },
+      23: { x: 63, y: 24 },
+      24: { x: 69, y: 31 },
+      25: { x: 74, y: 40 },
+      26: { x: 78, y: 52 },
+      27: { x: 81, y: 64 },
+      28: { x: 84, y: 78 },
+    };
+    if (upperMap[toothNumber]) return upperMap[toothNumber];
+  }
+
+  if (sectionId === 'lower' || (sectionId.startsWith('extra') && toothNumber >= 31 && toothNumber <= 48)) {
+    const lowerMap: Record<number, { x: number; y: number }> = {
+      48: { x: 18, y: 22 },
+      47: { x: 21, y: 36 },
+      46: { x: 24, y: 48 },
+      45: { x: 28, y: 60 },
+      44: { x: 33, y: 69 },
+      43: { x: 39, y: 76 },
+      42: { x: 45, y: 80 },
+      41: { x: 49, y: 81 },
+      31: { x: 53, y: 81 },
+      32: { x: 57, y: 80 },
+      33: { x: 63, y: 76 },
+      34: { x: 69, y: 69 },
+      35: { x: 74, y: 60 },
+      36: { x: 78, y: 48 },
+      37: { x: 81, y: 36 },
+      38: { x: 84, y: 22 },
+    };
+    if (lowerMap[toothNumber]) return lowerMap[toothNumber];
+  }
+
+  if (sectionId === 'panoramic') {
+    const panoMap: Record<number, { x: number; y: number }> = {
+      18: { x: 12, y: 35 }, 17: { x: 17, y: 35 }, 16: { x: 22, y: 35 }, 15: { x: 27, y: 35 },
+      14: { x: 32, y: 35 }, 13: { x: 37, y: 35 }, 12: { x: 42, y: 35 }, 11: { x: 47, y: 35 },
+      21: { x: 53, y: 35 }, 22: { x: 58, y: 35 }, 23: { x: 63, y: 35 }, 24: { x: 68, y: 35 },
+      25: { x: 73, y: 35 }, 26: { x: 78, y: 35 }, 27: { x: 83, y: 35 }, 28: { x: 88, y: 35 },
+      48: { x: 12, y: 65 }, 47: { x: 17, y: 65 }, 46: { x: 22, y: 65 }, 45: { x: 27, y: 65 },
+      44: { x: 32, y: 65 }, 43: { x: 37, y: 65 }, 42: { x: 42, y: 65 }, 41: { x: 47, y: 65 },
+      31: { x: 53, y: 65 }, 32: { x: 58, y: 65 }, 33: { x: 63, y: 65 }, 34: { x: 68, y: 65 },
+      35: { x: 73, y: 65 }, 36: { x: 78, y: 65 }, 37: { x: 83, y: 65 }, 38: { x: 88, y: 65 }
+    };
+    if (panoMap[toothNumber]) return panoMap[toothNumber];
+  }
+
+  if (sectionId === 'smile') {
+    const smileMap: Record<number, { x: number; y: number }> = {
+      13: { x: 24, y: 40 }, 12: { x: 34, y: 38 }, 11: { x: 45, y: 37 },
+      21: { x: 55, y: 37 }, 22: { x: 66, y: 38 }, 23: { x: 76, y: 40 },
+      43: { x: 24, y: 62 }, 42: { x: 34, y: 64 }, 41: { x: 45, y: 65 },
+      31: { x: 55, y: 65 }, 32: { x: 66, y: 64 }, 33: { x: 76, y: 62 },
+    };
+    if (smileMap[toothNumber]) return smileMap[toothNumber];
+  }
+
+  // Fallback baseado no quadrante do número FDI
+  if (toothNumber >= 11 && toothNumber <= 28) {
+    return { x: 30 + ((toothNumber % 10) * 4), y: 35 };
+  }
+  if (toothNumber >= 31 && toothNumber <= 48) {
+    return { x: 30 + ((toothNumber % 10) * 4), y: 65 };
+  }
+
+  return { x: 50, y: 50 };
+}
+
 // Elegant base64 SVG illustrations of teeth to serve as placeholders
 // This ensures that even before they upload a real photo, they see beautiful high-quality
 // stylized diagrams and can test drag-and-drop right away!

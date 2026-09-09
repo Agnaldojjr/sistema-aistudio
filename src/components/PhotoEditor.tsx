@@ -6,7 +6,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Info, Camera, X, SwitchCamera, Zap, ZapOff, ZoomIn, Loader2, ImageIcon, Focus, Plus } from 'lucide-react';
 import { PhotoSection, ToothMarker, Procedure } from '../types';
-import { DEMO_SVG_PLACEHOLDERS } from '../constants';
+import { DEMO_SVG_PLACEHOLDERS, getDefaultToothCoordinates } from '../constants';
 import { compressImage, compressFileToDataUrl } from '../lib/imageUtils';
 import { listPatientFilesFromSupabase, downloadFileAsDataUrlFromSupabase, uploadPatientFileToSupabase } from '../lib/supabaseStorage';
 import ImageMarkupEditor from './ImageMarkupEditor';
@@ -127,7 +127,14 @@ export default function PhotoEditor({
     try {
       setIsDownloadingFromGallery(fileId);
       const dataUrl = await downloadFileAsDataUrlFromSupabase(fileId);
-      onUpdateSection({ ...section, image: dataUrl, markers: [] });
+      const updatedMarkers = (section.markers || []).map((m) => {
+        if (!m.x || !m.y || (m.x === 50 && (m.y === 50 || m.y === 60))) {
+          const defaultPos = getDefaultToothCoordinates(m.toothNumber, section.id);
+          return { ...m, ...defaultPos };
+        }
+        return m;
+      });
+      onUpdateSection({ ...section, image: dataUrl, markers: updatedMarkers });
       setShowGallerySelector(false);
     } catch (err: any) {
       alert('Erro ao carregar imagem selecionada da galeria: ' + err.message);
@@ -318,7 +325,14 @@ export default function PhotoEditor({
           
           const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
           compressImage(dataUrl, 1024, 0.7).then((compressedDataUrl) => {
-            onUpdateSection({ ...section, image: compressedDataUrl, markers: [] });
+            const updatedMarkers = (section.markers || []).map((m) => {
+              if (!m.x || !m.y || (m.x === 50 && (m.y === 50 || m.y === 60))) {
+                const defaultPos = getDefaultToothCoordinates(m.toothNumber, section.id);
+                return { ...m, ...defaultPos };
+              }
+              return m;
+            });
+            onUpdateSection({ ...section, image: compressedDataUrl, markers: updatedMarkers });
             stopCamera();
           });
 
@@ -388,9 +402,17 @@ export default function PhotoEditor({
 
   // Load standard pre-designed dental illustration SVG
   const handleLoadDemo = () => {
+    const updatedMarkers = (section.markers || []).map((m) => {
+      if (!m.x || !m.y || (m.x === 50 && (m.y === 50 || m.y === 60))) {
+        const defaultPos = getDefaultToothCoordinates(m.toothNumber, section.id);
+        return { ...m, ...defaultPos };
+      }
+      return m;
+    });
     onUpdateSection({
       ...section,
       image: DEMO_SVG_PLACEHOLDERS[section.id],
+      markers: updatedMarkers,
     });
   };
 
@@ -402,9 +424,17 @@ export default function PhotoEditor({
     }
     try {
       const compressedDataUrl = await compressFileToDataUrl(file, 1024, 0.7);
+      const updatedMarkers = (section.markers || []).map((m) => {
+        if (!m.x || !m.y || (m.x === 50 && (m.y === 50 || m.y === 60))) {
+          const defaultPos = getDefaultToothCoordinates(m.toothNumber, section.id);
+          return { ...m, ...defaultPos };
+        }
+        return m;
+      });
       onUpdateSection({
         ...section,
         image: compressedDataUrl,
+        markers: updatedMarkers,
       });
 
       // Upload to Supabase patient folder in the background
@@ -457,12 +487,13 @@ export default function PhotoEditor({
         setSelectedMarkerId(null);
       }
     } else {
-      // Create new marker centered
+      // Create new marker with anatomical position based on quadrant
+      const defaultCoords = getDefaultToothCoordinates(toothNum, section.id);
       const newMarker: ToothMarker = {
         id: `${section.id}-${toothNum}`,
         toothNumber: toothNum,
-        x: 50, // center default
-        y: 60, // slightly lower center default
+        x: defaultCoords.x,
+        y: defaultCoords.y,
         procedures: [], // empty therapies initially
       };
       
