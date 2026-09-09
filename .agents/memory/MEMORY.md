@@ -6,3 +6,4 @@
 
 ## Workflow
 - [verification] After applying code changes, always test visually in the browser → verification-workflow.md
+- [git] Sempre realizar git add, commit e git push automaticamente após concluir alterações e validações.
