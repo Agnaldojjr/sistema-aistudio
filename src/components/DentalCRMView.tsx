@@ -342,7 +342,8 @@ export default function DentalCRMView({
       });
       
       if (!response.ok) {
-        throw new Error('Falha ao processar a imagem do orçamento.');
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.details || errData.error || 'Falha ao processar a imagem do orçamento.');
       }
       
       const { items } = await response.json();
@@ -424,9 +425,9 @@ export default function DentalCRMView({
       setActiveSections(newSections);
       alert('Orçamento importado com sucesso!');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert('Erro ao importar orçamento. Verifique se o formato da imagem é válido e se a API está online.');
+      alert(`Erro ao importar orçamento: ${error?.message || 'Verifique se o formato da imagem é válido e se a API está online.'}`);
     } finally {
       setIsImportingBudget(false);
       e.target.value = '';
