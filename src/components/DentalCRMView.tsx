@@ -5555,6 +5555,19 @@ export default function DentalCRMView({
                               onAddProcedure={setProcedures ? (newProc) => {
                                 setProcedures((prev: any) => [...prev, newProc]);
                               } : undefined}
+                              onEditProcedure={setProcedures ? (updatedProc) => {
+                                setProcedures((prev: any[]) => prev.map((p) => p.id === updatedProc.id ? updatedProc : p));
+                              } : undefined}
+                              onDeleteProcedure={setProcedures ? (procId) => {
+                                setProcedures((prev: any[]) => prev.filter((p) => p.id !== procId));
+                                setActiveSections((prevSections) => prevSections.map((sec) => ({
+                                  ...sec,
+                                  markers: sec.markers.map((m) => ({
+                                    ...m,
+                                    procedures: m.procedures.filter((id) => id !== procId)
+                                  }))
+                                })));
+                              } : undefined}
                             />
                           ))}
 

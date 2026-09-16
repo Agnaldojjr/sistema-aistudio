@@ -4,7 +4,7 @@
  */
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Info, Camera, X, SwitchCamera, Zap, ZapOff, ZoomIn, Loader2, ImageIcon, Focus, Plus } from 'lucide-react';
+import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Info, Camera, X, SwitchCamera, Zap, ZapOff, ZoomIn, Loader2, ImageIcon, Focus, Plus, Edit2, Trash2, Check } from 'lucide-react';
 import { PhotoSection, ToothMarker, Procedure } from '../types';
 import { DEMO_SVG_PLACEHOLDERS, getDefaultToothCoordinates } from '../constants';
 import { compressImage, compressFileToDataUrl } from '../lib/imageUtils';
@@ -20,6 +20,7 @@ interface PhotoEditorProps {
   driveFolderId?: string;
   onAddProcedure?: (proc: Procedure) => void;
   onEditProcedure?: (proc: Procedure) => void;
+  onDeleteProcedure?: (procedureId: string) => void;
 }
 
 export default function PhotoEditor({
@@ -31,6 +32,7 @@ export default function PhotoEditor({
   driveFolderId = '',
   onAddProcedure,
   onEditProcedure,
+  onDeleteProcedure,
 }: PhotoEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -81,7 +83,7 @@ export default function PhotoEditor({
 
   const handleInlineAddProcedure = () => {
     if (!inlineProcName.trim() || !onAddProcedure) return;
-    const parsedPrice = typeof inlineProcPrice === 'number' ? inlineProcPrice : parseFloat(String(inlineProcPrice)) || 0;
+    const parsedPrice = typeof inlineProcPrice === 'number' ? inlineProcPrice : parseFloat(String(inlineProcPrice).replace(',', '.')) || 0;
     const colorIndex = procedures.length % INLINE_COLORS.length;
     const newProc: Procedure = {
       id: 'p-' + Date.now().toString(),
@@ -93,6 +95,39 @@ export default function PhotoEditor({
     setInlineProcName('');
     setInlineProcPrice('');
     setShowInlineAddProc(false);
+  };
+
+  const handleSaveEditProcedure = (proc: Procedure) => {
+    if (!editProcName.trim() || !onEditProcedure) return;
+    const parsedPrice = typeof editProcPrice === 'number'
+      ? editProcPrice
+      : parseFloat(String(editProcPrice).replace(',', '.')) || 0;
+
+    const updated: Procedure = {
+      ...proc,
+      name: editProcName.trim(),
+      price: Math.max(0, parsedPrice),
+    };
+
+    onEditProcedure(updated);
+    setEditingProcId(null);
+  };
+
+  const handleDeleteProcedure = (procId: string, procName: string) => {
+    if (!window.confirm(`Deseja realmente apagar o procedimento "${procName}"? Ele será desvinculado dos dentes marcados.`)) {
+      return;
+    }
+    // Remove procedure from markers in this section
+    const updatedMarkers = section.markers.map((m) => ({
+      ...m,
+      procedures: m.procedures.filter((id) => id !== procId),
+    }));
+    onUpdateSection({ ...section, markers: updatedMarkers });
+
+    if (editingProcId === procId) {
+      setEditingProcId(null);
+    }
+    onDeleteProcedure?.(procId);
   };
 
   const handleOpenGallery = async () => {
@@ -1204,44 +1239,73 @@ export default function PhotoEditor({
                   const isChecked = activeMarker.procedures.includes(proc.id);
                   if (editingProcId === proc.id) {
                     return (
-                      <div key={proc.id} className="bg-[#FAF8F5] border border-[#E6DEC9] rounded-lg p-2 space-y-2">
+                      <div key={proc.id} className="bg-[#FAF8F5] border border-[#C09553]/60 rounded-lg p-2.5 space-y-2 animate-fadeIn shadow-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-[#4E1119] uppercase tracking-wide">Editar Procedimento</span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingProcId(null)}
+                            className="text-zinc-400 hover:text-zinc-600 p-0.5 rounded transition-colors cursor-pointer"
+                            title="Fechar"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                         <input
                           type="text"
                           value={editProcName}
                           onChange={(e) => setEditProcName(e.target.value)}
-                          className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-md px-2 py-1 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveEditProcedure(proc);
+                            if (e.key === 'Escape') setEditingProcId(null);
+                          }}
+                          placeholder="Nome do procedimento"
+                          className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-md px-2.5 py-1 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none transition-all"
+                          autoFocus
                         />
-                        <div className="flex gap-2">
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={editProcPrice}
-                            onChange={(e) => setEditProcPrice(e.target.value)}
-                            className="flex-1 bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-md px-2 py-1 text-xs font-mono text-zinc-800 focus:outline-none"
-                          />
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative flex-1">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-zinc-400">R$</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={editProcPrice}
+                              onChange={(e) => setEditProcPrice(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveEditProcedure(proc);
+                                if (e.key === 'Escape') setEditingProcId(null);
+                              }}
+                              placeholder="0"
+                              className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-md pl-7 pr-2 py-1 text-xs font-mono text-zinc-800 focus:outline-none transition-all"
+                            />
+                          </div>
                           <button
                             type="button"
-                            onClick={() => {
-                              if (onEditProcedure && editProcName.trim()) {
-                                onEditProcedure({
-                                  ...proc,
-                                  name: editProcName,
-                                  price: typeof editProcPrice === 'number' ? editProcPrice : parseFloat(String(editProcPrice)) || 0,
-                                });
-                                setEditingProcId(null);
-                              }
-                            }}
-                            className="px-2 py-1 bg-[#4E1119] text-white text-[10px] rounded"
+                            onClick={() => handleSaveEditProcedure(proc)}
+                            disabled={!editProcName.trim()}
+                            className="px-2.5 py-1 bg-[#4E1119] hover:bg-[#6c1b26] text-white text-[11px] font-semibold rounded-md flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                            title="Salvar alterações"
                           >
-                            Salvar
+                            <Check className="w-3 h-3" />
+                            <span>Salvar</span>
                           </button>
+                          {onDeleteProcedure && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProcedure(proc.id, proc.name)}
+                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                              title="Excluir procedimento"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => setEditingProcId(null)}
-                            className="px-2 py-1 bg-zinc-200 text-zinc-700 text-[10px] rounded"
+                            className="px-2 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 text-[11px] rounded-md transition-colors cursor-pointer"
                           >
-                            Cancel
+                            Cancelar
                           </button>
                         </div>
                       </div>
@@ -1249,7 +1313,7 @@ export default function PhotoEditor({
                   }
                   
                   return (
-                    <div key={proc.id} className={`w-full flex items-center justify-between p-1 rounded-lg border transition-all ${
+                    <div key={proc.id} className={`w-full group flex items-center justify-between p-1 rounded-lg border transition-all ${
                         isChecked
                           ? 'border-[#C09553]/40 bg-amber-50/20 font-medium'
                           : 'border-zinc-100 hover:bg-zinc-50'
@@ -1258,7 +1322,7 @@ export default function PhotoEditor({
                         id={`opt-treatment-${section.id}-${activeMarker.toothNumber}-${proc.id}`}
                         type="button"
                         onClick={() => toggleProcedureForMarker(activeMarker.id, proc.id)}
-                        className="flex-1 flex items-center justify-between text-left text-xs p-1"
+                        className="flex-1 flex items-center justify-between text-left text-xs p-1 cursor-pointer"
                       >
                         <div className="flex items-center gap-2 truncate pr-2.5">
                           <span
@@ -1283,20 +1347,39 @@ export default function PhotoEditor({
                           </div>
                         </div>
                       </button>
-                      {onEditProcedure && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingProcId(proc.id);
-                            setEditProcName(proc.name);
-                            setEditProcPrice(proc.price);
-                          }}
-                          className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-200 rounded transition-colors ml-1"
-                          title="Editar procedimento"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-                        </button>
+
+                      {/* Action buttons: Edit & Delete */}
+                      {(onEditProcedure || onDeleteProcedure) && (
+                        <div className="flex items-center gap-0.5 ml-1 flex-shrink-0">
+                          {onEditProcedure && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingProcId(proc.id);
+                                setEditProcName(proc.name);
+                                setEditProcPrice(proc.price);
+                              }}
+                              className="p-1 text-zinc-400 hover:text-[#4E1119] hover:bg-amber-100/50 rounded transition-colors cursor-pointer"
+                              title="Editar nome e valor"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          )}
+                          {onDeleteProcedure && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteProcedure(proc.id, proc.name);
+                              }}
+                              className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                              title="Apagar procedimento"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   );
