@@ -6,10 +6,9 @@ import {
   Download, 
   Loader2, 
   Check, 
-  Copy, 
   Edit3, 
   Eye, 
-  ShieldCheck
+  Printer
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { PatientData, ClinicSettings, TreatmentProposal } from '../types';
@@ -49,7 +48,7 @@ export interface DentalContractData {
   contractDate: string;
 
   // Status
-  status: 'aguardando_gov' | 'assinado';
+  status: 'impresso' | 'assinado' | 'aguardando_gov';
   signedFileUrl?: string;
   signedFileName?: string;
   signedAt?: string;
@@ -65,6 +64,69 @@ interface DentalContractModalProps {
   onContractGenerated?: (contract: DentalContractData) => void;
 }
 
+// Utilitário para conversão de valores em reais por extenso
+function numberToWordsBRL(num: number): string {
+  if (!num || num <= 0) return '';
+  const unidades = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+  const especiais = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+  const dezenas = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+  const centenas = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
+
+  const converterCentena = (n: number) => {
+    if (n === 100) return 'cem';
+    let res = '';
+    const c = Math.floor(n / 100);
+    const d = Math.floor((n % 100) / 10);
+    const u = n % 10;
+    if (c > 0) res += centenas[c];
+    if (d === 1) {
+      if (res) res += ' e ';
+      res += especiais[u];
+      return res;
+    }
+    if (d > 1) {
+      if (res) res += ' e ';
+      res += dezenas[d];
+    }
+    if (u > 0) {
+      if (res) res += ' e ';
+      res += unidades[u];
+    }
+    return res;
+  };
+
+  const inteiro = Math.floor(num);
+  const centavos = Math.round((num - inteiro) * 100);
+
+  const milhares = Math.floor(inteiro / 1000);
+  const resto = inteiro % 1000;
+
+  const partes: string[] = [];
+
+  if (milhares > 0) {
+    if (milhares === 1) {
+      partes.push('um mil');
+    } else {
+      partes.push(`${converterCentena(milhares)} mil`);
+    }
+  }
+
+  if (resto > 0) {
+    partes.push(converterCentena(resto));
+  }
+
+  let extenso = partes.join(resto > 0 && resto < 100 ? ' e ' : ' ');
+  if (inteiro === 1) extenso += ' real';
+  else if (inteiro > 1) extenso += ' reais';
+
+  if (centavos > 0) {
+    const centavosExtenso = converterCentena(centavos);
+    extenso += (inteiro > 0 ? ' e ' : '') + `${centavosExtenso} ${centavos === 1 ? 'centavo' : 'centavos'}`;
+  }
+
+  return extenso;
+}
+
 export default function DentalContractModal({
   patientName,
   patientData,
@@ -76,7 +138,7 @@ export default function DentalContractModal({
 }: DentalContractModalProps) {
   const [activeTab, setActiveTab] = useState<'preview' | 'edit'>('preview');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [copiedInstructions, setCopiedInstructions] = useState(false);
+  const [includeDentistSignature, setIncludeDentistSignature] = useState(true);
 
   // Formata valor inicial
   const initialValue = suggestedValue > 0 ? suggestedValue : (proposal?.customDiscountAmount || 0);
@@ -93,6 +155,8 @@ export default function DentalContractModal({
       pd.complement,
       pd.neighborhood
     ].filter(Boolean).join(' - ') || '';
+
+    const initialExtenso = initialValue > 0 ? ` (${numberToWordsBRL(initialValue)})` : '';
 
     return {
       id: `contrato_${Date.now()}`,
@@ -119,12 +183,12 @@ export default function DentalContractModal({
       guardianEmail: (pd as any).respEmail || '',
 
       totalAmount: initialValue,
-      totalAmountText: initialValue > 0 ? `R$ ${initialValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'A combinar',
+      totalAmountText: initialValue > 0 ? `R$ ${initialValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${initialExtenso}` : 'A combinar',
       paymentConditions: 'conforme datas e valores indicados no orçamento apresentado e aprovado que passa a fazer parte deste contrato como anexo',
 
       cityDate: `Belo Horizonte, ${formattedDate}`,
       contractDate: today.toISOString(),
-      status: 'aguardando_gov'
+      status: 'impresso'
     };
   });
 
@@ -444,53 +508,60 @@ export default function DentalContractModal({
       const col1X = margin;
       const col2X = margin + colWidth + 10;
 
-      // COLUNA 1: ASSINATURA DO PACIENTE / RESPONSÁVEL (COM CAMPO DESTACADO GOV.BR)
-      doc.setDrawColor(37, 99, 235); // Blue-600
-      doc.setLineDashPattern([2, 1], 0);
-      doc.setFillColor(243, 248, 255); // Soft blue tint
-      doc.roundedRect(col1X, currentY, colWidth, 34, 2, 2, 'FD');
-      doc.setLineDashPattern([], 0); // Reset
+      // ==========================================
+      // BLOCO DE ASSINATURAS (2 COLUNAS)
+      // ==========================================
+      const colWidth = (contentWidth - 10) / 2;
+      const col1X = margin;
+      const col2X = margin + colWidth + 10;
 
-      doc.setFontSize(7.5);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(37, 99, 235);
-      doc.text('ESPAÇO PARA ASSINATURA DIGITAL (GOV.BR)', col1X + (colWidth / 2), currentY + 6, { align: 'center' });
+      // COLUNA 1: ASSINATURA DO PACIENTE / RESPONSÁVEL (LINHA FÍSICA PARA CANETA)
+      doc.setDrawColor(80, 80, 80);
+      doc.setLineWidth(0.5);
+      doc.line(col1X + 5, currentY + 16, col1X + colWidth - 5, currentY + 16);
 
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(20, 20, 20);
-      doc.text(signerName || '________________________________', col1X + (colWidth / 2), currentY + 18, { align: 'center' });
+      doc.text(signerName || 'CONTRATANTE / PACIENTE', col1X + (colWidth / 2), currentY + 21, { align: 'center' });
 
       doc.setFontSize(7.5);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
-      doc.text(`CPF: ${signerCpf || '__________________'}`, col1X + (colWidth / 2), currentY + 23, { align: 'center' });
-      doc.text(signerRole, col1X + (colWidth / 2), currentY + 28, { align: 'center' });
+      doc.setTextColor(80, 80, 80);
+      doc.text(signerRole, col1X + (colWidth / 2), currentY + 25, { align: 'center' });
+      doc.text(`CPF: ${signerCpf || '__________________'}`, col1X + (colWidth / 2), currentY + 29, { align: 'center' });
 
-      // COLUNA 2: ASSINATURA AUTOMÁTICA DO DENTISTA
-      doc.setDrawColor(139, 0, 0); // Burgundy
-      doc.setFillColor(254, 252, 248);
-      doc.roundedRect(col2X, currentY, colWidth, 34, 2, 2, 'FD');
+      // COLUNA 2: ASSINATURA DO PROFISSIONAL
+      doc.setDrawColor(80, 80, 80);
+      doc.line(col2X + 5, currentY + 16, col2X + colWidth - 5, currentY + 16);
 
-      doc.setFontSize(7.5);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(139, 0, 0);
-      doc.text('ASSINATURA DIGITAL DO PROFISSIONAL', col2X + (colWidth / 2), currentY + 6, { align: 'center' });
+      if (includeDentistSignature) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(11);
+        doc.setTextColor(139, 0, 0); // Burgundy
+        doc.text('Dr. Agnaldo Ferreira', col2X + (colWidth / 2), currentY + 13, { align: 'center' });
 
-      // Rubrica estilizada
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(11);
-      doc.setTextColor(30, 30, 30);
-      doc.text('Dr. Agnaldo Ferreira', col2X + (colWidth / 2), currentY + 17, { align: 'center' });
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(60, 60, 60);
-      doc.text('Dr. Agnaldo Luiz Ferreira Junior', col2X + (colWidth / 2), currentY + 22, { align: 'center' });
-      doc.setFontSize(7);
-      doc.text('Cirurgião-Dentista • CRO-MG 58714', col2X + (colWidth / 2), currentY + 26, { align: 'center' });
-      doc.setTextColor(139, 0, 0);
-      doc.text('✓ Assinado e Certificado no Consultório', col2X + (colWidth / 2), currentY + 30, { align: 'center' });
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(20, 20, 20);
+        doc.text('Dr. Agnaldo Luiz Ferreira Junior', col2X + (colWidth / 2), currentY + 21, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(80, 80, 80);
+        doc.text('Cirurgião-Dentista • CRO-MG 58714', col2X + (colWidth / 2), currentY + 25, { align: 'center' });
+        doc.setTextColor(139, 0, 0);
+        doc.text('CONTRATADO', col2X + (colWidth / 2), currentY + 29, { align: 'center' });
+      } else {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(20, 20, 20);
+        doc.text('Dr. Agnaldo Luiz Ferreira Junior', col2X + (colWidth / 2), currentY + 21, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(80, 80, 80);
+        doc.text('Cirurgião-Dentista • CRO-MG 58714', col2X + (colWidth / 2), currentY + 25, { align: 'center' });
+        doc.text('Carimbo e Assinatura', col2X + (colWidth / 2), currentY + 29, { align: 'center' });
+      }
 
       currentY += 45;
 
@@ -525,6 +596,48 @@ export default function DentalContractModal({
     }
   };
 
+  // Impressão Direta na Impressora do Consultório (1 Clique)
+  const handleDirectPrint = async () => {
+    setIsGenerating(true);
+    try {
+      const { blob } = await generatePDF();
+      const blobUrl = URL.createObjectURL(blob);
+
+      if (onContractGenerated) {
+        onContractGenerated(formData);
+      }
+
+      let printIframe = document.getElementById('print-contract-iframe') as HTMLIFrameElement;
+      if (!printIframe) {
+        printIframe = document.createElement('iframe');
+        printIframe.id = 'print-contract-iframe';
+        printIframe.style.position = 'fixed';
+        printIframe.style.right = '0';
+        printIframe.style.bottom = '0';
+        printIframe.style.width = '0';
+        printIframe.style.height = '0';
+        printIframe.style.border = '0';
+        document.body.appendChild(printIframe);
+      }
+
+      printIframe.src = blobUrl;
+      printIframe.onload = () => {
+        setTimeout(() => {
+          try {
+            printIframe.contentWindow?.focus();
+            printIframe.contentWindow?.print();
+          } catch (e) {
+            window.open(blobUrl, '_blank')?.print();
+          }
+        }, 300);
+      };
+    } catch (e) {
+      alert('Erro ao enviar o contrato para a impressora. Tente novamente.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // Baixar PDF
   const handleDownloadPDF = async () => {
     try {
@@ -544,7 +657,7 @@ export default function DentalContractModal({
     }
   };
 
-  // Enviar WhatsApp com o link do GOV.BR
+  // Enviar WhatsApp (Cópia Digital de Cortesia para o Paciente)
   const handleSendWhatsApp = async () => {
     try {
       const { url, filename, blob } = await generatePDF();
@@ -553,24 +666,15 @@ export default function DentalContractModal({
         onContractGenerated(formData);
       }
 
-      // Mensagem direta e clara com o passo a passo do GOV.BR
       const recipientName = formData.hasGuardian && formData.guardianName ? formData.guardianName : formData.patientName;
       const cleanPhone = (formData.hasGuardian && formData.guardianPhone ? formData.guardianPhone : formData.phone).replace(/\D/g, '');
 
       const message = `Olá, *${recipientName}*! Tudo bem? Aqui é do consultório do *Dr. Agnaldo Ferreira*.
 
-Estamos enviando em anexo o seu *Contrato de Prestação de Serviços Odontológicos*.
+Estamos enviando para o seu arquivo pessoal uma cópia digital do seu *Contrato de Prestação de Serviços Odontológicos*.
 
-📲 *Como assinar pelo celular com o seu GOV.BR (Gratuito e Rápido):*
-1️⃣ Acesse o assinador oficial pelo celular: https://assinador.iti.br
-2️⃣ Entre com seu CPF e senha do GOV.BR (conta nível Prata ou Ouro).
-3️⃣ Toque em *"Escolher Arquivo"* e selecione o PDF do contrato que acabamos de enviar.
-4️⃣ Avance, posicione o retângulo da sua assinatura no campo *"ESPAÇO PARA ASSINATURA DIGITAL"* na última página e confirme.
-5️⃣ Baixe o contrato assinado e envie de volta aqui para o nosso WhatsApp!
+Qualquer dúvida durante o seu tratamento, estamos à sua inteira disposição!`;
 
-Qualquer dúvida durante o processo, estamos à sua disposição!`;
-
-      // Se suportar Web Share API em mobile, compartilha o arquivo e texto diretamente
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'application/pdf' })] })) {
         try {
           await navigator.share({
@@ -584,7 +688,6 @@ Qualquer dúvida durante o processo, estamos à sua disposição!`;
         }
       }
 
-      // Fallback: faz o download automático para o dentista/secretária e abre a conversa no WhatsApp
       const link = document.createElement('a');
       link.href = url;
       link.download = filename;
@@ -605,20 +708,6 @@ Qualquer dúvida durante o processo, estamos à sua disposição!`;
     }
   };
 
-  // Copiar instruções do GOV.BR
-  const handleCopyInstructions = () => {
-    const text = `📲 Como assinar seu contrato pelo celular com o GOV.BR:
-1. Acesse: https://assinador.iti.br
-2. Entre com sua conta GOV.BR (CPF e senha).
-3. Selecione o arquivo PDF do contrato.
-4. Posicione a assinatura no campo reservado na última página e clique em Assinar.
-5. Baixe o documento assinado e nos envie aqui no WhatsApp!`;
-
-    navigator.clipboard.writeText(text);
-    setCopiedInstructions(true);
-    setTimeout(() => setCopiedInstructions(false), 2500);
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-zinc-950/80 backdrop-blur-xs">
       <div className="bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden font-sans border border-zinc-200 w-full max-w-5xl h-[92vh]">
@@ -631,10 +720,10 @@ Qualquer dúvida durante o processo, estamos à sua disposição!`;
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-[#8B0000]">
-                Contrato Odontológico • Assinatura GOV.BR
+                Contrato Odontológico • Impressão e Assinatura
               </h2>
               <p className="text-xs text-zinc-500">
-                Qualificação completa, cláusulas protetivas e envio pelo WhatsApp
+                Qualificação completa, cláusulas protetivas e impressão física direta
               </p>
             </div>
           </div>
@@ -694,10 +783,11 @@ Qualquer dúvida durante o processo, estamos à sua disposição!`;
                       value={formData.totalAmount || ''}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value) || 0;
+                        const ext = val > 0 ? ` (${numberToWordsBRL(val)})` : '';
                         setFormData(prev => ({
                           ...prev,
                           totalAmount: val,
-                          totalAmountText: val > 0 ? `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'A combinar'
+                          totalAmountText: val > 0 ? `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${ext}` : 'A combinar'
                         }));
                       }}
                       placeholder="0,00"
@@ -707,7 +797,7 @@ Qualquer dúvida durante o processo, estamos à sua disposição!`;
 
                   <div>
                     <label className="block text-xs font-bold text-zinc-600 mb-1">
-                      Descrição / Valor por Extenso
+                      Descrição / Valor por Extenso (Gerado Automático)
                     </label>
                     <input
                       type="text"
@@ -729,6 +819,25 @@ Qualquer dúvida durante o processo, estamos à sua disposição!`;
                       placeholder="Ex: em 3x sem juros no cartão de crédito conforme orçamento anexo"
                       className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-300 focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20"
                     />
+                    {/* Presets Rápidos de Pagamento em 1 Clique */}
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {[
+                        'à vista no PIX com desconto',
+                        'em até 3x sem juros no cartão de crédito',
+                        'em até 6x sem juros no cartão de crédito',
+                        'em até 10x no cartão de crédito',
+                        'conforme orçamento apresentado e aprovado anexo'
+                      ].map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, paymentConditions: preset }))}
+                          className="px-2 py-0.5 bg-zinc-100 hover:bg-[#8B0000] text-zinc-700 hover:text-white rounded text-[11px] font-medium border border-zinc-200 transition-colors cursor-pointer"
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -869,8 +978,8 @@ Qualquer dúvida durante o processo, estamos à sua disposição!`;
                     </span>
                   </label>
                   {formData.hasGuardian && (
-                    <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-                      Assina via GOV.BR no lugar do paciente
+                    <span className="text-[11px] font-semibold text-zinc-700 bg-zinc-100 px-2.5 py-0.5 rounded border border-zinc-200">
+                      Assina fisicamente no lugar do paciente
                     </span>
                   )}
                 </div>
@@ -945,31 +1054,6 @@ Qualquer dúvida durante o processo, estamos à sua disposição!`;
           ) : (
             /* MODO PRÉVIA DO CONTRATO */
             <div className="max-w-3xl mx-auto space-y-4">
-              
-              {/* Card de Orientação do GOV.BR */}
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold text-blue-950">
-                      Assinatura Digital GOV.BR (Nível Prata ou Ouro)
-                    </p>
-                    <p className="text-blue-700 mt-0.5">
-                      Quem assinará pelo celular: <strong className="text-blue-900">{signerName || 'Paciente'}</strong> (CPF: {signerCpf || 'Não informado'})
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleCopyInstructions}
-                  className="px-3 py-1.5 bg-white border border-blue-300 rounded-xl text-blue-800 font-semibold text-[11px] hover:bg-blue-100 transition-colors flex items-center gap-1.5 shrink-0"
-                >
-                  {copiedInstructions ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedInstructions ? 'Instruções Copiadas!' : 'Copiar Roteiro'}
-                </button>
-              </div>
-
               {/* Simulação Visual da Folha de Papel do Contrato */}
               <div className="bg-white rounded-2xl shadow-md border border-zinc-200 p-8 text-zinc-800 font-serif leading-relaxed text-xs sm:text-[13px] space-y-6">
                 
@@ -1051,18 +1135,19 @@ Qualquer dúvida durante o processo, estamos à sua disposição!`;
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-sans">
-                    {/* Paciente GOV.BR */}
-                    <div className="p-4 rounded-2xl border-2 border-dashed border-blue-400 bg-blue-50/50 text-center flex flex-col justify-between min-h-[120px]">
-                      <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">
-                        Assinatura Digital (GOV.BR)
+                    {/* Paciente / Contratante */}
+                    <div className="p-4 rounded-2xl border border-zinc-200 bg-[#FAF8F5] text-center flex flex-col justify-between min-h-[120px]">
+                      <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">
+                        Assinatura do Paciente / Contratante
                       </span>
                       <div className="my-2">
+                        <div className="w-3/4 mx-auto border-b border-zinc-400 mb-2 mt-4"></div>
                         <p className="font-bold text-xs text-zinc-900">{signerName || 'Nome do Assinante'}</p>
                         <p className="text-[11px] text-zinc-500">CPF: {signerCpf || '000.000.000-00'}</p>
                         <p className="text-[10px] text-zinc-400">{signerRole}</p>
                       </div>
-                      <span className="text-[9px] text-blue-600 italic">
-                        Posicione o selo do GOV.BR neste campo no assinador.iti.br
+                      <span className="text-[9px] text-zinc-500 italic">
+                        Assinatura física com caneta no papel
                       </span>
                     </div>
 
@@ -1072,12 +1157,22 @@ Qualquer dúvida durante o processo, estamos à sua disposição!`;
                         Assinatura do Profissional
                       </span>
                       <div className="my-2">
-                        <p className="font-serif italic text-sm text-zinc-900 font-bold">Dr. Agnaldo Ferreira</p>
-                        <p className="text-xs font-bold text-zinc-800">Dr. Agnaldo Luiz Ferreira Junior</p>
-                        <p className="text-[11px] text-zinc-500">Cirurgião-Dentista • CRO-MG 58714</p>
+                        {includeDentistSignature ? (
+                          <>
+                            <p className="font-serif italic text-sm text-zinc-900 font-bold">Dr. Agnaldo Ferreira</p>
+                            <p className="text-xs font-bold text-zinc-800">Dr. Agnaldo Luiz Ferreira Junior</p>
+                            <p className="text-[11px] text-zinc-500">Cirurgião-Dentista • CRO-MG 58714</p>
+                          </>
+                        ) : (
+                          <div className="my-2">
+                            <div className="w-3/4 mx-auto border-b border-zinc-400 mb-2 mt-4"></div>
+                            <p className="text-xs font-bold text-zinc-800">Dr. Agnaldo Luiz Ferreira Junior</p>
+                            <p className="text-[10px] text-zinc-500">Carimbo e Assinatura Física</p>
+                          </div>
+                        )}
                       </div>
-                      <span className="text-[9px] text-emerald-700 font-semibold">
-                        ✓ Assinado e Certificado no Consultório
+                      <span className={`text-[9px] font-semibold ${includeDentistSignature ? 'text-emerald-700' : 'text-zinc-500'}`}>
+                        {includeDentistSignature ? '✓ Assinatura e Carimbo Pré-impressos' : 'Assinatura a caneta com carimbo'}
                       </span>
                     </div>
                   </div>
@@ -1090,17 +1185,33 @@ Qualquer dúvida durante o processo, estamos à sua disposição!`;
 
         {/* Bottom Footer Actions */}
         <div className="p-4 border-t border-zinc-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-          <div className="text-xs text-zinc-500 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            Assinatura do Dr. Agnaldo já incluída automaticamente no PDF
-          </div>
+          <label className="flex items-center gap-2 cursor-pointer font-medium text-zinc-700 select-none text-xs hover:text-zinc-900">
+            <input
+              type="checkbox"
+              checked={includeDentistSignature}
+              onChange={(e) => setIncludeDentistSignature(e.target.checked)}
+              className="w-4 h-4 text-[#8B0000] rounded focus:ring-[#8B0000] cursor-pointer"
+            />
+            <span>Assinatura/Carimbo do Dr. Agnaldo já impressos</span>
+          </label>
 
           <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
             <button
               type="button"
+              onClick={handleDirectPrint}
+              disabled={isGenerating}
+              className="w-full sm:w-auto px-6 py-2.5 bg-[#8B0000] text-white font-bold text-xs rounded-xl hover:bg-[#6e0000] transition-all shadow-sm hover:shadow flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              title="Enviar diretamente para a impressora do consultório"
+            >
+              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4 text-[#C09553]" />}
+              Imprimir Contrato
+            </button>
+
+            <button
+              type="button"
               onClick={handleDownloadPDF}
               disabled={isGenerating}
-              className="w-full sm:w-auto px-5 py-2.5 bg-zinc-100 text-zinc-800 font-bold text-xs rounded-xl hover:bg-zinc-200 border border-zinc-300 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2.5 bg-zinc-100 text-zinc-800 font-bold text-xs rounded-xl hover:bg-zinc-200 border border-zinc-300 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
               Baixar Contrato (PDF)
@@ -1110,10 +1221,10 @@ Qualquer dúvida durante o processo, estamos à sua disposição!`;
               type="button"
               onClick={handleSendWhatsApp}
               disabled={isGenerating}
-              className="w-full sm:w-auto px-5 py-2.5 bg-[#25D366] text-white font-bold text-xs rounded-xl hover:bg-[#1ebd5b] transition-all shadow-sm hover:shadow flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2.5 bg-[#25D366] text-white font-bold text-xs rounded-xl hover:bg-[#1ebd5b] transition-all shadow-sm hover:shadow flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
-              Baixar e Enviar no WhatsApp + GOV.BR
+              Enviar no WhatsApp
             </button>
           </div>
         </div>

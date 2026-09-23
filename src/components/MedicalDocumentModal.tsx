@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, FileText, Smartphone, Download, Loader2, Sparkles, ChevronRight, Plus } from 'lucide-react';
+import { X, FileText, Smartphone, Download, Loader2, Sparkles, ChevronRight, Plus, Printer, Check } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { PatientData, ClinicSettings } from '../types';
 
@@ -125,6 +125,70 @@ export default function MedicalDocumentModal({
   const [aiError, setAiError] = useState('');
   const [arrivalTime, setArrivalTime] = useState(initialArrivalTime || '');
   const [departureTime, setDepartureTime] = useState(initialDepartureTime || '');
+  
+  // Opções para impressão física no consultório
+  const [includeDigitalSignature, setIncludeDigitalSignature] = useState(true);
+  const [printTwoCopies, setPrintTwoCopies] = useState(false);
+
+  const COMMON_CIDS = [
+    { code: 'K01.1', label: 'Siso / Dente Incluso (K01.1)' },
+    { code: 'K04.0', label: 'Pulpite / Canal (K04.0)' },
+    { code: 'K04.7', label: 'Abscesso Periapical (K04.7)' },
+    { code: 'K05.3', label: 'Periodontite (K05.3)' },
+    { code: 'Z01.2', label: 'Consulta de Rotina (Z01.2)' },
+    { code: 'Z54.0', label: 'Pós-Cirúrgico (Z54.0)' }
+  ];
+
+  const setNowAsDeparture = () => {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    setDepartureTime(`${hh}:${mm}`);
+  };
+
+  const setArrivalFromDeparture = (minutesAgo: number) => {
+    let baseDate = new Date();
+    if (departureTime && departureTime.includes(':')) {
+      const [h, m] = departureTime.split(':').map(Number);
+      if (!isNaN(h) && !isNaN(m)) {
+        baseDate = new Date();
+        baseDate.setHours(h, m, 0, 0);
+      }
+    } else {
+      setNowAsDeparture();
+    }
+    const arrivalDate = new Date(baseDate.getTime() - minutesAgo * 60000);
+    const hh = String(arrivalDate.getHours()).padStart(2, '0');
+    const mm = String(arrivalDate.getMinutes()).padStart(2, '0');
+    setArrivalTime(`${hh}:${mm}`);
+  };
+
+  const setQuickRestDays = (days: number, isToday?: boolean) => {
+    if (days === 0) {
+      setAtestadoOptions({
+        retornarAtividades: true,
+        repousoHoje: false,
+        repousoDias: false,
+        acompanhante: false
+      });
+    } else if (isToday) {
+      setDaysOfRest('1');
+      setAtestadoOptions({
+        retornarAtividades: false,
+        repousoHoje: true,
+        repousoDias: false,
+        acompanhante: false
+      });
+    } else {
+      setDaysOfRest(String(days));
+      setAtestadoOptions({
+        retornarAtividades: false,
+        repousoHoje: false,
+        repousoDias: true,
+        acompanhante: false
+      });
+    }
+  };
 
   const handleSuggestPrescription = async () => {
     if (!procedureInput) return;
@@ -159,7 +223,7 @@ export default function MedicalDocumentModal({
         format: 'a4'
       });
 
-      // 1. Draw the AF logo (SVG -> PNG -> jsPDF)
+      // 1. Carrega o logo AF em SVG -> PNG
       const afSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="300" height="300">
         <path d="M50 10 L20 80 L35 80 L50 40 L65 80 L80 80 Z M30 65 L70 65" stroke="#8A1F27" stroke-width="4" fill="none" />
         <path d="M50 10 L50 90 M50 50 L75 50 M50 25 L70 25" stroke="#8A1F27" stroke-width="4" fill="none" />
@@ -185,120 +249,151 @@ export default function MedicalDocumentModal({
         img.src = svgBase64;
       });
 
-      if (imgData) {
-        doc.addImage(imgData, 'PNG', 85, 10, 40, 40); // centered top
-        
-        // Draw the watermarks on the right edge
-        doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
-        for (let i = 0; i < 12; i++) {
-          doc.addImage(imgData, 'PNG', 190, 10 + (i * 22), 10, 10);
+      const renderDocumentPage = (viaLabel?: string) => {
+        if (viaLabel) {
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(120, 120, 120);
+          doc.text(`[ ${viaLabel} ]`, 195, 12, { align: 'right' });
         }
-        doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
+
+        if (imgData) {
+          doc.addImage(imgData, 'PNG', 85, 10, 40, 40); // centered top
+          
+          // Draw subtle watermarks on the right edge
+          doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
+          for (let i = 0; i < 12; i++) {
+            doc.addImage(imgData, 'PNG', 190, 10 + (i * 22), 10, 10);
+          }
+          doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
+        }
+
+        // 2. Main Title (DR. AGNALDO FERREIRA)
+        doc.setTextColor(138, 31, 39); // #8A1F27
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        const docName = clinicSettings.doctorName || 'DR. AGNALDO FERREIRA';
+        doc.text(docName.toUpperCase(), 105, 55, { align: 'center', charSpace: 1.5 });
+        
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.text((clinicSettings.doctorRole || 'CIRURGIÃO DENTISTA').toUpperCase(), 105, 60, { align: 'center', charSpace: 1 });
+        doc.text(clinicSettings.cro || 'CRO-MG 58714', 105, 64, { align: 'center', charSpace: 1 });
+
+        // 3. Document Type & Body
+        doc.setFontSize(18);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(0, 0, 0); // Black
+        if (type === 'atestado') {
+          doc.text('ATESTADO', 105, 80, { align: 'center', charSpace: 2 });
+        } else if (type === 'declaracao') {
+          doc.setFontSize(15);
+          doc.text('DECLARAÇÃO DE COMPARECIMENTO', 105, 80, { align: 'center', charSpace: 1 });
+        } else {
+          doc.text('RECEITUÁRIO', 105, 80, { align: 'center', charSpace: 2 });
+        }
+
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "normal");
+
+        if (type === 'atestado' || type === 'declaracao') {
+           const prefix = type === 'atestado' ? 'Atesto que o(a) paciente ' : 'Declaro que o(a) paciente ';
+           const today = new Date().toLocaleDateString('pt-BR');
+           const paragraphText = `${prefix}${patientName || '__________________________________________'}, esteve neste consultório recebendo atendimento odontológico no período das ${arrivalTime || '___:___'} às ${departureTime || '___:___'} horas, do dia ${today}${type === 'declaracao' ? ' devendo retornar as suas atividades normais.' : '.'}`;
+           
+           const splitParagraph = doc.splitTextToSize(paragraphText, 170);
+           doc.text(splitParagraph, 20, 100);
+
+           if (type === 'atestado') {
+             // Checkboxes
+             const boxYStart = 125 + (splitParagraph.length * 6);
+             const boxSize = 3;
+             
+             doc.setLineWidth(0.3);
+             
+             // Retornar as atividades normais.
+             if (atestadoOptions.retornarAtividades) {
+                 doc.setFillColor(0, 0, 0);
+                 doc.rect(20, boxYStart, boxSize, boxSize, 'F');
+             } else {
+                 doc.rect(20, boxYStart, boxSize, boxSize);
+             }
+             doc.text('Retornar as atividades normais.', 25, boxYStart + 2.5);
+             
+             // Permanecer em repouso hoje.
+             if (atestadoOptions.repousoHoje) {
+                 doc.setFillColor(0, 0, 0);
+                 doc.rect(20, boxYStart + 10, boxSize, boxSize, 'F');
+             } else {
+                 doc.rect(20, boxYStart + 10, boxSize, boxSize);
+             }
+             doc.text('Permanecer em repouso hoje.', 25, boxYStart + 12.5);
+             
+             // Permanecer em repouso ___ dias
+             if (atestadoOptions.repousoDias) {
+                 doc.setFillColor(0, 0, 0);
+                 doc.rect(20, boxYStart + 20, boxSize, boxSize, 'F');
+             } else {
+                 doc.rect(20, boxYStart + 20, boxSize, boxSize);
+             }
+             const parsedDays = parseInt(daysOfRest) || 0;
+             doc.text(`Permanecer em repouso ${parsedDays > 0 ? parsedDays : '___'} dias a partir desta data.`, 25, boxYStart + 22.5);
+             
+             // Acompanhante.
+             if (atestadoOptions.acompanhante) {
+                 doc.setFillColor(0, 0, 0);
+                 doc.rect(20, boxYStart + 30, boxSize, boxSize, 'F');
+             } else {
+                 doc.rect(20, boxYStart + 30, boxSize, boxSize);
+             }
+             doc.text('Acompanhante.', 25, boxYStart + 32.5);
+     
+             doc.text(`CID: ${cid || '________________'}`, 20, boxYStart + 50);
+           }
+
+        } else {
+           const splitContent = doc.splitTextToSize(content, 170);
+           doc.text(splitContent, 20, 100);
+        }
+
+        // 4. Signature
+        const bottomY = 240;
+        doc.setLineWidth(0.5);
+        doc.line(65, bottomY, 145, bottomY);
+        
+        if (includeDigitalSignature) {
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(30, 30, 30);
+          doc.text(clinicSettings.doctorName || 'Dr. Agnaldo Ferreira', 105, bottomY + 5, { align: 'center' });
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(100, 100, 100);
+          doc.text(`${clinicSettings.doctorRole || 'Cirurgião Dentista'} • ${clinicSettings.cro || 'CRO-MG 58714'}`, 105, bottomY + 9, { align: 'center' });
+        } else {
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(80, 80, 80);
+          doc.text("Assinatura e Carimbo", 105, bottomY + 5, { align: 'center' });
+        }
+
+        // 5. Footer (Red contact line)
+        doc.setTextColor(138, 31, 39); // #8A1F27
+        doc.setFontSize(9);
+        doc.text(clinicSettings.address, 105, 275, { align: 'center' });
+        
+        const phoneLine = `(31) 98513-1303   dragnaldof@gmail.com   @dr.agnaldoferreira`;
+        doc.text(phoneLine, 105, 280, { align: 'center' });
+      };
+
+      // Renderiza 1ª Via
+      renderDocumentPage(printTwoCopies ? '1ª VIA - PACIENTE' : undefined);
+
+      // Se selecionou 2 Vias, gera a segunda página
+      if (printTwoCopies) {
+        doc.addPage();
+        renderDocumentPage(type === 'receituario' ? '2ª VIA - FARMÁCIA / CLÍNICA' : '2ª VIA - CLÍNICA / ARQUIVO');
       }
-
-      // 2. Main Title (DR. AGNALDO FERREIRA)
-      doc.setTextColor(138, 31, 39); // #8A1F27
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      const docName = clinicSettings.doctorName || 'DR. AGNALDO FERREIRA';
-      doc.text(docName.toUpperCase(), 105, 55, { align: 'center', charSpace: 1.5 });
-      
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.text((clinicSettings.doctorRole || 'CIRURGIÃO DENTISTA').toUpperCase(), 105, 60, { align: 'center', charSpace: 1 });
-      doc.text(clinicSettings.cro || 'CRO-MG 58714', 105, 64, { align: 'center', charSpace: 1 });
-
-      // 3. Document Type & Body
-      doc.setFontSize(18);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(0, 0, 0); // Black
-      if (type === 'atestado') {
-        doc.text('ATESTADO', 105, 80, { align: 'center', charSpace: 2 });
-      } else if (type === 'declaracao') {
-        doc.setFontSize(15);
-        doc.text('DECLARAÇÃO DE COMPARECIMENTO', 105, 80, { align: 'center', charSpace: 1 });
-      } else {
-        doc.text('RECEITUÁRIO', 105, 80, { align: 'center', charSpace: 2 });
-      }
-
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "normal");
-
-      if (type === 'atestado' || type === 'declaracao') {
-         const prefix = type === 'atestado' ? 'Atesto que o(a) paciente ' : 'Declaro que o(a) paciente ';
-         const today = new Date().toLocaleDateString('pt-BR');
-         const paragraphText = `${prefix}${patientName || '__________________________________________'}, esteve neste consultório recebendo atendimento odontológico no período das ${arrivalTime || '___:___'} às ${departureTime || '___:___'} horas, do dia ${today}${type === 'declaracao' ? ' devendo retornar as suas atividades normais.' : '.'}`;
-         
-         const splitParagraph = doc.splitTextToSize(paragraphText, 170);
-         doc.text(splitParagraph, 20, 100);
-
-         if (type === 'atestado') {
-           // Checkboxes
-           const boxYStart = 125 + (splitParagraph.length * 6);
-           const boxSize = 3;
-           
-           doc.setLineWidth(0.3);
-           
-           // Retornar as atividades normais.
-           if (atestadoOptions.retornarAtividades) {
-               doc.setFillColor(0, 0, 0);
-               doc.rect(20, boxYStart, boxSize, boxSize, 'F');
-           } else {
-               doc.rect(20, boxYStart, boxSize, boxSize);
-           }
-           doc.text('Retornar as atividades normais.', 25, boxYStart + 2.5);
-           
-           // Permanecer em repouso hoje.
-           if (atestadoOptions.repousoHoje) {
-               doc.setFillColor(0, 0, 0);
-               doc.rect(20, boxYStart + 10, boxSize, boxSize, 'F');
-           } else {
-               doc.rect(20, boxYStart + 10, boxSize, boxSize);
-           }
-           doc.text('Permanecer em repouso hoje.', 25, boxYStart + 12.5);
-           
-           // Permanecer em repouso ___ dias
-           if (atestadoOptions.repousoDias) {
-               doc.setFillColor(0, 0, 0);
-               doc.rect(20, boxYStart + 20, boxSize, boxSize, 'F');
-           } else {
-               doc.rect(20, boxYStart + 20, boxSize, boxSize);
-           }
-           const parsedDays = parseInt(daysOfRest) || 0;
-           doc.text(`Permanecer em repouso ${parsedDays > 0 ? parsedDays : '___'} dias a partir desta data.`, 25, boxYStart + 22.5);
-           
-           // Acompanhante.
-           if (atestadoOptions.acompanhante) {
-               doc.setFillColor(0, 0, 0);
-               doc.rect(20, boxYStart + 30, boxSize, boxSize, 'F');
-           } else {
-               doc.rect(20, boxYStart + 30, boxSize, boxSize);
-           }
-           doc.text('Acompanhante.', 25, boxYStart + 32.5);
-  
-           doc.text(`CID: ${cid || '________________'}`, 20, boxYStart + 50);
-         }
-
-      } else {
-         const splitContent = doc.splitTextToSize(content, 170);
-         doc.text(splitContent, 20, 100);
-      }
-
-      // 4. Signature
-      const bottomY = 240;
-      doc.setLineWidth(0.5);
-      doc.line(65, bottomY, 145, bottomY);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text("Assinatura", 105, bottomY + 5, { align: 'center' });
-
-      // 5. Footer (Red contact line)
-      doc.setTextColor(138, 31, 39); // #8A1F27
-      doc.setFontSize(9);
-      doc.text(clinicSettings.address, 105, 275, { align: 'center' });
-      
-      const phoneLine = `(31) 98513-1303   dragnaldof@gmail.com   @dr.agnaldoferreira`;
-      doc.text(phoneLine, 105, 280, { align: 'center' });
 
       // Output Blob
       const pdfBlob = doc.output('blob');
@@ -310,6 +405,49 @@ export default function MedicalDocumentModal({
     } catch (err) {
       console.error("PDF Gen Error:", err);
       throw err;
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Impressão Direta na Impressora do Consultório (1 Clique)
+  const handleDirectPrint = async () => {
+    setIsGenerating(true);
+    try {
+      const { blob } = await generatePDF();
+      const blobUrl = URL.createObjectURL(blob);
+
+      let printIframe = document.getElementById('print-doc-iframe') as HTMLIFrameElement;
+      if (!printIframe) {
+        printIframe = document.createElement('iframe');
+        printIframe.id = 'print-doc-iframe';
+        printIframe.style.position = 'fixed';
+        printIframe.style.right = '0';
+        printIframe.style.bottom = '0';
+        printIframe.style.width = '0';
+        printIframe.style.height = '0';
+        printIframe.style.border = '0';
+        document.body.appendChild(printIframe);
+      }
+
+      printIframe.src = blobUrl;
+      printIframe.onload = () => {
+        setTimeout(() => {
+          try {
+            printIframe.contentWindow?.focus();
+            printIframe.contentWindow?.print();
+          } catch (e) {
+            window.open(blobUrl, '_blank')?.print();
+          }
+        }, 300);
+      };
+
+      if (type === 'declaracao' && onEmit) {
+        onEmit({ arrivalTime, departureTime });
+      }
+    } catch (err) {
+      console.error("Print Error:", err);
+      alert("Erro ao enviar para impressão. Tente novamente.");
     } finally {
       setIsGenerating(false);
     }
@@ -399,28 +537,68 @@ export default function MedicalDocumentModal({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Horário de Chegada</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-zinc-500 uppercase">Horário de Chegada</label>
+                  </div>
                   <input
                     type="time"
                     value={arrivalTime}
                     onChange={(e) => setArrivalTime(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-zinc-300 focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20"
+                    className="w-full p-2.5 rounded-xl border border-zinc-300 focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20 text-sm font-semibold"
                   />
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setArrivalFromDeparture(30)}
+                      className="px-2 py-0.5 bg-zinc-100 hover:bg-[#C09553]/20 text-zinc-700 hover:text-[#4E1119] rounded text-[11px] font-semibold border border-zinc-200 transition-colors"
+                      title="Chegou 30 minutos antes"
+                    >
+                      -30 min
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setArrivalFromDeparture(60)}
+                      className="px-2 py-0.5 bg-zinc-100 hover:bg-[#C09553]/20 text-zinc-700 hover:text-[#4E1119] rounded text-[11px] font-semibold border border-zinc-200 transition-colors"
+                      title="Chegou 1 hora antes"
+                    >
+                      -1 hora
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setArrivalFromDeparture(120)}
+                      className="px-2 py-0.5 bg-zinc-100 hover:bg-[#C09553]/20 text-zinc-700 hover:text-[#4E1119] rounded text-[11px] font-semibold border border-zinc-200 transition-colors"
+                      title="Chegou 2 horas antes"
+                    >
+                      -2 horas
+                    </button>
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Horário de Saída</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-zinc-500 uppercase">Horário de Saída</label>
+                  </div>
                   <input
                     type="time"
                     value={departureTime}
                     onChange={(e) => setDepartureTime(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-zinc-300 focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20"
+                    className="w-full p-2.5 rounded-xl border border-zinc-300 focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20 text-sm font-semibold"
                   />
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <button
+                      type="button"
+                      onClick={setNowAsDeparture}
+                      className="px-2.5 py-0.5 bg-[#4E1119] hover:bg-[#380c12] text-white rounded text-[11px] font-bold transition-colors shadow-2xs"
+                      title="Definir horário atual como saída"
+                    >
+                      Agora
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {type === 'atestado' && (
                 <>
-                  <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                     <div>
                       <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Dias de Repouso</label>
                       <input
@@ -428,8 +606,29 @@ export default function MedicalDocumentModal({
                         min="0"
                         value={daysOfRest}
                         onChange={(e) => setDaysOfRest(e.target.value)}
-                        className="w-full p-2.5 rounded-xl border border-zinc-300 focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20"
+                        className="w-full p-2.5 rounded-xl border border-zinc-300 focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20 text-sm font-semibold"
                       />
+                      {/* Chips de Repouso Rápido */}
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {[
+                          { label: 'Hoje', days: 1, isToday: true },
+                          { label: '1 dia', days: 1 },
+                          { label: '2 dias', days: 2 },
+                          { label: '3 dias', days: 3 },
+                          { label: '5 dias', days: 5 },
+                          { label: '7 dias', days: 7 },
+                          { label: '14 dias', days: 14 }
+                        ].map((chip, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setQuickRestDays(chip.days, chip.isToday)}
+                            className="px-2 py-0.5 bg-zinc-100 hover:bg-[#4E1119] text-zinc-700 hover:text-white rounded text-[11px] font-bold border border-zinc-200 transition-colors cursor-pointer"
+                          >
+                            {chip.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">CID (Opcional)</label>
@@ -438,8 +637,22 @@ export default function MedicalDocumentModal({
                         placeholder="Ex: K04.0"
                         value={cid}
                         onChange={(e) => setCid(e.target.value)}
-                        className="w-full p-2.5 rounded-xl border border-zinc-300 focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20"
+                        className="w-full p-2.5 rounded-xl border border-zinc-300 focus:border-[#C09553] focus:ring focus:ring-[#C09553]/20 text-sm font-semibold"
                       />
+                      {/* Chips de CIDs Odontológicos Comuns */}
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {COMMON_CIDS.map(c => (
+                          <button
+                            key={c.code}
+                            type="button"
+                            onClick={() => setCid(c.code)}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border transition-colors cursor-pointer ${cid === c.code ? 'bg-[#4E1119] text-white border-[#4E1119]' : 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-[#C09553]/20'}`}
+                            title={c.label}
+                          >
+                            {c.code}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   
@@ -581,25 +794,64 @@ export default function MedicalDocumentModal({
           )}
         </div>
 
-        <div className="p-4 border-t border-zinc-100 bg-zinc-50 flex flex-col sm:flex-row items-center gap-3 justify-end shrink-0">
-          <button
-            onClick={handleDownload}
-              disabled={isGenerating}
-              className="w-full sm:w-auto px-5 py-2.5 bg-zinc-100 text-zinc-800 font-bold rounded-xl hover:bg-zinc-200 border border-zinc-300 transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              Baixar PDF
-            </button>
+        {/* Barra de Opções para Impressão Física no Consultório */}
+        <div className="px-6 py-2.5 bg-[#FAF8F5] border-t border-zinc-200 flex flex-wrap items-center justify-between gap-4 text-xs shrink-0">
+          <div className="flex flex-wrap items-center gap-5">
+            <label className="flex items-center gap-2 cursor-pointer font-medium text-zinc-700 select-none hover:text-zinc-900">
+              <input
+                type="checkbox"
+                checked={includeDigitalSignature}
+                onChange={(e) => setIncludeDigitalSignature(e.target.checked)}
+                className="w-4 h-4 text-[#4E1119] rounded focus:ring-[#4E1119] cursor-pointer"
+              />
+              <span>Assinatura/Carimbo do Dr. Agnaldo já impressos</span>
+            </label>
 
-            <button
-              onClick={handleSendWhatsApp}
-              disabled={isGenerating}
-              className="w-full sm:w-auto px-5 py-2.5 bg-[#25D366] text-white font-bold rounded-xl hover:bg-[#128C7E] transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
-              Baixar e Enviar WhatsApp
-            </button>
+            <label className="flex items-center gap-2 cursor-pointer font-medium text-zinc-700 select-none hover:text-zinc-900">
+              <input
+                type="checkbox"
+                checked={printTwoCopies}
+                onChange={(e) => setPrintTwoCopies(e.target.checked)}
+                className="w-4 h-4 text-[#4E1119] rounded focus:ring-[#4E1119] cursor-pointer"
+              />
+              <span>Imprimir em 2 Vias (1ª Via Paciente / 2ª Via Arquivo ou Farmácia)</span>
+            </label>
           </div>
+          <span className="text-[11px] text-zinc-400 font-medium">Otimizado para Folha A4 Comum</span>
+        </div>
+
+        <div className="p-4 border-t border-zinc-200 bg-white flex flex-col sm:flex-row items-center gap-3 justify-end shrink-0">
+          <button
+            type="button"
+            onClick={handleDirectPrint}
+            disabled={isGenerating}
+            className="w-full sm:w-auto px-6 py-2.5 bg-[#4E1119] text-white font-bold rounded-xl hover:bg-[#380c12] transition-all shadow-sm hover:shadow flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            title="Enviar diretamente para a impressora do consultório"
+          >
+            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4 text-[#C09553]" />}
+            Imprimir Agora
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={isGenerating}
+            className="w-full sm:w-auto px-4 py-2.5 bg-zinc-100 text-zinc-700 font-bold rounded-xl hover:bg-zinc-200 border border-zinc-300 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Baixar PDF
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSendWhatsApp}
+            disabled={isGenerating}
+            className="w-full sm:w-auto px-4 py-2.5 bg-[#25D366] text-white font-bold rounded-xl hover:bg-[#128C7E] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
+            WhatsApp
+          </button>
+        </div>
       </div>
     </div>
   );
