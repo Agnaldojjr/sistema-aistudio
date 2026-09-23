@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePlanning3D } from '../hooks/usePlanning3D';
 import { calculateBudget } from '../services/budgetEngine';
 import { usePatientContext } from '../../context/PatientContext';
+import { saveBudgetLocally, uploadBudgetToCloud } from '../../services/budgetSyncService';
 import { jsPDF } from 'jspdf';
 import { Coins, Calendar, Printer, Trash2, PlusCircle, Pencil, Check, X, ChevronDown } from 'lucide-react';
 
@@ -48,6 +49,46 @@ export function BudgetPanel3D() {
     paymentMethod === 'CREDIT_CARD' ? installmentsCount : 1,
     paymentMethod
   );
+
+  // Auto-Save Local Imediato (0s) + Upload com Debounce na Nuvem (Opções A, B e A)
+  const [syncStatus3D, setSyncStatus3D] = useState<'idle' | 'saved_local' | 'syncing' | 'synced'>('idle');
+  const timer3DRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!selectedPatient?.id || procedures.length === 0) return;
+
+    const patientId = selectedPatient.id;
+    const patientName = selectedPatient.name || activeProposal?.patientName || 'Paciente';
+    const filename = 'orcamento_3d_ativo.json';
+
+    const statePayload = {
+      procedures,
+      teeth,
+      budget,
+      paymentMethod,
+      discountType,
+      discountValue,
+      installmentsCount,
+      timestamp: Date.now()
+    };
+
+    // 1. Salvamento local imediato (0s)
+    const { jsonStr } = saveBudgetLocally(patientId, patientName, filename, statePayload as any);
+    setSyncStatus3D('saved_local');
+
+    // 2. Debounce na nuvem (2.5s)
+    if (timer3DRef.current) clearTimeout(timer3DRef.current);
+    timer3DRef.current = setTimeout(async () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+      setSyncStatus3D('syncing');
+      const res = await uploadBudgetToCloud(patientId, filename, jsonStr);
+      if (res.success) setSyncStatus3D('synced');
+    }, 2500);
+
+    return () => {
+      if (timer3DRef.current) clearTimeout(timer3DRef.current);
+    };
+  }, [procedures, paymentMethod, discountType, discountValue, installmentsCount, selectedPatient?.id]);
 
   const startEditing = (proc: { id: string; procedure: string; price: number }) => {
     setEditingId(proc.id);
@@ -238,9 +279,26 @@ export function BudgetPanel3D() {
   return (
     <div className="flex flex-col gap-5 text-white">
       {/* Cabeçalho */}
-      <div className="flex items-center gap-2 text-sky-400 font-bold uppercase tracking-wider text-xs border-b border-slate-800 pb-3">
-        <Coins className="w-4 h-4" />
-        <span>Motor Financeiro Integrado</span>
+      <div className="flex items-center justify-between text-sky-400 font-bold uppercase tracking-wider text-xs border-b border-slate-800 pb-3">
+        <div className="flex items-center gap-2">
+          <Coins className="w-4 h-4" />
+          <span>Motor Financeiro Integrado</span>
+        </div>
+        {syncStatus3D === 'saved_local' && (
+          <span className="text-[10px] text-amber-400/90 font-medium normal-case flex items-center gap-1">
+            💾 salvo local...
+          </span>
+        )}
+        {syncStatus3D === 'syncing' && (
+          <span className="text-[10px] text-sky-300 font-medium normal-case animate-pulse flex items-center gap-1">
+            ☁️ enviando nuvem...
+          </span>
+        )}
+        {syncStatus3D === 'synced' && (
+          <span className="text-[10px] text-emerald-400 font-medium normal-case flex items-center gap-1">
+            <Check className="w-3 h-3" /> nuvem sincronizada
+          </span>
+        )}
       </div>
 
       {/* ═══ LISTA EDITÁVEL DE PROCEDIMENTOS ═══ */}

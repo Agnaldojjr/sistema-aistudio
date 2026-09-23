@@ -508,13 +508,6 @@ export default function DentalContractModal({
       const col1X = margin;
       const col2X = margin + colWidth + 10;
 
-      // ==========================================
-      // BLOCO DE ASSINATURAS (2 COLUNAS)
-      // ==========================================
-      const colWidth = (contentWidth - 10) / 2;
-      const col1X = margin;
-      const col2X = margin + colWidth + 10;
-
       // COLUNA 1: ASSINATURA DO PACIENTE / RESPONSÁVEL (LINHA FÍSICA PARA CANETA)
       doc.setDrawColor(80, 80, 80);
       doc.setLineWidth(0.5);

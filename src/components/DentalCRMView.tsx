@@ -63,6 +63,7 @@ import ImageMarkupEditor from './ImageMarkupEditor';
 import { AIAssistedWhatsApp } from './AIAssistedWhatsApp';
 import { usePatientContext } from '../context/PatientContext';
 import { getDefaultToothCoordinates } from '../constants';
+import { syncAllPendingBudgets } from '../services/budgetSyncService';
 
 // --- ZOD SCHEMAS FOR HISTORICAL IMPORT CONTENT VALIDATION ---
 const lenientString = z.preprocess((val) => (val !== undefined && val !== null) ? String(val) : val, z.string()).optional().nullable();
@@ -1224,41 +1225,34 @@ export default function DentalCRMView({
     }
   }, [selectedProposalId, driveFolderId]);
 
-  // OPTION C: OFFLINE-FIRST LOCAL SAVE - Sincronização em Background
+  // OPTION C: OFFLINE-FIRST LOCAL SAVE - Sincronização em Background Unificada
   useEffect(() => {
-    const syncOfflineBudgets = async () => {
-      const syncQueueStr = localStorage.getItem('ag_offline_budgets');
-      if (!syncQueueStr) return;
-      const syncQueue = JSON.parse(syncQueueStr);
-      if (syncQueue.length === 0) return;
+    // Sincroniza imediatamente na montagem
+    syncAllPendingBudgets();
+    
+    // Tenta sincronizar a cada 1 minuto caso a aba fique aberta
+    const interval = setInterval(() => {
+      syncAllPendingBudgets();
+    }, 60000);
 
-      let remainingQueue = [...syncQueue];
-      let hasUpdates = false;
-
-      for (const item of syncQueue) {
-        try {
-          const fileBlob = new Blob([item.data], { type: 'application/json' });
-          const { uploadPatientFileToSupabase } = await import('../lib/supabaseStorage');
-          await uploadPatientFileToSupabase(item.patientId || item.patientName, fileBlob, item.id, 'Orcamentos');
-          console.log(`✅ Sincronizado offline budget: ${item.id}`);
-          remainingQueue = remainingQueue.filter(q => q.id !== item.id);
-          hasUpdates = true;
-        } catch (err) {
-          console.warn(`⏳ Ainda falhando ao sincronizar ${item.id}. Mantendo na fila local.`, err);
+    // Ouve eventos de novo orçamento sincronizado para recarregar a lista caso pertença ao paciente atual
+    const handleBudgetSynced = (e: any) => {
+      if (selectedPatient && (e.detail?.patientId === selectedPatient.id || e.detail?.patientId === selectedPatient.name)) {
+        if (driveFolderId) {
+          listPatientFilesFromSupabase(driveFolderId, selectedPatient.name).then(files => {
+            const filtered = filterSupabaseProposals(files);
+            setSupabaseProposals(filtered);
+          }).catch(console.warn);
         }
-      }
-
-      if (hasUpdates) {
-        localStorage.setItem('ag_offline_budgets', JSON.stringify(remainingQueue));
       }
     };
 
-    syncOfflineBudgets();
-    
-    // Tenta sincronizar a cada 1 minuto caso a aba fique aberta
-    const interval = setInterval(syncOfflineBudgets, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    window.addEventListener('ag-budget-synced', handleBudgetSynced);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('ag-budget-synced', handleBudgetSynced);
+    };
+  }, [selectedPatient, driveFolderId]);
 
 
   // Helper to extract procedure instances from a saved proposal JSON

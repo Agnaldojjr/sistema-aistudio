@@ -54,7 +54,7 @@ interface IssuedDeclaration {
 }
 
 export default function PatientDocumentsTab({ proposal, clinicSettings, setClinicSettings }: PatientDocumentsTabProps) {
-  const { selectedPatient, setDocumentosList } = usePatientContext();
+  const { selectedPatient, setDocumentosList, documentosList } = usePatientContext();
   const pd = selectedPatient || proposal.patientData || {};
   const patientName = selectedPatient ? selectedPatient.name : (proposal.patientName || '');
   
@@ -86,7 +86,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
     });
 
     if (setDocumentosList) {
-      setDocumentosList((prevDocs: any[]) => [
+      setDocumentosList([
         {
           id: newContract.id,
           patientId: selectedPatient?.id || '',
@@ -96,7 +96,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
           date: newContract.contractDate,
           data: newContract
         },
-        ...(prevDocs || []).filter((d: any) => d.id !== newContract.id)
+        ...(documentosList || []).filter((d: any) => d.id !== newContract.id)
       ]);
     }
   };

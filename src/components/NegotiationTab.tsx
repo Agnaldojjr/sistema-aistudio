@@ -24,11 +24,14 @@ import {
   Zap,
   Loader2,
   Share2,
-  FileDown
+  FileDown,
+  Save,
+  WifiOff
 } from 'lucide-react';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from '../types';
 import { usePatientContext } from '../context/PatientContext';
 import { uploadPatientFileToSupabase, getPatientFileUrlFromSupabase } from '../lib/supabaseStorage';
+import { useAutoSaveBudget } from '../hooks/useAutoSaveBudget';
 import { jsPDF } from 'jspdf';
 
 interface NegotiationTabProps {
@@ -405,6 +408,32 @@ export default function NegotiationTab({
 
   const chosenSim = simulations[selectedPlanIndices[0]] || simulations[0];
   
+  // Auto-Save Local Imediato (0s) + Upload com Debounce na Nuvem (Opções A, B e A)
+  const {
+    syncStatus,
+    lastSavedLocal,
+    lastSyncedCloud,
+    cloudError,
+    forceCloudSync,
+    sealPermanentVersion
+  } = useAutoSaveBudget({
+    patientId: selectedPatient?.id,
+    patientName: patientName,
+    currentFileId,
+    setCurrentFileId,
+    proposal,
+    sections,
+    procedures,
+    simulations,
+    selectedPlanIndices,
+    customNetDesired,
+    boxEntradas,
+    boxMethods,
+    boxInstallments,
+    debounceCloudMs: 2500,
+    enabled: !!selectedPatient?.id || !!patientName
+  });
+
   // Assistente Comercial AI logic
   const exceededRule = chosenSim.isExceeded;
   const scriptInstallmentValue = formatCurrency(chosenSim.valorParcela);
@@ -1147,71 +1176,18 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
     setIsSavingDrive(true);
     setSaveSuccessMsg('');
     try {
-      const stateToSave = {
-        proposal,
-        sections,
-        procedures,
-        simulations,
-        selectedPlanIndices
-      };
-      
-      const jsonStr = JSON.stringify(stateToSave);
-      const fileBlob = new Blob([jsonStr], { type: 'application/json' });
-      
-      // R1: Non-Overwriting & Versioned Budgets
-      let versionFilename = `orcamento_v${Date.now()}.json`;
-      if (currentFileId && currentFileId !== 'NEW_FILE' && currentFileId.includes('.json')) {
-        const cleanName = currentFileId.split('/').pop()!;
-        const match = cleanName.match(/orcamento_v(\d+)/);
-        if (match) {
-          const nextV = parseInt(match[1], 10) + 1;
-          versionFilename = `orcamento_v${nextV}.json`;
-        } else {
-          versionFilename = `orcamento_v2_${Date.now()}.json`;
-        }
-      }
-      
-      // OPTION C: OFFLINE-FIRST LOCAL SAVE
-      const syncQueueStr = localStorage.getItem('ag_offline_budgets') || '[]';
-      const syncQueue = JSON.parse(syncQueueStr);
-      const offlineItem = {
-         id: versionFilename,
-         patientId: selectedPatient?.id || patientName,
-         patientName: patientName,
-         data: jsonStr,
-         timestamp: Date.now()
-      };
-      
-      const existingIdx = syncQueue.findIndex((q: any) => q.id === versionFilename);
-      if (existingIdx > -1) syncQueue[existingIdx] = offlineItem;
-      else syncQueue.push(offlineItem);
-      
-      localStorage.setItem('ag_offline_budgets', JSON.stringify(syncQueue));
-
-      try {
-        await uploadPatientFileToSupabase(selectedPatient?.id || patientName, fileBlob, versionFilename, 'Orcamentos');
-        
-        // Remove from local queue if successful
-        const updatedQueue = JSON.parse(localStorage.getItem('ag_offline_budgets') || '[]').filter((q: any) => q.id !== versionFilename);
-        localStorage.setItem('ag_offline_budgets', JSON.stringify(updatedQueue));
-        
-        const res = { id: `Orcamentos/${versionFilename}` };
-        if (res && res.id && setCurrentFileId) {
-          setCurrentFileId(res.id);
-        }
-        setSaveSuccessMsg('Salvo na nuvem com sucesso!');
-      } catch (err: any) {
-        console.warn('Falha ao salvar na nuvem (offline ou erro). Salvo localmente.', err);
-        const res = { id: `Orcamentos/${versionFilename}` };
-        if (res && res.id && setCurrentFileId) {
-          setCurrentFileId(res.id);
-        }
-        setSaveSuccessMsg('Salvo offline. O sistema sincronizará quando houver internet.');
+      // Cria uma versão permanente e sincroniza imediatamente com o Supabase
+      const sealedVersion = await sealPermanentVersion();
+      if (sealedVersion) {
+        setSaveSuccessMsg('Versão salva na nuvem!');
+      } else {
+        await forceCloudSync();
+        setSaveSuccessMsg('Salvo no Supabase!');
       }
 
       // Integracao com o financeiro
       if (proposal.status === 'Aprovado (paciente pagou)') {
-        const fileKey = currentFileId || 'orcamento_salvo.json';
+        const fileKey = currentFileId || (sealedVersion ? `Orcamentos/${sealedVersion}` : 'orcamento_salvo.json');
         const budgetPayId = 'pay-budget-' + fileKey.replace(/[^a-zA-Z0-9-]/g, '_');
         const amount = simulations[selectedPlanIndices[0]]?.custoTotal || 0;
         const description = `Orçamento: ${fileKey.split('/').pop()?.replace('.json', '').replace('orcamento_salvo', 'Orçamento').replace(/_/g, ' ') || 'Orçamento'} - Aprovado e Pago`;
@@ -1266,7 +1242,6 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         }, 300);
       }
 
-      setSaveSuccessMsg('Salvo no Supabase!');
       setTimeout(() => setSaveSuccessMsg(''), 4000);
     } catch (err: any) {
       alert('Erro ao salvar no Supabase: ' + err.message);
@@ -1280,10 +1255,61 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       
       {/* ================= HEADER AND PRINT BUTTON ================= */}
       <div className="bg-gradient-to-r from-[#8B0000] to-[#2D060B] border border-[#C09553]/40 rounded-xl p-5 sm:p-6 shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
-        <div className="space-y-1">
-          <span className="text-[10px] font-extrabold text-[#C09553] tracking-widest uppercase block">
-            Aba 3. Negociação Facilitada
-          </span>
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-[10px] font-extrabold text-[#C09553] tracking-widest uppercase block">
+              Aba 3. Negociação Facilitada
+            </span>
+
+            {/* Badge de Auto-Save Local e Upload na Nuvem */}
+            {syncStatus === 'saving_local' && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-200 border border-amber-500/30 animate-pulse">
+                <Save className="w-3 h-3 text-amber-400" />
+                <span>Gravando localmente...</span>
+              </span>
+            )}
+            {syncStatus === 'saved_local' && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-200 border border-amber-500/30">
+                <Save className="w-3 h-3 text-amber-400" />
+                <span>Salvo no dispositivo (enviando nuvem...)</span>
+              </span>
+            )}
+            {syncStatus === 'syncing_cloud' && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-sky-500/20 text-sky-200 border border-sky-500/30">
+                <Loader2 className="w-3 h-3 text-sky-400 animate-spin" />
+                <span>Enviando para a nuvem...</span>
+              </span>
+            )}
+            {syncStatus === 'synced_cloud' && (
+              <button
+                type="button"
+                onClick={forceCloudSync}
+                title="Orçamento salvo no navegador e sincronizado na nuvem. Clique para forçar reenvio."
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-200 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors cursor-pointer"
+              >
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                <span>Nuvem sincronizada {lastSyncedCloud ? `(${lastSyncedCloud.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})` : ''}</span>
+              </button>
+            )}
+            {syncStatus === 'offline' && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-700/60 text-zinc-300 border border-zinc-500/40" title="Sem internet no momento. As alterações estão gravadas localmente e serão sincronizadas assim que a conexão voltar.">
+                <WifiOff className="w-3 h-3 text-zinc-400" />
+                <span>Modo Offline (seguro no navegador)</span>
+              </span>
+            )}
+            {syncStatus === 'error' && (
+              <button
+                type="button"
+                onClick={forceCloudSync}
+                title={`Falha na nuvem: ${cloudError || 'Tentar novamente'}. Clique para sincronizar agora.`}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-200 border border-rose-500/30 hover:bg-rose-500/30 transition-colors cursor-pointer"
+              >
+                <AlertCircle className="w-3 h-3 text-rose-400" />
+                <span>Salvo local (falha na nuvem - retentar)</span>
+              </button>
+            )}
+          </div>
+
           <h2 className="text-lg font-serif text-[#FAF8F5] font-semibold leading-tight">
             Calculadora de Entrada Inteligente (Taxas de Maquininha)
           </h2>
