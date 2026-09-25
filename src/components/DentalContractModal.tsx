@@ -48,7 +48,7 @@ export interface DentalContractData {
   contractDate: string;
 
   // Status
-  status: 'impresso' | 'assinado' | 'aguardando_gov';
+  status?: 'impresso' | 'assinado' | 'pendente' | 'aguardando_gov';
   signedFileUrl?: string;
   signedFileName?: string;
   signedAt?: string;
@@ -197,7 +197,7 @@ export default function DentalContractModal({
   const signerCpf = formData.hasGuardian && formData.guardianCpf ? formData.guardianCpf : formData.cpf;
   const signerRole = formData.hasGuardian ? `Responsável Legal (${formData.guardianKinship || 'Grau de Parentesco'}) de ${formData.patientName}` : 'Paciente / Contratante';
 
-  // Gerador de PDF Profissional
+  // Gerador de PDF Profissional Ultra-Compacto e Contínuo
   const generatePDF = async () => {
     setIsGenerating(true);
     try {
@@ -209,370 +209,259 @@ export default function DentalContractModal({
 
       const pageWidth = 210;
       const pageHeight = 297;
-      const margin = 20;
+      const margin = 13; // Margem compacta (largura útil: 184mm) para evitar desperdício de papel
       const contentWidth = pageWidth - (margin * 2);
 
       const addHeader = (pageNum: number) => {
-        doc.setFillColor(139, 0, 0); // #8B0000
-        doc.rect(margin, 12, contentWidth, 0.8, 'F');
+        doc.setFillColor(139, 0, 0); // Burgundy
+        doc.rect(margin, 8, contentWidth, 0.6, 'F');
 
-        doc.setFontSize(8);
+        doc.setFontSize(7.5);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(139, 0, 0);
-        doc.text('CONSULTÓRIO ODONTOLÓGICO DR. AGNALDO FERREIRA', margin, 10);
+        doc.text('CONSULTÓRIO ODONTOLÓGICO DR. AGNALDO FERREIRA', margin, 6.5);
 
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(120, 120, 120);
-        doc.text(`CRO-MG 58714 • Belo Horizonte/MG`, pageWidth - margin, 10, { align: 'right' });
+        doc.setTextColor(110, 110, 110);
+        doc.text('CRO-MG 58714 • Belo Horizonte/MG', pageWidth - margin, 6.5, { align: 'right' });
       };
 
       const addFooter = (pageNum: number, totalPages: number) => {
-        doc.setFillColor(200, 200, 200);
-        doc.rect(margin, pageHeight - 14, contentWidth, 0.4, 'F');
+        doc.setFillColor(210, 210, 210);
+        doc.rect(margin, pageHeight - 11, contentWidth, 0.3, 'F');
 
-        doc.setFontSize(7.5);
+        doc.setFontSize(7);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(130, 130, 130);
-        doc.text('Rua dos Goitacazes, 375, Sala 1001, Centro - Belo Horizonte/MG • Tel: (31) 97568-5420 • dragnaldof@gmail.com', margin, pageHeight - 9);
-        doc.text(`Página ${pageNum} de ${totalPages}`, pageWidth - margin, pageHeight - 9, { align: 'right' });
+        doc.setTextColor(120, 120, 120);
+        doc.text('Rua dos Goitacazes, 375, Sala 1001, Centro - Belo Horizonte/MG • Tel: (31) 97568-5420 • dragnaldof@gmail.com', margin, pageHeight - 7);
+        doc.text(`Página ${pageNum} de ${totalPages}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
       };
 
-      let currentY = 22;
+      let currentY = 15;
 
-      // --- PÁGINA 1 ---
-      addHeader(1);
+      // Função de quebra de página contínua e dinâmica (só quebra quando o espaço esgotar)
+      const ensureSpace = (neededHeight: number) => {
+        if (currentY + neededHeight > pageHeight - 14) {
+          doc.addPage();
+          currentY = 15;
+        }
+      };
 
-      // Título
-      doc.setFontSize(14);
+      // TÍTULO DO CONTRATO
+      doc.setFontSize(12.5);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(30, 30, 30);
+      doc.setTextColor(25, 25, 25);
       doc.text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS ODONTOLÓGICOS', pageWidth / 2, currentY, { align: 'center' });
-      currentY += 10;
+      currentY += 6;
 
       // QUALIFICAÇÃO DAS PARTES
-      doc.setFontSize(10.5);
+      doc.setFontSize(8.5);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(139, 0, 0);
       doc.text('QUALIFICAÇÃO DAS PARTES', margin, currentY);
-      currentY += 6;
+      currentY += 4;
+
+      doc.setFontSize(7.8);
+      doc.setTextColor(25, 25, 25);
 
       // CONTRATADO
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('CONTRATADO:', margin, currentY);
-      currentY += 4.5;
-
       doc.setFont('helvetica', 'normal');
-      const contratadoText = 'Nome: Agnaldo Luiz Ferreira Junior, Profissão: Cirurgião-Dentista, Nacionalidade: Brasileiro, RG: 20068243, CRO-UF Nº: CRO-MG-58714, com consultório localizado à: Rua dos Goitacazes, 375, Sala 1001, CEP: 30190-050, Cidade: Belo Horizonte, UF: MG, Telefone: (31) 97568-5420, E-mail: dragnaldof@gmail.com, doravante denominado simplesmente CONTRATADO.';
+      const contratadoText = 'CONTRATADO: Agnaldo Luiz Ferreira Junior, Cirurgião-Dentista, Brasileiro, RG: 20068243, CRO-MG Nº: 58714, com consultório localizado à Rua dos Goitacazes, 375, Sala 1001, CEP: 30190-050, Cidade: Belo Horizonte, UF: MG, Telefone: (31) 97568-5420, E-mail: dragnaldof@gmail.com, doravante denominado simplesmente CONTRATADO.';
       const splitContratado = doc.splitTextToSize(contratadoText, contentWidth);
+      ensureSpace((splitContratado.length * 3.25) + 2);
       doc.text(splitContratado, margin, currentY);
-      currentY += (splitContratado.length * 4.2) + 4;
+      currentY += (splitContratado.length * 3.25) + 2.5;
 
       // CONTRATANTE
-      doc.setFont('helvetica', 'bold');
-      doc.text('CONTRATANTE:', margin, currentY);
-      currentY += 4.5;
-
-      doc.setFont('helvetica', 'normal');
-      const contratanteText = `Nome: ${formData.patientName || '__________________________________'}, Profissão: ${formData.profession || '_______________'}, Nacionalidade: ${formData.nationality || 'Brasileiro(a)'}, Data de Nascimento: ${formData.birthDate || '__________'}, CPF: ${formData.cpf || '_________________'}, RG: ${formData.rg || '_______________'}, residente e domiciliado(a) à ${formData.address || '__________________________________________________'}, CEP: ${formData.cep || '__________'}, Cidade: ${formData.city || 'Belo Horizonte'}, UF: ${formData.state || 'MG'}, Telefone: ${formData.phone || '_______________'}, E-mail: ${formData.email || '__________________________________'}, doravante denominado(a) simplesmente CONTRATANTE ou PACIENTE.`;
+      const contratanteText = `CONTRATANTE: ${formData.patientName || '__________________________________'}, Profissão: ${formData.profession || '_______________'}, Nacionalidade: ${formData.nationality || 'Brasileiro(a)'}, Data de Nascimento: ${formData.birthDate || '__________'}, CPF: ${formData.cpf || '_________________'}, RG: ${formData.rg || '_______________'}, residente e domiciliado(a) à ${formData.address || '__________________________________________________'}, CEP: ${formData.cep || '__________'}, Cidade: ${formData.city || 'Belo Horizonte'}, UF: ${formData.state || 'MG'}, Telefone: ${formData.phone || '_______________'}, E-mail: ${formData.email || '__________________________________'}, doravante denominado(a) simplesmente CONTRATANTE ou PACIENTE.`;
       const splitContratante = doc.splitTextToSize(contratanteText, contentWidth);
+      ensureSpace((splitContratante.length * 3.25) + 2);
       doc.text(splitContratante, margin, currentY);
-      currentY += (splitContratante.length * 4.2) + 4;
+      currentY += (splitContratante.length * 3.25) + 2.5;
 
       // Responsável Legal (se aplicável)
       if (formData.hasGuardian && formData.guardianName) {
-        doc.setFont('helvetica', 'bold');
-        doc.text('Responsável Legal (se aplicável):', margin, currentY);
-        currentY += 4.5;
-
-        doc.setFont('helvetica', 'normal');
-        const respText = `Nome: ${formData.guardianName}, Grau de Parentesco: ${formData.guardianKinship || 'Responsável'}, CPF: ${formData.guardianCpf || '_________________'}, RG: ${formData.guardianRg || '_______________'}, Telefone: ${formData.guardianPhone || '_______________'}, E-mail: ${formData.guardianEmail || '__________________________________'}.`;
+        const respText = `RESPONSÁVEL LEGAL: ${formData.guardianName}, Grau de Parentesco: ${formData.guardianKinship || 'Responsável'}, CPF: ${formData.guardianCpf || '_________________'}, RG: ${formData.guardianRg || '_______________'}, Telefone: ${formData.guardianPhone || '_______________'}, E-mail: ${formData.guardianEmail || '__________________________________'}.`;
         const splitResp = doc.splitTextToSize(respText, contentWidth);
+        ensureSpace((splitResp.length * 3.25) + 2);
         doc.text(splitResp, margin, currentY);
-        currentY += (splitResp.length * 4.2) + 4;
+        currentY += (splitResp.length * 3.25) + 2.5;
       }
 
       doc.setFont('helvetica', 'italic');
-      doc.text('tem entre si contratado, na melhor forma do direito as seguintes condições:', margin, currentY);
-      currentY += 7;
+      doc.setFontSize(7.5);
+      doc.setTextColor(80, 80, 80);
+      ensureSpace(4);
+      doc.text('Têm entre si justo e contratado, na melhor forma do direito, as seguintes cláusulas e condições:', margin, currentY);
+      currentY += 4.5;
+
+      // Helper para renderizar cláusulas com fluxo contínuo
+      const renderClause = (title: string, paragraphs: string[]) => {
+        const firstLines = doc.splitTextToSize(paragraphs[0] || '', contentWidth);
+        const minBlock = 4 + (firstLines.length * 3.25) + 2;
+        ensureSpace(minBlock);
+
+        doc.setFontSize(8.2);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(139, 0, 0);
+        doc.text(title, margin, currentY);
+        currentY += 3.8;
+
+        doc.setFontSize(7.8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(25, 25, 25);
+
+        paragraphs.forEach((pText) => {
+          const lines = doc.splitTextToSize(pText, contentWidth);
+          const pHeight = lines.length * 3.25;
+          ensureSpace(pHeight + 1.5);
+          doc.text(lines, margin, currentY);
+          currentY += pHeight + 2;
+        });
+      };
 
       // CLÁUSULA PRIMEIRA – DO OBJETIVO
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(139, 0, 0);
-      doc.text('CLÁUSULA PRIMEIRA – DO OBJETIVO', margin, currentY);
-      currentY += 5;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      const clausula1 = 'O objetivo do presente contrato constitui-se na prestação de serviços odontológicos, pelos profissionais do corpo clínico do CONTRATADO no endereço do consultório especificado no contrato ou em outro consultório indicado pelo CONTRATADO desde que previamente notificado ao paciente, de acordo com o plano de tratamento apresentado e aceito pelas partes, constando no prontuário do paciente e autoriza o uso das imagens do tratamento para divulgação em redes sociais.';
-      const splitC1 = doc.splitTextToSize(clausula1, contentWidth);
-      doc.text(splitC1, margin, currentY);
-      currentY += (splitC1.length * 4.2) + 5;
+      renderClause('CLÁUSULA PRIMEIRA – DO OBJETIVO', [
+        'O objetivo do presente contrato constitui-se na prestação de serviços odontológicos, pelos profissionais do corpo clínico do CONTRATADO no endereço do consultório especificado no contrato ou em outro consultório indicado pelo CONTRATADO desde que previamente notificado ao paciente, de acordo com o plano de tratamento apresentado e aceito pelas partes, constando no prontuário do paciente e autoriza o uso das imagens do tratamento para divulgação em redes sociais.'
+      ]);
 
       // CLÁUSULA SEGUNDA – DO VALOR E DO PAGAMENTO DOS HONORÁRIOS
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(139, 0, 0);
-      doc.text('CLÁUSULA SEGUNDA – DO VALOR E DO PAGAMENTO DOS HONORÁRIOS', margin, currentY);
-      currentY += 5;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
       const valorFormatado = formData.totalAmount > 0 
         ? `R$ ${formData.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
         : formData.totalAmountText;
-      const clausula2 = `O valor total dos honorários profissionais, relativos aos serviços odontológicos prestados é de ${valorFormatado}, e seu pagamento deverá ser realizado ${formData.paymentConditions}.`;
-      const splitC2 = doc.splitTextToSize(clausula2, contentWidth);
-      doc.text(splitC2, margin, currentY);
-      currentY += (splitC2.length * 4.2) + 4;
-
-      const c2_p1 = '# 1º - O valor dos honorários, ora estipulado, poderá sofrer alteração, caso seja necessário modificar o plano de tratamento inicialmente aprovado, em face da constatação de questões técnicas ou outras intercorrências que inviabilizem sua execução, sendo necessário que as partes acordem, formalmente, os novos valores ajustados.';
-      const splitC2_p1 = doc.splitTextToSize(c2_p1, contentWidth);
-      doc.text(splitC2_p1, margin, currentY);
-
-      // --- PÁGINA 2 ---
-      doc.addPage();
-      addHeader(2);
-      currentY = 22;
-
-      const c2_p2 = '# 2º - Os pagamentos vencidos e efetuados fora dos prazos previstos, estarão sujeitos a atualização monetária e a multa de acordo com as taxas praticadas pela instituição geradora do boleto e em caso de inadimplência poderá ocorrer a negativação do CPF do devedor.';
-      const splitC2_p2 = doc.splitTextToSize(c2_p2, contentWidth);
-      doc.text(splitC2_p2, margin, currentY);
-      currentY += (splitC2_p2.length * 4.2) + 4;
-
-      const c2_p3 = '# 3º - Os recibos de pagamento deverão ser solicitados e fornecidos no momento da contratação do serviço sobre o valor pago do tratamento e não inclui o valor dos serviços relacionados a consulta de crédito, emissão de boleto, compensação bancária, cobrança, encargos por atraso e cadastro nos serviços de proteção ao crédito porque são serviços terceirizados e não fazem parte do tratamento.';
-      const splitC2_p3 = doc.splitTextToSize(c2_p3, contentWidth);
-      doc.text(splitC2_p3, margin, currentY);
-      currentY += (splitC2_p3.length * 4.2) + 4;
-
-      const c2_p4 = '# 4º - Não serão emitidos recibos em outra oportunidade, com o objetivo de evitar a duplicidade no recolhimento de impostos. Essa medida visa garantir a transparência e a conformidade fiscal, assegurando que todas as partes envolvidas estejam cientes e de acordo com as obrigações tributárias desde o início da prestação dos serviços.';
-      const splitC2_p4 = doc.splitTextToSize(c2_p4, contentWidth);
-      doc.text(splitC2_p4, margin, currentY);
-      currentY += (splitC2_p4.length * 4.2) + 6;
+      
+      renderClause('CLÁUSULA SEGUNDA – DO VALOR E DO PAGAMENTO DOS HONORÁRIOS', [
+        `O valor total dos honorários profissionais, relativos aos serviços odontológicos prestados é de ${valorFormatado}, e seu pagamento deverá ser realizado ${formData.paymentConditions}.`,
+        '§ 1º - O valor dos honorários, ora estipulado, poderá sofrer alteração, caso seja necessário modificar o plano de tratamento inicialmente aprovado, em face da constatação de questões técnicas ou outras intercorrências que inviabilizem sua execução, sendo necessário que as partes acordem, formalmente, os novos valores ajustados.',
+        '§ 2º - Os pagamentos vencidos e efetuados fora dos prazos previstos, estarão sujeitos a atualização monetária e a multa de acordo com as taxas praticadas pela instituição geradora do boleto e em caso de inadimplência poderá ocorrer a negativação do CPF do devedor.',
+        '§ 3º - Os recibos de pagamento deverão ser solicitados e fornecidos no momento da contratação do serviço sobre o valor pago do tratamento e não inclui o valor dos serviços relacionados a consulta de crédito, emissão de boleto, compensação bancária, cobrança, encargos por atraso e cadastro nos serviços de proteção ao crédito porque são serviços terceirizados e não fazem parte do tratamento.',
+        '§ 4º - Não serão emitidos recibos em outra oportunidade, com o objetivo de evitar a duplicidade no recolhimento de impostos. Essa medida visa garantir a transparência e a conformidade fiscal, assegurando que todas as partes envolvidas estejam cientes e de acordo com as obrigações tributárias desde o início da prestação dos serviços.'
+      ]);
 
       // CLÁUSULA TERCEIRA – DAS GARANTIAS
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(139, 0, 0);
-      doc.text('CLÁUSULA TERCEIRA – DAS GARANTIAS', margin, currentY);
-      currentY += 5;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      const c3_p1 = '# 1º - O CONTRATADO declara que os tratamentos propostos e demais materiais utilizados possuem efetiva comprovação científica, respeitando o mais alto nível profissional e o estado atual da ciência.';
-      const splitC3_p1 = doc.splitTextToSize(c3_p1, contentWidth);
-      doc.text(splitC3_p1, margin, currentY);
-      currentY += (splitC3_p1.length * 4.2) + 4;
-
-      const c3_p2 = '# 2º - O paciente foi devidamente informado sobre propósitos, custos, riscos e alternativas de tratamento, bem como que a Odontologia não é uma ciência exata e que os resultados esperados a partir do diagnóstico poderão não se concretizar em face da resposta biológica individual de cada paciente e da própria limitação da ciência.';
-      const splitC3_p2 = doc.splitTextToSize(c3_p2, contentWidth);
-      doc.text(splitC3_p2, margin, currentY);
-      currentY += (splitC3_p2.length * 4.2) + 6;
+      renderClause('CLÁUSULA TERCEIRA – DAS GARANTIAS', [
+        '§ 1º - O CONTRATADO declara que os tratamentos propostos e demais materiais utilizados possuem efetiva comprovação científica, respeitando o mais alto nível profissional e o estado atual da ciência.',
+        '§ 2º - O paciente foi devidamente informado sobre propósitos, custos, riscos e alternativas de tratamento, bem como que a Odontologia não é uma ciência exata e que os resultados esperados a partir do diagnóstico poderão não se concretizar em face da resposta biológica individual de cada paciente e da própria limitação da ciência.'
+      ]);
 
       // CLÁUSULA QUARTA – DAS OBRIGAÇÕES DO CORPO CLÍNICO
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(139, 0, 0);
-      doc.text('CLÁUSULA QUARTA – DAS OBRIGAÇÕES DO CORPO CLÍNICO', margin, currentY);
-      currentY += 5;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      const clausula4 = 'O corpo clínico se compromete a utilizar as técnicas mais modernas e eficazes e os materiais adequados à execução do plano de tratamento aprovado, assumir a responsabilidade pelos serviços prestados, resguardar a privacidade do paciente e o necessário sigilo, bem como zelar pela saúde e dignidade de forma humanizada, ética e consciente.';
-      const splitC4 = doc.splitTextToSize(clausula4, contentWidth);
-      doc.text(splitC4, margin, currentY);
-      currentY += (splitC4.length * 4.2) + 6;
+      renderClause('CLÁUSULA QUARTA – DAS OBRIGAÇÕES DO CORPO CLÍNICO', [
+        'O corpo clínico se compromete a utilizar as técnicas mais modernas e eficazes e os materiais adequados à execução do plano de tratamento aprovado, assumir a responsabilidade pelos serviços prestados, resguardar a privacidade do paciente e o necessário sigilo, bem como zelar pela saúde e dignidade de forma humanizada, ética e consciente.'
+      ]);
 
       // CLÁUSULA QUINTA – DAS OBRIGAÇÕES DO PACIENTE OU SEU RESPONSÁVEL
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(139, 0, 0);
-      doc.text('CLÁUSULA QUINTA – DAS OBRIGAÇÕES DO PACIENTE OU SEU RESPONSÁVEL', margin, currentY);
-      currentY += 5;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      const c5_p1 = '# 1º - O paciente ou seu responsável se compromete a seguir rigorosamente as orientações do cirurgião-dentista, comunicando imediatamente qualquer alteração em decorrência do tratamento realizado, comparecer pontualmente às consultas marcadas, justificando as faltas com antecedência mínima de 24 horas.';
-      const splitC5_p1 = doc.splitTextToSize(c5_p1, contentWidth);
-      doc.text(splitC5_p1, margin, currentY);
-      currentY += (splitC5_p1.length * 4.2) + 4;
-
-      const c5_pu = 'Parágrafo único – as faltas não justificadas, conforme preceitua a cláusula quinta deverão ser cobradas no valor vigente de uma consulta de emergência.';
-      const splitC5_pu = doc.splitTextToSize(c5_pu, contentWidth);
-      doc.text(splitC5_pu, margin, currentY);
-
-      // --- PÁGINA 3 ---
-      doc.addPage();
-      addHeader(3);
-      currentY = 22;
-
-      const c5_p2 = '# 2º - Seguir rigorosamente as prescrições, encaminhamentos a outros especialistas da área odontológica ou profissionais de outras áreas de saúde e demais orientações fornecidas pelo(a) cirurgião-dentista, sob a pena de ser declarado interrompido o tratamento.';
-      const splitC5_p2 = doc.splitTextToSize(c5_p2, contentWidth);
-      doc.text(splitC5_p2, margin, currentY);
-      currentY += (splitC5_p2.length * 4.2) + 4;
-
-      const c5_p3 = '# 3º - O paciente deve se comportar de maneira adequada durante sua permanência na Clínica e informar ao cirurgião-dentista qualquer dúvida ou insatisfação sobre o tratamento em execução.';
-      const splitC5_p3 = doc.splitTextToSize(c5_p3, contentWidth);
-      doc.text(splitC5_p3, margin, currentY);
-      currentY += (splitC5_p3.length * 4.2) + 4;
-
-      const c5_p4 = '# 4º - Manter seus dados cadastrais sempre atualizados fornecendo comprovante de endereço e foto de documento oficial com foto, informando eventuais mudanças de endereço, telefone, e-mail ou outros dados que possam ajudar a localização do paciente.';
-      const splitC5_p4 = doc.splitTextToSize(c5_p4, contentWidth);
-      doc.text(splitC5_p4, margin, currentY);
-      currentY += (splitC5_p4.length * 4.2) + 6;
+      renderClause('CLÁUSULA QUINTA – DAS OBRIGAÇÕES DO PACIENTE OU SEU RESPONSÁVEL', [
+        '§ 1º - O paciente ou seu responsável se compromete a seguir rigorosamente as orientações do cirurgião-dentista, comunicando imediatamente qualquer alteração em decorrência do tratamento realizado, comparecer pontualmente às consultas marcadas, justificando as faltas com antecedência mínima de 24 horas.',
+        'Parágrafo único – As faltas não justificadas, conforme preceitua a cláusula quinta deverão ser cobradas no valor vigente de uma consulta de emergência.',
+        '§ 2º - Seguir rigorosamente as prescrições, encaminhamentos a outros especialistas da área odontológica ou profissionais de outras áreas de saúde e demais orientações fornecidas pelo(a) cirurgião-dentista, sob a pena de ser declarado interrompido o tratamento.',
+        '§ 3º - O paciente deve se comportar de maneira adequada durante sua permanência na Clínica e informar ao cirurgião-dentista qualquer dúvida ou insatisfação sobre o tratamento em execução.',
+        '§ 4º - Manter seus dados cadastrais sempre atualizados fornecendo comprovante de endereço e foto de documento oficial com foto, informando eventuais mudanças de endereço, telefone, e-mail ou outros dados que possam ajudar a localização do paciente.'
+      ]);
 
       // CLÁUSULA SEXTA - DA DURAÇÃO DO CONTRATO
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(139, 0, 0);
-      doc.text('CLÁUSULA SEXTA - DA DURAÇÃO DO CONTRATO', margin, currentY);
-      currentY += 5;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      const c6_p1 = '# 1º - O presente contrato tem duração pelo período necessário para a realização do tratamento, conforme informado no plano de tratamento aprovado, desde que o paciente compareça às consultas previamente agendadas.';
-      const splitC6_p1 = doc.splitTextToSize(c6_p1, contentWidth);
-      doc.text(splitC6_p1, margin, currentY);
-      currentY += (splitC6_p1.length * 4.2) + 4;
-
-      const c6_pu = 'Parágrafo único – O tratamento proposto será realizado de acordo com a frequência com que o paciente comparecer às consultas, podendo ser mais rápido ou sofrer alguma prorrogação de acordo com eventual complexidade do caso bem como pela resposta biológica do paciente.';
-      const splitC6_pu = doc.splitTextToSize(c6_pu, contentWidth);
-      doc.text(splitC6_pu, margin, currentY);
-      currentY += (splitC6_pu.length * 4.2) + 6;
+      renderClause('CLÁUSULA SEXTA - DA DURAÇÃO DO CONTRATO', [
+        '§ 1º - O presente contrato tem duração pelo período necessário para a realização do tratamento, conforme informado no plano de tratamento aprovado, desde que o paciente compareça às consultas previamente agendadas.',
+        'Parágrafo único – O tratamento proposto será realizado de acordo com a frequência com que o paciente comparecer às consultas, podendo ser mais rápido ou sofrer alguma prorrogação de acordo com eventual complexidade do caso bem como pela resposta biológica do paciente.'
+      ]);
 
       // CLÁUSULA SÉTIMA – DA RESCISÃO
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(139, 0, 0);
-      doc.text('CLÁUSULA SÉTIMA – DA RESCISÃO', margin, currentY);
-      currentY += 5;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      const c7_intro = 'Este contrato poderá ser rescindido a qualquer tempo com comunicação por escrito, por qualquer uma das partes, sendo cobrado os valores de tabela vigente sem desconto relativos aos trabalhos realizados, mesmo que não totalmente concluídos.';
-      const splitC7_intro = doc.splitTextToSize(c7_intro, contentWidth);
-      doc.text(splitC7_intro, margin, currentY);
-      currentY += (splitC7_intro.length * 4.2) + 4;
-
-      const c7_p1 = '# 1º - Será caracterizado o abandono de tratamento quando o paciente faltar a três consultas consecutivas ou se ausentar sem justificativa do consultório por mais de 45 dias, sendo neste caso considerado o contrato rescindido por iniciativa do paciente, ficando assim a Clínica isenta de qualquer responsabilidade desse ato.';
-      const splitC7_p1 = doc.splitTextToSize(c7_p1, contentWidth);
-      doc.text(splitC7_p1, margin, currentY);
-      currentY += (splitC7_p1.length * 4.2) + 4;
-
-      const c7_p2 = '# 2º - O paciente já se declara ciente de que o abandono de tratamento poderá acarretar prejuízos à sua saúde, inclusive com agravamento do estado inicial, não sendo necessária nova chamada do paciente para que o abandono seja caracterizado e os valores devidos devem ser quitados.';
-      const splitC7_p2 = doc.splitTextToSize(c7_p2, contentWidth);
-      doc.text(splitC7_p2, margin, currentY);
-      currentY += (splitC7_p2.length * 4.2) + 4;
-
-      const c7_p3 = '# 3º - Em consonância com o disposto no Artigo 5º, do Código de Ética Odontológica, durante o tratamento, ocorrendo fatos que à critério do Cirurgião-dentista, prejudiquem o bom relacionamento com o paciente ou pleno desempenho profissional, O CONTRATADO reserva o direito de renunciar ao atendimento do paciente mediante prévia comunicação e fornecendo todas as informações técnicas necessárias ao cirurgião-dentista sucessor.';
-      const splitC7_p3 = doc.splitTextToSize(c7_p3, contentWidth);
-      doc.text(splitC7_p3, margin, currentY);
-      currentY += (splitC7_p3.length * 4.2) + 4;
-
-      const c7_p4 = '# 4º - Em caso de desistência do tratamento mesmo antes de começar os procedimentos o consultório tem o direito de cobrar a consulta de avaliação no valor da tabela vigente e todos os encargos financeiros causados pela aprovação do tratamento e recolhimento de impostos.';
-      const splitC7_p4 = doc.splitTextToSize(c7_p4, contentWidth);
-      doc.text(splitC7_p4, margin, currentY);
-      currentY += (splitC7_p4.length * 4.2) + 4;
-
-      const c7_p5 = '# 5º - O estorno de cartões de débito e crédito somente é possível na hora da realização da transação e não é possível essa operação em outro momento devido aos custos operacionais e recolhimento de encargos, em caso de cancelamento do tratamento o consultório reserva o direito de cobrar todas as tarifas financeiras aplicadas bem como os impostos gerados nessa movimentação.';
-      const splitC7_p5 = doc.splitTextToSize(c7_p5, contentWidth);
-      doc.text(splitC7_p5, margin, currentY);
-
-      // --- PÁGINA 4 ---
-      doc.addPage();
-      addHeader(4);
-      currentY = 22;
-
-      const c7_p6 = '# 6º - O consultório não trabalha com reembolso de dinheiro, o cancelamento do contrato poderá ser ressarcido apenas com voucher contendo créditos no valor do saldo do pagamento realizado descontando os valores das consultas e procedimentos realizados.';
-      const splitC7_p6 = doc.splitTextToSize(c7_p6, contentWidth);
-      doc.text(splitC7_p6, margin, currentY);
-      currentY += (splitC7_p6.length * 4.2) + 7;
+      renderClause('CLÁUSULA SÉTIMA – DA RESCISÃO', [
+        'Este contrato poderá ser rescindido a qualquer tempo com comunicação por escrito, por qualquer uma das partes, sendo cobrado os valores de tabela vigente sem desconto relativos aos trabalhos realizados, mesmo que não totalmente concluídos.',
+        '§ 1º - Será caracterizado o abandono de tratamento quando o paciente faltar a três consultas consecutivas ou se ausentar sem justificativa do consultório por mais de 45 dias, sendo neste caso considerado o contrato rescindido por iniciativa do paciente, ficando assim a Clínica isenta de qualquer responsabilidade desse ato.',
+        '§ 2º - O paciente já se declara ciente de que o abandono de tratamento poderá acarretar prejuízos à sua saúde, inclusive com agravamento do estado inicial, não sendo necessária nova chamada do paciente para que o abandono seja caracterizado e os valores devidos devem ser quitados.',
+        '§ 3º - Em consonância com o disposto no Artigo 5º, do Código de Ética Odontológica, durante o tratamento, ocorrendo fatos que à critério do Cirurgião-dentista, prejudiquem o bom relacionamento com o paciente ou pleno desempenho profissional, O CONTRATADO reserva o direito de renunciar ao atendimento do paciente mediante prévia comunicação e fornecendo todas as informações técnicas necessárias ao cirurgião-dentista sucessor.',
+        '§ 4º - Em caso de desistência do tratamento mesmo antes de começar os procedimentos o consultório tem o direito de cobrar a consulta de avaliação no valor da tabela vigente e todos os encargos financeiros causados pela aprovação do tratamento e recolhimento de impostos.',
+        '§ 5º - O estorno de cartões de débito e crédito somente é possível na hora da realização da transação e não é possível essa operação em outro momento devido aos custos operacionais e recolhimento de encargos, em caso de cancelamento do tratamento o consultório reserva o direito de cobrar todas as tarifas financeiras aplicadas bem como os impostos gerados nessa movimentação.',
+        '§ 6º - O consultório não trabalha com reembolso de dinheiro, o cancelamento do contrato poderá ser ressarcido apenas com voucher contendo créditos no valor do saldo do pagamento realizado descontando os valores das consultas e procedimentos realizados.'
+      ]);
 
       // CLÁUSULA OITAVA - FORO
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(139, 0, 0);
-      doc.text('CLÁUSULA OITAVA - FORO', margin, currentY);
-      currentY += 5;
+      renderClause('CLÁUSULA OITAVA - FORO', [
+        'Para dirimir quaisquer dúvidas sobre o presente contrato fica eleito o Foro da Comarca de Belo Horizonte, com exclusão de qualquer outro por mais privilegiado que seja. E por estarem de acordo com as condições acima descritas, assinam o presente contrato, em duas vias de igual teor, na presença de duas testemunhas, para que produza todos os efeitos legais.'
+      ]);
 
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      const clausula8 = 'Para dirimir quaisquer dúvidas sobre o presente contrato fica eleito o Foro da Comarca de Belo Horizonte, com exclusão de qualquer outro por mais privilegiado que seja. E por estarem de acordo com as condições acima descritas, assinam o presente contrato, em duas vias de igual teor, na presença de duas testemunhas, para que produza todos os efeitos legais.';
-      const splitC8 = doc.splitTextToSize(clausula8, contentWidth);
-      doc.text(splitC8, margin, currentY);
-      currentY += (splitC8.length * 4.2) + 8;
-
-      // Data de Fecho
+      // Data de Fecho e Assinaturas
+      ensureSpace(44);
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(25, 25, 25);
       doc.text(formData.cityDate, margin, currentY);
-      currentY += 15;
+      currentY += 12;
 
       // ==========================================
-      // BLOCO DE ASSINATURAS (2 COLUNAS)
+      // BLOCO DE ASSINATURAS (2 COLUNAS COMPACTAS)
       // ==========================================
       const colWidth = (contentWidth - 10) / 2;
       const col1X = margin;
       const col2X = margin + colWidth + 10;
 
-      // COLUNA 1: ASSINATURA DO PACIENTE / RESPONSÁVEL (LINHA FÍSICA PARA CANETA)
-      doc.setDrawColor(80, 80, 80);
-      doc.setLineWidth(0.5);
-      doc.line(col1X + 5, currentY + 16, col1X + colWidth - 5, currentY + 16);
+      // COLUNA 1: PACIENTE / RESPONSÁVEL
+      doc.setDrawColor(100, 100, 100);
+      doc.setLineWidth(0.4);
+      doc.line(col1X + 4, currentY, col1X + colWidth - 4, currentY);
 
-      doc.setFontSize(8.5);
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(20, 20, 20);
-      doc.text(signerName || 'CONTRATANTE / PACIENTE', col1X + (colWidth / 2), currentY + 21, { align: 'center' });
+      doc.text(signerName || 'CONTRATANTE / PACIENTE', col1X + (colWidth / 2), currentY + 3.8, { align: 'center' });
 
-      doc.setFontSize(7.5);
+      doc.setFontSize(7);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(80, 80, 80);
-      doc.text(signerRole, col1X + (colWidth / 2), currentY + 25, { align: 'center' });
-      doc.text(`CPF: ${signerCpf || '__________________'}`, col1X + (colWidth / 2), currentY + 29, { align: 'center' });
+      doc.setTextColor(70, 70, 70);
+      doc.text(signerRole, col1X + (colWidth / 2), currentY + 7.2, { align: 'center' });
+      doc.text(`CPF: ${signerCpf || '__________________'}`, col1X + (colWidth / 2), currentY + 10.5, { align: 'center' });
 
-      // COLUNA 2: ASSINATURA DO PROFISSIONAL
-      doc.setDrawColor(80, 80, 80);
-      doc.line(col2X + 5, currentY + 16, col2X + colWidth - 5, currentY + 16);
+      // COLUNA 2: CIRURGIÃO-DENTISTA
+      doc.setDrawColor(100, 100, 100);
+      doc.line(col2X + 4, currentY, col2X + colWidth - 4, currentY);
 
       if (includeDentistSignature) {
         doc.setFont('helvetica', 'italic');
-        doc.setFontSize(11);
+        doc.setFontSize(9.5);
         doc.setTextColor(139, 0, 0); // Burgundy
-        doc.text('Dr. Agnaldo Ferreira', col2X + (colWidth / 2), currentY + 13, { align: 'center' });
+        doc.text('Dr. Agnaldo Ferreira', col2X + (colWidth / 2), currentY - 2.5, { align: 'center' });
 
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8.5);
+        doc.setFontSize(8);
         doc.setTextColor(20, 20, 20);
-        doc.text('Dr. Agnaldo Luiz Ferreira Junior', col2X + (colWidth / 2), currentY + 21, { align: 'center' });
+        doc.text('Dr. Agnaldo Luiz Ferreira Junior', col2X + (colWidth / 2), currentY + 3.8, { align: 'center' });
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.setTextColor(80, 80, 80);
-        doc.text('Cirurgião-Dentista • CRO-MG 58714', col2X + (colWidth / 2), currentY + 25, { align: 'center' });
+        doc.setFontSize(7);
+        doc.setTextColor(70, 70, 70);
+        doc.text('Cirurgião-Dentista • CRO-MG 58714', col2X + (colWidth / 2), currentY + 7.2, { align: 'center' });
         doc.setTextColor(139, 0, 0);
-        doc.text('CONTRATADO', col2X + (colWidth / 2), currentY + 29, { align: 'center' });
+        doc.text('CONTRATADO', col2X + (colWidth / 2), currentY + 10.5, { align: 'center' });
       } else {
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8.5);
+        doc.setFontSize(8);
         doc.setTextColor(20, 20, 20);
-        doc.text('Dr. Agnaldo Luiz Ferreira Junior', col2X + (colWidth / 2), currentY + 21, { align: 'center' });
+        doc.text('Dr. Agnaldo Luiz Ferreira Junior', col2X + (colWidth / 2), currentY + 3.8, { align: 'center' });
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.setTextColor(80, 80, 80);
-        doc.text('Cirurgião-Dentista • CRO-MG 58714', col2X + (colWidth / 2), currentY + 25, { align: 'center' });
-        doc.text('Carimbo e Assinatura', col2X + (colWidth / 2), currentY + 29, { align: 'center' });
+        doc.setFontSize(7);
+        doc.setTextColor(70, 70, 70);
+        doc.text('Cirurgião-Dentista • CRO-MG 58714', col2X + (colWidth / 2), currentY + 7.2, { align: 'center' });
+        doc.text('Carimbo e Assinatura', col2X + (colWidth / 2), currentY + 10.5, { align: 'center' });
       }
 
-      currentY += 45;
+      currentY += 19;
 
       // TESTEMUNHAS
-      doc.setDrawColor(150, 150, 150);
-      doc.line(col1X + 5, currentY, col1X + colWidth - 5, currentY);
-      doc.line(col2X + 5, currentY, col2X + colWidth - 5, currentY);
+      doc.setDrawColor(160, 160, 160);
+      doc.line(col1X + 4, currentY, col1X + colWidth - 4, currentY);
+      doc.line(col2X + 4, currentY, col2X + colWidth - 4, currentY);
 
-      doc.setFontSize(8);
+      doc.setFontSize(7);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(80, 80, 80);
-      doc.text('Testemunha 1 (Nome e CPF)', col1X + (colWidth / 2), currentY + 4, { align: 'center' });
-      doc.text('Testemunha 2 (Nome e CPF)', col2X + (colWidth / 2), currentY + 4, { align: 'center' });
+      doc.setTextColor(90, 90, 90);
+      doc.text('Testemunha 1 (Nome e CPF)', col1X + (colWidth / 2), currentY + 3.5, { align: 'center' });
+      doc.text('Testemunha 2 (Nome e CPF)', col2X + (colWidth / 2), currentY + 3.5, { align: 'center' });
 
-      // Aplica rodapé em todas as 4 páginas
-      for (let p = 1; p <= 4; p++) {
+      // Aplica cabeçalho e rodapé em todas as páginas geradas dinamicamente
+      const totalPages = doc.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
         doc.setPage(p);
-        addFooter(p, 4);
+        addHeader(p);
+        addFooter(p, totalPages);
       }
 
       const pdfBlob = doc.output('blob');

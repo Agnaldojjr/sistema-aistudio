@@ -32,7 +32,7 @@ import {
   FileCheck
 } from 'lucide-react';
 import MedicalDocumentModal from './MedicalDocumentModal';
-import DentalContractModal, { DentalContractData } from './DentalContractModal';
+import DentalContractModal from './DentalContractModal';
 import PatientGallery from './PatientGallery';
 import * as XLSX from 'xlsx';
 import { getSupabaseCRMDatabase } from '../lib/supabaseCrm';
@@ -61,109 +61,8 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
   const [docModalType, setDocModalType] = useState<'receituario' | 'atestado' | 'declaracao' | null>(null);
   const [reprintData, setReprintData] = useState<{ arrival: string, departure: string } | null>(null);
   
-  // --- CONTRATOS ODONTOLÓGICOS (GOV.BR) STATES ---
+  // --- CONTRATOS ODONTOLÓGICOS (EMISSÃO E IMPRESSÃO DIRETA) ---
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
-  const [contractUploadLoadingId, setContractUploadLoadingId] = useState<string | null>(null);
-
-  const contractStorageKey = `dentalContractsHistory_${patientName}`;
-  const [contractsHistory, setContractsHistory] = useState<DentalContractData[]>(() => {
-    try {
-      const stored = localStorage.getItem(contractStorageKey);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    localStorage.setItem(contractStorageKey, JSON.stringify(contractsHistory));
-  }, [contractsHistory, contractStorageKey]);
-
-  const handleContractGenerated = (newContract: DentalContractData) => {
-    setContractsHistory(prev => {
-      const filtered = prev.filter(c => c.id !== newContract.id);
-      return [newContract, ...filtered];
-    });
-
-    if (setDocumentosList) {
-      setDocumentosList([
-        {
-          id: newContract.id,
-          patientId: selectedPatient?.id || '',
-          name: `Contrato Odontológico - R$ ${newContract.totalAmount.toFixed(2)}`,
-          type: 'contrato_gov',
-          status: newContract.status,
-          date: newContract.contractDate,
-          data: newContract
-        },
-        ...(documentosList || []).filter((d: any) => d.id !== newContract.id)
-      ]);
-    }
-  };
-
-  const handleUploadSignedContract = async (e: React.ChangeEvent<HTMLInputElement>, contractId: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setContractUploadLoadingId(contractId);
-    try {
-      const pIdentifier = selectedPatient?.id || patientName || 'Paciente';
-      let fileUrl = '';
-      
-      try {
-        const uploadRes = await uploadPatientFileToSupabase(pIdentifier, file, file.name, 'Contratos_Assinados');
-        if (uploadRes && (uploadRes as any).path) {
-          fileUrl = (uploadRes as any).path;
-        }
-      } catch (uploadErr) {
-        console.warn('Upload no Supabase falhou ou usuário offline, referenciando local:', uploadErr);
-      }
-
-      setContractsHistory(prev => prev.map(c => {
-        if (c.id === contractId) {
-          return {
-            ...c,
-            status: 'assinado',
-            signedFileName: file.name,
-            signedFileUrl: fileUrl,
-            signedAt: new Date().toISOString()
-          };
-        }
-        return c;
-      }));
-
-      alert('Contrato assinado anexado com sucesso!');
-    } catch (err) {
-      console.error('Erro ao anexar contrato assinado:', err);
-      alert('Erro ao processar o arquivo do contrato.');
-    } finally {
-      setContractUploadLoadingId(null);
-    }
-  };
-
-  const handleResendContractWhatsApp = (contract: DentalContractData) => {
-    const recipientName = contract.hasGuardian && contract.guardianName ? contract.guardianName : contract.patientName;
-    const cleanPhone = (contract.hasGuardian && contract.guardianPhone ? contract.guardianPhone : contract.phone).replace(/\D/g, '');
-
-    const message = `Olá, *${recipientName}*! Tudo bem? Aqui é do consultório do *Dr. Agnaldo Ferreira*.
-
-Lembramos de enviar o seu *Contrato de Prestação de Serviços Odontológicos* para assinatura no celular pelo GOV.BR:
-
-📲 *Passo a passo:*
-1️⃣ Acesse: https://assinador.iti.br
-2️⃣ Entre com seu CPF e senha do GOV.BR (nível Prata ou Ouro).
-3️⃣ Toque em "Escolher Arquivo" e selecione o PDF do contrato.
-4️⃣ Posicione sua assinatura no campo reservado na última página e confirme.
-5️⃣ Baixe o contrato assinado e nos envie aqui pelo WhatsApp!
-
-Qualquer dúvida, estamos à sua disposição!`;
-
-    const waUrl = cleanPhone && cleanPhone.length >= 10
-      ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`
-      : `https://wa.me/?text=${encodeURIComponent(message)}`;
-
-    window.open(waUrl, '_blank');
-  };
 
   const localStorageKey = `declarationsHistory_${patientName}`;
   const [declarationsHistory, setDeclarationsHistory] = useState<IssuedDeclaration[]>(() => {
@@ -1529,14 +1428,14 @@ Qualquer dúvida, estamos à sua disposição!`;
                   className="flex items-center gap-2 px-6 py-3 bg-[#8B0000] text-white border border-[#8B0000] rounded-xl font-bold hover:bg-[#6e0000] hover:shadow-md transition-all sm:flex-1 justify-center cursor-pointer shadow-xs"
                >
                   <FileCheck className="w-5 h-5 text-[#C09553]" />
-                  Emitir Contrato (GOV.BR)
+                  Emitir Contrato Odontológico
                </button>
                <button
                   onClick={() => {
                     setReprintData(null);
                     setDocModalType('receituario');
                   }}
-                  className="flex items-center gap-2 px-6 py-3 bg-white border border-[#D5CBB3] rounded-xl text-zinc-800 font-bold hover:border-[#C09553] hover:shadow-md transition-all sm:flex-1 justify-center"
+                  className="flex items-center gap-2 px-6 py-3 bg-white border border-[#D5CBB3] rounded-xl text-zinc-800 font-bold hover:border-[#C09553] hover:shadow-md transition-all sm:flex-1 justify-center cursor-pointer"
                >
                   <FileText className="w-5 h-5 text-[#C09553]" />
                   Emitir Receituário
@@ -1546,7 +1445,7 @@ Qualquer dúvida, estamos à sua disposição!`;
                     setReprintData(null);
                     setDocModalType('atestado');
                   }}
-                  className="flex items-center gap-2 px-6 py-3 bg-white border border-[#D5CBB3] rounded-xl text-zinc-800 font-bold hover:border-[#C09553] hover:shadow-md transition-all sm:flex-1 justify-center"
+                  className="flex items-center gap-2 px-6 py-3 bg-white border border-[#D5CBB3] rounded-xl text-zinc-800 font-bold hover:border-[#C09553] hover:shadow-md transition-all sm:flex-1 justify-center cursor-pointer"
                >
                   <FileSignature className="w-5 h-5 text-[#C09553]" />
                   Emitir Atestado
@@ -1556,104 +1455,12 @@ Qualquer dúvida, estamos à sua disposição!`;
                     setReprintData(null);
                     setDocModalType('declaracao');
                   }}
-                  className="flex items-center gap-2 px-6 py-3 bg-white border border-[#D5CBB3] rounded-xl text-zinc-800 font-bold hover:border-[#C09553] hover:shadow-md transition-all sm:flex-1 justify-center"
+                  className="flex items-center gap-2 px-6 py-3 bg-white border border-[#D5CBB3] rounded-xl text-zinc-800 font-bold hover:border-[#C09553] hover:shadow-md transition-all sm:flex-1 justify-center cursor-pointer"
                >
                   <FileText className="w-5 h-5 text-[#C09553]" />
                   Emitir Declaração
                </button>
             </div>
-            
-            {/* Histórico de Contratos Odontológicos com GOV.BR */}
-            {contractsHistory.length > 0 && (
-               <div className="mt-8 pt-6 border-t border-zinc-200">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-bold text-[#8B0000] text-sm flex items-center gap-2">
-                    <FileCheck className="w-4 h-4 text-[#C09553]" />
-                    Contratos de Prestação de Serviços • Assinatura GOV.BR
-                  </h4>
-                  <span className="text-[11px] text-zinc-500 font-medium">
-                    {contractsHistory.length} contrato(s) emitido(s)
-                  </span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
-                     <thead className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 uppercase text-[10px]">
-                       <tr>
-                         <th className="px-4 py-3 font-semibold">Data da Emissão</th>
-                         <th className="px-4 py-3 font-semibold">Quem Assina</th>
-                         <th className="px-4 py-3 font-semibold">Valor dos Honorários</th>
-                         <th className="px-4 py-3 font-semibold">Status GOV.BR</th>
-                         <th className="px-4 py-3 font-semibold text-right">Ações</th>
-                       </tr>
-                     </thead>
-                     <tbody className="divide-y divide-zinc-100 text-xs">
-                       {contractsHistory.map(contr => (
-                         <tr key={contr.id} className="hover:bg-zinc-50 transition-colors">
-                           <td className="px-4 py-3 text-zinc-700 font-medium whitespace-nowrap">
-                             {new Date(contr.contractDate).toLocaleDateString('pt-BR')}
-                           </td>
-                           <td className="px-4 py-3 text-zinc-800">
-                             <div className="font-bold">{contr.hasGuardian && contr.guardianName ? contr.guardianName : contr.patientName}</div>
-                             <div className="text-[10px] text-zinc-400">{contr.hasGuardian ? `Responsável (${contr.guardianKinship})` : 'Paciente Titular'}</div>
-                           </td>
-                           <td className="px-4 py-3 text-[#8B0000] font-bold whitespace-nowrap">
-                             {contr.totalAmount > 0 ? `R$ ${contr.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : contr.totalAmountText}
-                           </td>
-                           <td className="px-4 py-3 whitespace-nowrap">
-                             {contr.status === 'assinado' ? (
-                               <div>
-                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                   <Check className="w-3 h-3" />
-                                   Assinado via GOV.BR
-                                 </span>
-                                 {contr.signedFileName && (
-                                   <div className="text-[10px] text-zinc-500 mt-1 truncate max-w-[170px]">
-                                     📄 {contr.signedFileName}
-                                   </div>
-                                 )}
-                               </div>
-                             ) : (
-                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                 <Clock className="w-3 h-3" />
-                                 Aguardando GOV.BR
-                               </span>
-                             )}
-                           </td>
-                           <td className="px-4 py-3 text-right whitespace-nowrap">
-                             <div className="flex items-center justify-end gap-2">
-                               <button
-                                 onClick={() => handleResendContractWhatsApp(contr)}
-                                 className="flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 transition-colors bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg cursor-pointer"
-                                 title="Reenviar orientações e link do GOV.BR no WhatsApp"
-                               >
-                                 <Phone className="w-3.5 h-3.5" />
-                                 WhatsApp
-                               </button>
-
-                               <label className="flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-800 transition-colors bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg cursor-pointer">
-                                 {contractUploadLoadingId === contr.id ? (
-                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                 ) : (
-                                   <Upload className="w-3.5 h-3.5" />
-                                 )}
-                                 <span>{contr.status === 'assinado' ? 'Substituir PDF' : 'Anexar Assinado'}</span>
-                                 <input
-                                   type="file"
-                                   accept=".pdf"
-                                   className="hidden"
-                                   disabled={contractUploadLoadingId === contr.id}
-                                   onChange={(e) => handleUploadSignedContract(e, contr.id)}
-                                 />
-                               </label>
-                             </div>
-                           </td>
-                         </tr>
-                       ))}
-                     </tbody>
-                  </table>
-                </div>
-               </div>
-            )}
             
             {declarationsHistory.length > 0 && (
                <div className="mt-8 pt-6 border-t border-zinc-200">
@@ -1718,8 +1525,8 @@ Qualquer dúvida, estamos à sua disposição!`;
           patientData={pd}
           clinicSettings={clinicSettings}
           proposal={proposal}
+          suggestedValue={proposal?.customDiscountAmount || 0}
           onClose={() => setIsContractModalOpen(false)}
-          onContractGenerated={handleContractGenerated}
         />
       )}
 

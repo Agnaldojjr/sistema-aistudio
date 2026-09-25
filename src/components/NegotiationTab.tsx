@@ -893,9 +893,9 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       });
 
       flatList.forEach((item, idx) => {
-        if (currentY > 250) {
+        if (currentY > 260) {
           doc.addPage();
-          currentY = 25;
+          currentY = 20;
         }
         doc.setFontSize(8);
         doc.text(item.tooth.toString(), 17, currentY);
@@ -909,8 +909,8 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         const costStr = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price);
         doc.text(costStr, 165, currentY);
 
-        doc.line(15, currentY + 3, 195, currentY + 3);
-        currentY += 8;
+        doc.line(15, currentY + 2, 195, currentY + 2);
+        currentY += 5.8;
       });
 
       // compile images with markers
@@ -1054,15 +1054,23 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       });
 
       // Disclaimer about fees
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setTextColor(100, 100, 100);
       doc.setFont('Helvetica', 'normal');
       const feeDisclaimer = "* ATENÇÃO: As taxas informadas são valores aproximados para simulação. O valor praticado pela maquininha deve ser consultado e conferido no dia de efetuar o pagamento.";
       const splitDisclaimer = doc.splitTextToSize(feeDisclaimer, 180);
-      doc.text(splitDisclaimer, 15, currentY + 20);
+      doc.text(splitDisclaimer, 15, currentY + 6);
+      currentY += (splitDisclaimer.length * 3.5) + 6;
+
+      // Quebra limpa de página caso a assinatura não caiba na página atual
+      if (currentY + 22 > 275) {
+        doc.addPage();
+        currentY = 25;
+      } else {
+        currentY += 10;
+      }
 
       // Signatures
-      currentY += 65;
       doc.setDrawColor(180, 180, 180);
       doc.line(20, currentY, 90, currentY);
       doc.line(120, currentY, 190, currentY);
@@ -1071,7 +1079,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       doc.setTextColor(120, 120, 120);
       doc.setFont('Helvetica', 'bold');
       doc.text("ASSINATURA DO CIRURGIÃO DENTISTA", 20, currentY + 4);
-      doc.text(clinicSettings.doctorName.toUpperCase(), 20, currentY + 8);
+      doc.text((clinicSettings.doctorName || 'Dr. Agnaldo Ferreira').toUpperCase(), 20, currentY + 8);
 
       doc.text("ASSINATURA DO PACIENTE / RESPONSÁVEL", 120, currentY + 4);
       doc.text((patientName || 'PACIENTE').toUpperCase(), 120, currentY + 8);
