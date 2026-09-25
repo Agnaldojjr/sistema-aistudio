@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { PatientData, ClinicSettings, TreatmentProposal } from '../types';
+import { fetchAddressByCep, formatCep } from '../lib/cep';
 
 export interface DentalContractData {
   id: string;
@@ -139,6 +140,33 @@ export default function DentalContractModal({
   const [activeTab, setActiveTab] = useState<'preview' | 'edit'>('preview');
   const [isGenerating, setIsGenerating] = useState(false);
   const [includeDentistSignature, setIncludeDentistSignature] = useState(true);
+  const [isLoadingCep, setIsLoadingCep] = useState(false);
+
+  const handleCepLookup = async (cepInput: string) => {
+    const formatted = formatCep(cepInput);
+    setFormData(prev => ({ ...prev, cep: formatted }));
+
+    const clean = cepInput.replace(/\D/g, '');
+    if (clean.length === 8) {
+      setIsLoadingCep(true);
+      try {
+        const addr = await fetchAddressByCep(clean);
+        if (addr) {
+          setFormData(prev => ({
+            ...prev,
+            cep: addr.cep || formatted,
+            address: addr.street ? `${addr.street}${addr.neighborhood ? ` - ${addr.neighborhood}` : ''}` : prev.address,
+            city: addr.city || prev.city || 'Belo Horizonte',
+            state: addr.state || prev.state || 'MG'
+          }));
+        }
+      } catch (err) {
+        console.warn('Erro ao buscar CEP:', err);
+      } finally {
+        setIsLoadingCep(false);
+      }
+    }
+  };
 
   // Formata valor inicial
   const initialValue = suggestedValue > 0 ? suggestedValue : (proposal?.customDiscountAmount || 0);
@@ -796,11 +824,21 @@ Qualquer dúvida durante o seu tratamento, estamos à sua inteira disposição!`
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-zinc-600 mb-1">CEP</label>
+                    <label className="block text-xs font-medium text-zinc-600 mb-1 flex items-center justify-between">
+                      <span>CEP</span>
+                      {isLoadingCep && (
+                        <span className="text-[10px] text-[#8B0000] font-normal flex items-center gap-1 animate-pulse">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Buscando...
+                        </span>
+                      )}
+                    </label>
                     <input
                       type="text"
+                      placeholder="00000-000"
+                      maxLength={9}
                       value={formData.cep}
-                      onChange={(e) => setFormData(prev => ({ ...prev, cep: e.target.value }))}
+                      onChange={(e) => handleCepLookup(e.target.value)}
+                      onBlur={(e) => handleCepLookup(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-300 focus:border-[#C09553]"
                     />
                   </div>

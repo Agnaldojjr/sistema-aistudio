@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { TreatmentProposal, PatientData, CRMPatient } from '../types';
-import { User, HeartPulse, MapPin, Building2, Save, MessageCircle, Cake, Sparkles, CalendarClock, AlertCircle, Phone } from 'lucide-react';
+import { User, HeartPulse, MapPin, Building2, Save, MessageCircle, Cake, Sparkles, CalendarClock, AlertCircle, Phone, Loader2 } from 'lucide-react';
 import { usePatientContext } from '../context/PatientContext';
+import { fetchAddressByCep, formatCep } from '../lib/cep';
 
 interface PatientRegistrationTabProps {
   proposal: TreatmentProposal;
@@ -60,9 +61,9 @@ export default function PatientRegistrationTab({ proposal, setProposal }: Patien
     return createdDate < sixMonthsAgo;
   };
 
-  const handleUpdate = (field: keyof CRMPatient, value: string) => {
+  const handleBatchUpdate = (updates: Partial<CRMPatient>) => {
     if (selectedPatient) {
-      const updatedPatient = { ...selectedPatient, [field]: value };
+      const updatedPatient = { ...selectedPatient, ...updates };
       setSelectedPatient(updatedPatient);
       setProposal(prev => ({
         ...prev,
@@ -73,9 +74,42 @@ export default function PatientRegistrationTab({ proposal, setProposal }: Patien
         ...prev,
         patientData: {
           ...(prev.patientData || {}),
-          [field]: value
+          ...updates
         }
       }));
+    }
+  };
+
+  const handleUpdate = (field: keyof CRMPatient, value: string) => {
+    handleBatchUpdate({ [field]: value });
+  };
+
+  const [isLoadingCep, setIsLoadingCep] = React.useState(false);
+
+  const handleCepLookup = async (cepInput: string) => {
+    const formatted = formatCep(cepInput);
+    handleUpdate('cep', formatted);
+
+    const clean = cepInput.replace(/\D/g, '');
+    if (clean.length === 8) {
+      setIsLoadingCep(true);
+      try {
+        const addr = await fetchAddressByCep(clean);
+        if (addr) {
+          handleBatchUpdate({
+            cep: addr.cep || formatted,
+            street: addr.street || pd.street || '',
+            neighborhood: addr.neighborhood || pd.neighborhood || '',
+            city: addr.city || pd.city || '',
+            state: addr.state || pd.state || '',
+            complement: addr.complement || pd.complement || ''
+          });
+        }
+      } catch (err) {
+        console.warn('Erro ao buscar CEP:', err);
+      } finally {
+        setIsLoadingCep(false);
+      }
     }
   };
 
@@ -277,8 +311,23 @@ export default function PatientRegistrationTab({ proposal, setProposal }: Patien
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-zinc-500 font-semibold mb-1">CEP</label>
-              <input type="text" value={pd.cep || ''} onChange={e => handleUpdate('cep', e.target.value)} className="w-full border border-zinc-300 rounded p-2 focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] focus:outline-none" />
+              <label className="block text-zinc-500 font-semibold mb-1 flex items-center justify-between">
+                <span>CEP</span>
+                {isLoadingCep && (
+                  <span className="text-[10px] text-[#8B0000] font-normal flex items-center gap-1 animate-pulse">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Buscando...
+                  </span>
+                )}
+              </label>
+              <input 
+                type="text" 
+                placeholder="00000-000" 
+                maxLength={9}
+                value={pd.cep || ''} 
+                onChange={e => handleCepLookup(e.target.value)} 
+                onBlur={e => handleCepLookup(e.target.value)}
+                className="w-full border border-zinc-300 rounded p-2 focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] focus:outline-none" 
+              />
             </div>
             <div className="md:col-span-3">
               <label className="block text-zinc-500 font-semibold mb-1">Logradouro</label>

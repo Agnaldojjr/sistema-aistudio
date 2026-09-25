@@ -49,6 +49,7 @@ import { jsPDF } from 'jspdf';
 import { supabase } from '../lib/supabase';
 import * as XLSX from 'xlsx';
 import { CRMPatient, CRMAppointment, CRMClinicalHistory, CRMCommunication } from '../types';
+import { fetchAddressByCep, formatCep } from '../lib/cep';
 import { z } from 'zod';
 import {
   listPatientFilesFromSupabase,
@@ -782,6 +783,35 @@ export default function DentalCRMView({
   const [isEditingPatient, setIsEditingPatient] = useState(false);
   const [editPatientData, setEditPatientData] = useState<Partial<CRMPatient>>({});
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [isLoadingCep, setIsLoadingCep] = useState(false);
+
+  const handleCepLookup = async (cepInput: string) => {
+    const formatted = formatCep(cepInput);
+    setEditPatientData(prev => ({ ...prev, cep: formatted }));
+
+    const clean = cepInput.replace(/\D/g, '');
+    if (clean.length === 8) {
+      setIsLoadingCep(true);
+      try {
+        const addr = await fetchAddressByCep(clean);
+        if (addr) {
+          setEditPatientData(prev => ({
+            ...prev,
+            cep: addr.cep || formatted,
+            street: addr.street || prev.street || '',
+            neighborhood: addr.neighborhood || prev.neighborhood || '',
+            city: addr.city || prev.city || '',
+            state: addr.state || prev.state || '',
+            complement: addr.complement || prev.complement || ''
+          }));
+        }
+      } catch (err) {
+        console.warn('Erro ao buscar CEP:', err);
+      } finally {
+        setIsLoadingCep(false);
+      }
+    }
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -4460,8 +4490,23 @@ export default function DentalCRMView({
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
                                   <div>
-                                    <label className="block text-zinc-500 font-semibold mb-1">CEP</label>
-                                    <input type="text" placeholder="00000-000" value={editPatientData.cep || ''} onChange={e => setEditPatientData(prev => ({ ...prev, cep: e.target.value }))} className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" />
+                                    <label className="block text-zinc-500 font-semibold mb-1 flex items-center justify-between">
+                                      <span>CEP</span>
+                                      {isLoadingCep && (
+                                        <span className="text-[10px] text-[#8B0000] font-normal flex items-center gap-1 animate-pulse">
+                                          <Loader2 className="w-3 h-3 animate-spin" /> Buscando...
+                                        </span>
+                                      )}
+                                    </label>
+                                    <input 
+                                      type="text" 
+                                      placeholder="00000-000" 
+                                      maxLength={9}
+                                      value={editPatientData.cep || ''} 
+                                      onChange={e => handleCepLookup(e.target.value)} 
+                                      onBlur={e => handleCepLookup(e.target.value)}
+                                      className="w-full bg-[#FAF8F5] border border-zinc-200 rounded-lg px-3 py-2 outline-none focus:border-[#C09553] focus:ring-1 focus:ring-[#C09553] transition-all" 
+                                    />
                                   </div>
                                   <div className="md:col-span-3">
                                     <label className="block text-zinc-500 font-semibold mb-1">Logradouro</label>
