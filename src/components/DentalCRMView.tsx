@@ -1577,42 +1577,69 @@ export default function DentalCRMView({
     if (!window.confirm("Deseja realmente excluir este orçamento/projeto do Supabase?")) return;
     try {
       setIsLoadingSupabaseProposals(true);
-      await deletePatientFileFromSupabase(driveFolderId || selectedPatient?.name || "Unknown", fileId);
-      if (driveFolderId) {
-        const proposals = await listPatientFilesFromSupabase(driveFolderId, selectedPatient?.name);
+      const targetFolder = driveFolderId || selectedPatient?.id || selectedPatient?.name || "Unknown";
+      await deletePatientFileFromSupabase(targetFolder, fileId, 'Orcamentos');
+      const folderToLoad = driveFolderId || selectedPatient?.id;
+      if (folderToLoad) {
+        const proposals = await listPatientFilesFromSupabase(folderToLoad, selectedPatient?.name);
         setSupabaseProposals(filterSupabaseProposals(proposals));
       }
+      if (selectedProposalId === fileId) {
+        setSelectedProposalId(null);
+        setSelectedProposalData(null);
+      }
     } catch (err: any) {
-      alert("Erro ao excluir orçamento: " + err.message);
+      alert("Erro ao excluir orçamento: " + (err.message || err));
     } finally {
       setIsLoadingSupabaseProposals(false);
     }
   };
 
   const renameSupabaseProposalFile = async (fileId: string, currentName: string) => {
-    const cleanCurrentName = currentName.replace('.json', '').replace('orcamento_salvo_', '').replace(/_/g, ' ');
+    const cleanCurrentName = currentName
+      .replace(/^Orcamentos\//, '')
+      .replace(/\.json$/i, '')
+      .replace(/^orcamento_salvo_/, '')
+      .replace(/^orcamento_salvo/, '')
+      .replace(/^orcamento_ativo/, 'Orçamento Ativo')
+      .replace(/_/g, ' ')
+      .trim();
+
     const newNameInput = window.prompt("Digite o novo nome para o orçamento:", cleanCurrentName);
     if (!newNameInput || newNameInput.trim() === '' || newNameInput.trim() === cleanCurrentName) return;
     
     // Format to safe filename
-    const safeBaseName = newNameInput.trim().toLowerCase().replace(/\s+/g, '_');
-    const newFilename = `orcamento_salvo_${safeBaseName}.json`;
+    const safeBaseName = newNameInput
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+
+    const newFilename = `orcamento_salvo_${safeBaseName || 'custom'}.json`;
     
     try {
       setIsLoadingSupabaseProposals(true);
-      await renamePatientFileInSupabase(driveFolderId || selectedPatient?.name || "Unknown", currentName, newFilename);
-      if (driveFolderId) {
-        const proposals = await listPatientFilesFromSupabase(driveFolderId, selectedPatient?.name);
-        setSupabaseProposals(filterSupabaseProposals(proposals));
+      const targetFolder = driveFolderId || selectedPatient?.id || selectedPatient?.name || "Unknown";
+      await renamePatientFileInSupabase(targetFolder, fileId, newFilename, 'Orcamentos');
+      
+      const folderToLoad = driveFolderId || selectedPatient?.id;
+      if (folderToLoad) {
+        const proposals = await listPatientFilesFromSupabase(folderToLoad, selectedPatient?.name);
+        const filtered = filterSupabaseProposals(proposals);
+        setSupabaseProposals(filtered);
         
-        // Update selected proposal ID if it was renamed
-        const found = proposals.find(p => p.name === newFilename);
-        if (found) {
+        // Update selected proposal ID if it was renamed (P2: preserve active selection)
+        const wasCurrentSelected = selectedProposalId === fileId;
+        const found = filtered.find(p => p.name === newFilename || p.name === `Orcamentos/${newFilename}` || p.id.endsWith(`/${newFilename}`));
+        if (found && (wasCurrentSelected || !selectedProposalId)) {
           setSelectedProposalId(found.id);
         }
       }
     } catch (err: any) {
-      alert("Erro ao renomear orçamento: " + err.message);
+      alert("Erro ao renomear orçamento: " + (err.message || err));
     } finally {
       setIsLoadingSupabaseProposals(false);
     }
@@ -5029,8 +5056,8 @@ export default function DentalCRMView({
                                   <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3">
                                     <div className="space-y-1 flex-1 min-w-0">
                                       <div className="flex items-center gap-2">
-                                        <h5 className="font-serif font-bold text-sm text-[#8B0000] truncate">
-                                          {prop.name.replace('.json', '').replace('orcamento_salvo', 'Orçamento').replace(/_/g, ' ')}
+                                        <h5 className="font-serif font-bold text-sm text-[#8B0000] truncate capitalize" title={prop.name}>
+                                          {prop.name.replace(/^Orcamentos\//, '').replace(/\.json$/i, '').replace(/^orcamento_salvo_/, '').replace(/^orcamento_salvo/, '').replace(/^orcamento_ativo/, 'Orçamento Ativo').replace(/_/g, ' ').trim() || 'Orçamento'}
                                         </h5>
                                         <button
                                           type="button"
@@ -6022,8 +6049,8 @@ export default function DentalCRMView({
                                         <FileText className="w-4 h-4" />
                                       </div>
                                       <div className="min-w-0">
-                                        <p className="text-xs font-bold text-zinc-800 truncate" title={prop.name}>
-                                          {prop.name.replace('.json', '')}
+                                        <p className="text-xs font-bold text-zinc-800 truncate capitalize" title={prop.name}>
+                                          {prop.name.replace(/^Orcamentos\//, '').replace(/\.json$/i, '').replace(/^orcamento_salvo_/, '').replace(/^orcamento_salvo/, '').replace(/^orcamento_ativo/, 'Orçamento Ativo').replace(/_/g, ' ').trim() || 'Orçamento'}
                                         </p>
                                         <p className="text-[9px] text-zinc-500 font-mono">
                                           Atualizado em: {new Date(prop.modifiedTime || prop.createdTime).toLocaleDateString('pt-BR')} às {new Date(prop.modifiedTime || prop.createdTime).toLocaleTimeString('pt-BR')}

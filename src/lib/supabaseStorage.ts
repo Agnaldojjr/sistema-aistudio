@@ -201,13 +201,27 @@ export async function deletePatientFileFromSupabase(patientIdentifier: string, f
   const targetFolder = getSafePatientPath(patientIdentifier);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
   const finalFilename = getSafeFilename(filename);
-  const filePath = filename.includes('/') ? filename : `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
+
+  let filePath: string;
+  if (filename.startsWith(`${userId}/`)) {
+    filePath = filename;
+  } else if (filename.includes('/')) {
+    filePath = `${userId}/${targetFolder}/${filename.replace(/^\/+/, '')}`;
+  } else {
+    filePath = `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
+  }
 
   const { error } = await supabase.storage
     .from(BUCKET_NAME)
     .remove([filePath]);
 
   if (error) {
+    // If not found and no subfolder was passed, try fallback to Orcamentos/
+    if (!subfolder && !filename.includes('/')) {
+      const fallbackPath = `${userId}/${targetFolder}/Orcamentos/${finalFilename}`;
+      await supabase.storage.from(BUCKET_NAME).remove([fallbackPath]);
+      return;
+    }
     console.error('Erro ao deletar arquivo:', error);
     throw error;
   }
@@ -241,7 +255,11 @@ export async function getPatientFileUrlFromSupabase(patientIdentifier: string, f
   const targetFolder = getSafePatientPath(patientIdentifier);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
   const finalFilename = getSafeFilename(filename);
-  const filePath = filename.includes('/') ? filename : `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
+  const filePath = filename.startsWith(`${userId}/`)
+    ? filename
+    : (filename.includes('/')
+      ? `${userId}/${targetFolder}/${filename.replace(/^\/+/, '')}`
+      : `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`);
 
   const { data, error } = await supabase.storage.from(BUCKET_NAME).createSignedUrl(filePath, expiresIn);
   if (error) {
@@ -262,14 +280,45 @@ export async function renamePatientFileInSupabase(patientIdentifier: string, old
   const userId = session.user.id;
   const targetFolder = getSafePatientPath(patientIdentifier);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
-  const finalOldFilename = getSafeFilename(oldFilename);
-  const finalNewFilename = getSafeFilename(newFilename);
-  const oldPath = oldFilename.includes('/') ? oldFilename : `${userId}/${targetFolder}/${subfolderPath}${finalOldFilename}`;
-  const newPath = newFilename.includes('/') ? newFilename : `${userId}/${targetFolder}/${subfolderPath}${finalNewFilename}`;
+  const safeNewBaseName = getSafeFilename(newFilename.split('/').pop() || newFilename);
+  
+  let oldPath: string;
+  let newPath: string;
+
+  if (oldFilename.startsWith(`${userId}/`)) {
+    // oldFilename is already the complete storagePath (e.g. from file.id)
+    oldPath = oldFilename;
+    const parentDir = oldPath.substring(0, oldPath.lastIndexOf('/'));
+    newPath = `${parentDir}/${safeNewBaseName}`;
+  } else if (oldFilename.includes('/')) {
+    // Relative path with subfolder (e.g. "Orcamentos/orcamento_salvo_123.json")
+    const cleanOld = oldFilename.replace(/^\/+/, '');
+    oldPath = `${userId}/${targetFolder}/${cleanOld}`;
+    const parentDir = oldPath.substring(0, oldPath.lastIndexOf('/'));
+    newPath = `${parentDir}/${safeNewBaseName}`;
+  } else {
+    // Simple filename without slashes
+    const finalOldFilename = getSafeFilename(oldFilename);
+    oldPath = `${userId}/${targetFolder}/${subfolderPath}${finalOldFilename}`;
+    newPath = `${userId}/${targetFolder}/${subfolderPath}${safeNewBaseName}`;
+  }
+
+  // Check if oldPath and newPath are identical
+  if (oldPath === newPath) return;
 
   const { error } = await supabase.storage.from(BUCKET_NAME).move(oldPath, newPath);
+
   if (error) {
-    console.error('Erro ao renomear arquivo:', error);
+    // Fallback: If oldPath was assumed at root but actually lives in Orcamentos/
+    if (!oldFilename.includes('Orcamentos') && !subfolder) {
+      const fallbackOld = `${userId}/${targetFolder}/Orcamentos/${getSafeFilename(oldFilename)}`;
+      const fallbackNew = `${userId}/${targetFolder}/Orcamentos/${safeNewBaseName}`;
+      const fallbackResult = await supabase.storage.from(BUCKET_NAME).move(fallbackOld, fallbackNew);
+      if (!fallbackResult.error) {
+        return;
+      }
+    }
+    console.error('Erro ao renomear arquivo no Supabase Storage:', error);
     throw error;
   }
 }

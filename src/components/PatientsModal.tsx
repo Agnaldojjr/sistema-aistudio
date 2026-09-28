@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Search, FileText, Loader2, CalendarPlus, FolderOpen, ChevronLeft, ImageIcon, MessageCircle, Phone, Trash2, ShieldAlert, Pencil, Check, User, Camera, Upload, RefreshCw, Cake, CalendarClock, AlertCircle, Zap, ZapOff, Focus, LayoutGrid } from 'lucide-react';
 import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
-import { listPatientFilesFromSupabase, uploadPatientFileToSupabase, deletePatientFileFromSupabase, downloadFileAsDataUrlFromSupabase } from '../lib/supabaseStorage';
+import { listPatientFilesFromSupabase, uploadPatientFileToSupabase, deletePatientFileFromSupabase, downloadFileAsDataUrlFromSupabase, renamePatientFileInSupabase } from '../lib/supabaseStorage';
 import { ClinicSettings } from '../types';
 import ImageMarkupEditor from './ImageMarkupEditor';
 
@@ -324,30 +324,55 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
     }
   };
 
+  const formatProposalDisplayName = (fileName: string) => {
+    if (!fileName) return 'Orçamento';
+    return fileName
+      .replace(/^Orcamentos\//, '')
+      .replace(/\.json$/i, '')
+      .replace(/^orcamento_salvo_/, '')
+      .replace(/^orcamento_salvo/, '')
+      .replace(/^orcamento_ativo/, 'Orçamento Ativo')
+      .replace(/_/g, ' ')
+      .trim() || 'Orçamento';
+  };
+
   const handleStartRename = (prop: any, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingProposalId(prop.id);
-    setEditingProposalName(prop.name.replace('.json', ''));
+    setEditingProposalName(formatProposalDisplayName(prop.name));
   };
 
   const handleRenameProposal = async (proposalId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!editingProposalName.trim()) return;
+    if (!editingProposalName.trim() || !selectedPatient) return;
     try {
       setRenamingId(proposalId);
-      // Supabase Storage não tem rename direto simples. Teríamos que baixar e reupar.
-      // Omitido no mockup para simplificar, já que a migração não focou nisso.
-      alert('Renomear arquivos no Supabase em desenvolvimento.');
-      setProposals(prev => prev.map(p => {
-        if (p.id === proposalId) {
-          const finalName = editingProposalName.trim();
-          return { ...p, name: finalName.endsWith('.json') ? finalName : finalName + '.json' };
-        }
-        return p;
-      }));
+      
+      const safeBaseName = editingProposalName
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+
+      const newFilename = `orcamento_salvo_${safeBaseName || 'custom'}.json`;
+
+      await renamePatientFileInSupabase(
+        selectedPatient.id,
+        proposalId,
+        newFilename,
+        'Orcamentos'
+      );
+
+      // Refresh proposals from Supabase
+      const allFiles = await listPatientFilesFromSupabase(selectedPatient.id, selectedPatient.name);
+      const jsonFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.json'));
+      setProposals(jsonFiles);
       setEditingProposalId(null);
     } catch (err: any) {
-      alert('Erro ao renomear orçamento: ' + err.message);
+      alert('Erro ao renomear orçamento: ' + (err.message || err));
     } finally {
       setRenamingId(null);
     }
@@ -355,14 +380,14 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
 
   const handleDeleteProposal = async (proposalId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!selectedPatient) return;
     try {
       setLoadingId(proposalId);
-      const fileName = proposalId.split('/').pop() || proposalId;
-      await deletePatientFileFromSupabase(selectedPatient?.name || '', fileName);
+      await deletePatientFileFromSupabase(selectedPatient.id, proposalId, 'Orcamentos');
       setProposals(prev => prev.filter(p => p.id !== proposalId));
       setConfirmDeleteProposalId(null);
     } catch (err: any) {
-      alert('Erro ao excluir orçamento: ' + err.message);
+      alert('Erro ao excluir orçamento: ' + (err.message || err));
     } finally {
       setLoadingId(null);
     }
@@ -974,7 +999,9 @@ export default function PatientsModal({ onClose, onLoadPatient, onNewAppointment
                                   </div>
                                   <div>
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <p className="text-sm font-bold text-zinc-800">{prop.name.replace('.json', '')}</p>
+                                      <p className="text-sm font-bold text-zinc-800 capitalize" title={prop.name}>
+                                        {formatProposalDisplayName(prop.name)}
+                                      </p>
                                       
                                       {/* Status Badge */}
                                       <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColor(prop.appProperties?.status || 'Aberto (paciente não pagou)')}`}>
