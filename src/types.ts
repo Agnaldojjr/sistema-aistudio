@@ -43,12 +43,14 @@ export interface ToothMarker {
 }
 
 export interface PhotoSection {
-  id: 'upper' | 'lower' | 'smile' | 'panoramic' | 'geral';
+  id: string; // 'upper' | 'lower' | 'smile' | 'panoramic' | 'geral' or custom 'extra-...'
   title: string;
   subtitle: string;
+  description?: string; // Identificação ou descrição textual do que se trata a foto
   image: string | null; // Data URL or reference image path
   markers: ToothMarker[];
   installments?: number;
+  isExtra?: boolean;
 }
 
 export interface BudgetVersion {

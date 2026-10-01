@@ -26,16 +26,25 @@ import {
   Share2,
   FileDown,
   Save,
-  WifiOff
+  WifiOff,
+  Camera,
+  Plus,
+  Trash2,
+  Upload,
+  FileText,
+  Check,
+  Edit2
 } from 'lucide-react';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from '../types';
 import { usePatientContext } from '../context/PatientContext';
 import { uploadPatientFileToSupabase, getPatientFileUrlFromSupabase } from '../lib/supabaseStorage';
+import { compressFileToDataUrl, compressImage } from '../lib/imageUtils';
 import { useAutoSaveBudget } from '../hooks/useAutoSaveBudget';
 import { jsPDF } from 'jspdf';
 
 interface NegotiationTabProps {
   sections: PhotoSection[];
+  onUpdateSections?: (sections: PhotoSection[]) => void;
   procedures: Procedure[];
   proposal: TreatmentProposal;
   setProposal: React.Dispatch<React.SetStateAction<TreatmentProposal>>;
@@ -78,6 +87,10 @@ const drawMarkersOnImage = (sec: PhotoSection, procedures: Procedure[]): Promise
   return new Promise((resolve) => {
     if (!sec.image) {
       resolve('');
+      return;
+    }
+    if (!sec.markers || sec.markers.length === 0) {
+      resolve(sec.image);
       return;
     }
     const img = new Image();
@@ -159,6 +172,7 @@ const drawMarkersOnImage = (sec: PhotoSection, procedures: Procedure[]): Promise
 
 export default function NegotiationTab({
   sections,
+  onUpdateSections,
   procedures,
   proposal,
   setProposal,
@@ -176,6 +190,22 @@ export default function NegotiationTab({
     setClinicalHistory,
     saveContextToSupabase 
   } = usePatientContext();
+
+  const handleUpdateAllSections = useCallback((newSections: PhotoSection[]) => {
+    setActiveSections(newSections);
+    if (onUpdateSections) {
+      onUpdateSections(newSections);
+    }
+  }, [setActiveSections, onUpdateSections]);
+
+  // Estados para importação de fotos avulsas e identificação/descrição no orçamento
+  const [showAddAvulsaModal, setShowAddAvulsaModal] = useState(false);
+  const [avulsaTitle, setAvulsaTitle] = useState('');
+  const [avulsaDescription, setAvulsaDescription] = useState('');
+  const [avulsaDataUrl, setAvulsaDataUrl] = useState<string | null>(null);
+  const [isProcessingAvulsaPhoto, setIsProcessingAvulsaPhoto] = useState(false);
+  const [editingTitleSectionId, setEditingTitleSectionId] = useState<string | null>(null);
+  const [editingTitleText, setEditingTitleText] = useState('');
   const patientName = selectedPatient ? selectedPatient.name : (proposal.patientName || '');
   const pd = selectedPatient || proposal.patientData || {};
   
@@ -913,16 +943,17 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         currentY += 5.8;
       });
 
-      // compile images with markers
-      const sectionsWithImages: { title: string; subtitle: string; dataUrl: string }[] = [];
+      // compile images with markers and loose photos
+      const sectionsWithImages: { title: string; subtitle?: string; description?: string; dataUrl: string }[] = [];
       for (const sec of sections) {
-        if (sec.image && sec.markers && sec.markers.length > 0) {
+        if (sec.image) {
           try {
             const dataUrl = await drawMarkersOnImage(sec, procedures);
             if (dataUrl) {
               sectionsWithImages.push({
                 title: sec.title,
                 subtitle: sec.subtitle,
+                description: sec.description,
                 dataUrl
               });
             }
@@ -975,12 +1006,14 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           doc.setFont('Helvetica', 'bold');
           doc.text(item.title.toUpperCase(), imgX, itemY);
           
-          // Subtitle
-          if (item.subtitle) {
+          // Description or Subtitle
+          const textToShow = item.description || item.subtitle;
+          if (textToShow) {
             doc.setFontSize(6.5);
-            doc.setTextColor(120, 120, 120);
+            doc.setTextColor(100, 100, 100);
             doc.setFont('Helvetica', 'normal');
-            doc.text(item.subtitle, imgX, itemY + 3.5);
+            const lines = doc.splitTextToSize(textToShow, imgWidth);
+            doc.text(lines.slice(0, 2), imgX, itemY + 3.5);
           }
           
           // Add image
@@ -2134,24 +2167,142 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
 
         {/* Registros de Fotos Mapeadas (Fotos do Planejamento) */}
         {(() => {
-          const activeSections = sections.filter((s) => !!s.image || s.markers.length > 0);
-          if (activeSections.length === 0) return null;
+          const displayedSections = (sections || []).filter((s) => !!s.image || (s.markers && s.markers.length > 0) || s.id === 'upper' || s.id === 'lower');
+          if (displayedSections.length === 0) return null;
           return (
             <div className="mt-4 no-print-break space-y-2">
-              <div className="border-b border-zinc-100 pb-1">
-                <h4 className="text-[10px] font-bold text-[#8B0000] uppercase tracking-wider">
-                  Registro de Mapeamento Clínico Visual (Fotos do Planejamento)
+              <div className="border-b border-zinc-100 pb-1.5 flex items-center justify-between">
+                <h4 className="text-[10px] font-bold text-[#8B0000] uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                  <Camera className="w-3.5 h-3.5 text-[#C09553]" />
+                  <span>Registro de Mapeamento Clínico Visual (Fotos do Planejamento)</span>
                 </h4>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvulsaTitle('');
+                    setAvulsaDescription('');
+                    setAvulsaDataUrl(null);
+                    setShowAddAvulsaModal(true);
+                  }}
+                  className="px-2.5 py-1 bg-[#FAF8F5] text-[#8B0000] text-[10px] font-bold rounded-lg border border-[#C09553]/40 hover:border-[#C09553] hover:bg-[#8B0000] hover:text-white transition-all flex items-center gap-1 shadow-2xs cursor-pointer select-none"
+                  title="Importar foto avulsa com identificação/legenda para o orçamento"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>+ Importar Foto Avulsa</span>
+                </button>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                {activeSections.map((sec) => {
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {displayedSections.map((sec) => {
                   const hasImg = !!sec.image;
-                  const markers = sec.markers;
+                  const markers = sec.markers || [];
+                  const isExtra = !!sec.isExtra || sec.id.startsWith('extra-');
+                  const isEditingThisTitle = editingTitleSectionId === sec.id;
+
                   return (
-                    <div key={sec.id} className="border border-[#E6DEC9]/60 rounded-xl p-2.5 bg-white space-y-1.5 shadow-2xs">
-                      <span className="text-[9px] font-bold text-[#B48C4D] uppercase tracking-wider block font-sans">
-                        {sec.title}
-                      </span>
+                    <div key={sec.id} className="border border-[#E6DEC9]/60 rounded-xl p-2.5 bg-white space-y-2 shadow-2xs relative">
+                      {/* Top Header of the Card */}
+                      <div className="flex items-center justify-between gap-2">
+                        {isEditingThisTitle ? (
+                          <div className="flex items-center gap-1 flex-1">
+                            <input
+                              type="text"
+                              value={editingTitleText}
+                              onChange={(e) => setEditingTitleText(e.target.value)}
+                              className="text-[10px] font-bold text-zinc-900 border border-[#C09553] rounded px-1.5 py-0.5 w-full focus:outline-none"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newTitle = editingTitleText.trim() || sec.title;
+                                const updated = (sections || []).map(s => s.id === sec.id ? { ...s, title: newTitle } : s);
+                                handleUpdateAllSections(updated);
+                                setEditingTitleSectionId(null);
+                              }}
+                              className="text-xs text-green-700 hover:text-green-800 p-0.5"
+                              title="Salvar título"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingTitleSectionId(null)}
+                              className="text-xs text-zinc-400 hover:text-zinc-600 p-0.5"
+                              title="Cancelar"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            <span className="text-[9px] font-bold text-[#B48C4D] uppercase tracking-wider block font-sans truncate">
+                              {sec.title}
+                            </span>
+                            {isExtra && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingTitleSectionId(sec.id);
+                                  setEditingTitleText(sec.title);
+                                }}
+                                className="text-zinc-400 hover:text-[#8B0000] p-0.5 transition-colors"
+                                title="Editar título"
+                              >
+                                <Edit2 className="w-2.5 h-2.5" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Top Action Icons */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <label
+                            className="p-1 text-zinc-400 hover:text-[#8B0000] hover:bg-zinc-100 rounded cursor-pointer transition-colors"
+                            title={hasImg ? "Trocar foto" : "Carregar foto"}
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                try {
+                                  const dataUrl = await compressFileToDataUrl(file, 1024, 0.7);
+                                  const updated = (sections || []).map(s => s.id === sec.id ? { ...s, image: dataUrl } : s);
+                                  handleUpdateAllSections(updated);
+                                  const patientId = selectedPatient?.id || selectedPatient?.name || patientName;
+                                  if (patientId) {
+                                    uploadPatientFileToSupabase(patientId, file, `${sec.id}_${Date.now()}.jpg`).catch(() => {});
+                                  }
+                                } catch (err) {
+                                  console.error(err);
+                                  alert('Falha ao carregar imagem.');
+                                }
+                              }}
+                            />
+                          </label>
+
+                          {isExtra && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`Deseja realmente remover a foto "${sec.title}" do orçamento?`)) {
+                                  const updated = (sections || []).filter(s => s.id !== sec.id);
+                                  handleUpdateAllSections(updated);
+                                }
+                              }}
+                              className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Excluir esta foto avulsa"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Photo Image Box */}
                       <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-[#E6DEC9] bg-zinc-950">
                         {hasImg ? (
                           <>
@@ -2208,10 +2359,51 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                             })}
                           </>
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-[10px] text-zinc-400 italic">
-                            Foto não inserida
-                          </div>
+                          <label className="w-full h-full flex flex-col items-center justify-center text-[10px] text-zinc-400 gap-1.5 cursor-pointer hover:bg-zinc-900 transition-colors group">
+                            <Upload className="w-4 h-4 text-zinc-500 group-hover:text-[#C09553] transition-colors" />
+                            <span className="group-hover:text-zinc-200 transition-colors font-medium">Clique para inserir foto</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                try {
+                                  const dataUrl = await compressFileToDataUrl(file, 1024, 0.7);
+                                  const updated = (sections || []).map(s => s.id === sec.id ? { ...s, image: dataUrl } : s);
+                                  handleUpdateAllSections(updated);
+                                  const patientId = selectedPatient?.id || selectedPatient?.name || patientName;
+                                  if (patientId) {
+                                    uploadPatientFileToSupabase(patientId, file, `${sec.id}_${Date.now()}.jpg`).catch(() => {});
+                                  }
+                                } catch (err) {
+                                  console.error(err);
+                                  alert('Falha ao carregar imagem.');
+                                }
+                              }}
+                            />
+                          </label>
                         )}
+                      </div>
+
+                      {/* Text field for Identification / Description */}
+                      <div className="space-y-1 pt-0.5">
+                        <label className="text-[9px] font-bold text-[#8B0000] uppercase tracking-wider flex items-center gap-1 font-sans">
+                          <FileText className="w-2.5 h-2.5 text-[#C09553]" />
+                          <span>Identificação / Do que se trata:</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Fratura dente 21, Raio-X periapical, Sorriso frontal..."
+                          value={sec.description || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const updated = (sections || []).map((s) => s.id === sec.id ? { ...s, description: val } : s);
+                            handleUpdateAllSections(updated);
+                          }}
+                          className="w-full bg-[#FAF8F5] border border-[#E6DEC9] focus:border-[#8B0000] focus:bg-white focus:outline-none rounded-md px-2.5 py-1 text-[11px] text-zinc-800 placeholder:text-zinc-400 transition-all font-sans"
+                        />
                       </div>
                     </div>
                   );
@@ -2220,6 +2412,188 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
             </div>
           );
         })()}
+
+        {/* Modal de Importação de Foto Avulsa no Orçamento */}
+        {showAddAvulsaModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+            <div className="bg-[#FAF8F5] border border-[#E6DEC9] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-fadeIn flex flex-col max-h-[90vh]">
+              <div className="bg-white px-5 py-4 border-b border-[#E6DEC9] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Camera className="w-5 h-5 text-[#8B0000]" />
+                  <h3 className="font-serif font-bold text-[#4E1119] text-base">Importar Foto Avulsa para o Orçamento</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddAvulsaModal(false)}
+                  className="text-zinc-400 hover:text-red-600 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4 overflow-y-auto flex-1">
+                {/* Título da Foto */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-700 uppercase tracking-wide">
+                    Título / Identificação Principal *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Raio-X Dente 21, Sorriso Frontal, Tomografia, Perfil..."
+                    value={avulsaTitle}
+                    onChange={(e) => setAvulsaTitle(e.target.value)}
+                    className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-lg px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none transition-all"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Descrição / Do que se trata */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-700 uppercase tracking-wide">
+                    Descrição Detalhada / Do que se trata (Aparecerá na proposta e PDF)
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Ex: Observa-se fratura oblíqua na coroa e terço médio da raiz, indicando necessidade de reconstrução..."
+                    value={avulsaDescription}
+                    onChange={(e) => setAvulsaDescription(e.target.value)}
+                    className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-lg px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none transition-all resize-none"
+                  />
+                </div>
+
+                {/* Seleção / Upload da Foto */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-700 uppercase tracking-wide">
+                    Foto / Imagem *
+                  </label>
+                  
+                  {avulsaDataUrl ? (
+                    <div className="relative aspect-video rounded-xl overflow-hidden border-2 border-[#C09553] bg-zinc-950 group">
+                      <img src={avulsaDataUrl} alt="Preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <label className="px-3 py-1.5 bg-white text-zinc-800 text-xs font-bold rounded-lg cursor-pointer hover:bg-zinc-100 transition-colors shadow">
+                          Trocar Foto
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setIsProcessingAvulsaPhoto(true);
+                              try {
+                                const dataUrl = await compressFileToDataUrl(file, 1024, 0.7);
+                                setAvulsaDataUrl(dataUrl);
+                              } finally {
+                                setIsProcessingAvulsaPhoto(false);
+                              }
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setAvulsaDataUrl(null)}
+                          className="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition-colors shadow cursor-pointer"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="border-2 border-dashed border-[#C09553] bg-amber-50/40 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-amber-50/70 transition-colors">
+                      {isProcessingAvulsaPhoto ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <Loader2 className="w-8 h-8 text-[#8B0000] animate-spin" />
+                          <span className="text-xs text-zinc-500 font-medium">Otimizando e comprimindo foto...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 text-[#C09553] mb-2" />
+                          <span className="font-bold text-[#8B0000] text-sm">Clique para selecionar foto do computador</span>
+                          <span className="text-xs text-zinc-500 mt-0.5">JPG, PNG ou WEBP (comprimida automaticamente)</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setIsProcessingAvulsaPhoto(true);
+                              try {
+                                const dataUrl = await compressFileToDataUrl(file, 1024, 0.7);
+                                setAvulsaDataUrl(dataUrl);
+                                if (!avulsaTitle) {
+                                  const baseName = file.name.replace(/\.[^/.]+$/, '');
+                                  setAvulsaTitle(baseName.replace(/[_-]/g, ' '));
+                                }
+                              } catch (err) {
+                                console.error(err);
+                                alert('Erro ao processar imagem.');
+                              } finally {
+                                setIsProcessingAvulsaPhoto(false);
+                              }
+                            }}
+                          />
+                        </>
+                      )}
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 bg-white border-t border-[#E6DEC9] flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddAvulsaModal(false)}
+                  className="px-4 py-2 text-zinc-600 text-xs font-semibold hover:bg-zinc-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={!avulsaDataUrl || isProcessingAvulsaPhoto}
+                  onClick={async () => {
+                    const finalTitle = avulsaTitle.trim() || 'Foto Avulsa';
+                    const newSection: PhotoSection = {
+                      id: `extra-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                      title: finalTitle,
+                      subtitle: 'Registro Clínico Avulso',
+                      description: avulsaDescription.trim(),
+                      image: avulsaDataUrl,
+                      markers: [],
+                      isExtra: true
+                    };
+                    const updated = [...(sections || []), newSection];
+                    handleUpdateAllSections(updated);
+                    setShowAddAvulsaModal(false);
+
+                    // Background upload to Supabase if patient is available
+                    const patientId = selectedPatient?.id || selectedPatient?.name || patientName;
+                    if (patientId && avulsaDataUrl) {
+                      try {
+                        const arr = avulsaDataUrl.split(',');
+                        const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+                        const bstr = atob(arr[1]);
+                        let n = bstr.length;
+                        const u8arr = new Uint8Array(n);
+                        while (n--) u8arr[n] = bstr.charCodeAt(n);
+                        const blob = new Blob([u8arr], { type: mime });
+                        uploadPatientFileToSupabase(patientId, blob, `${newSection.id}.jpg`).catch(() => {});
+                      } catch (err) {
+                        console.warn('Erro ao salvar no storage:', err);
+                      }
+                    }
+                  }}
+                  className="px-5 py-2 bg-[#8B0000] hover:bg-[#a32c3d] text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Adicionar ao Orçamento</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Active Tooth observations section */}
         {(() => {

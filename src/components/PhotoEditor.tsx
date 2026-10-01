@@ -4,7 +4,7 @@
  */
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Info, Camera, X, SwitchCamera, Zap, ZapOff, ZoomIn, Loader2, ImageIcon, Focus, Plus, Edit2, Trash2, Check } from 'lucide-react';
+import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Info, Camera, X, SwitchCamera, Zap, ZapOff, ZoomIn, Loader2, ImageIcon, Focus, Plus, Edit2, Trash2, Check, FileText } from 'lucide-react';
 import { PhotoSection, ToothMarker, Procedure } from '../types';
 import { DEMO_SVG_PLACEHOLDERS, getDefaultToothCoordinates } from '../constants';
 import { compressImage, compressFileToDataUrl } from '../lib/imageUtils';
@@ -15,6 +15,7 @@ interface PhotoEditorProps {
   section: PhotoSection;
   procedures: Procedure[];
   onUpdateSection: (updatedSection: PhotoSection) => void;
+  onDeleteSection?: (sectionId: string) => void;
   markerSize?: number;
   patientName?: string;
   driveFolderId?: string;
@@ -27,6 +28,7 @@ export default function PhotoEditor({
   section,
   procedures,
   onUpdateSection,
+  onDeleteSection,
   markerSize = 26,
   patientName = '',
   driveFolderId = '',
@@ -38,6 +40,9 @@ export default function PhotoEditor({
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Local state for currently active / highlighted tooth marker
@@ -427,9 +432,15 @@ export default function PhotoEditor({
     } else if (section.id === 'lower') {
       // Lower Right (48 to 41) and Lower Left (31 to 38)
       return [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
-    } else {
+    } else if (section.id === 'smile') {
       // Smile / Anterior teeth commonly displayed (upper and lower anterior)
       return [13, 12, 11, 21, 22, 23, 43, 42, 41, 31, 32, 33];
+    } else {
+      // Foto Avulsa / Panorâmica / Geral: lista completa de dentes (18..11, 21..28, 48..41, 31..38)
+      return [
+        18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28,
+        48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38
+      ];
     }
   };
 
@@ -947,20 +958,82 @@ export default function PhotoEditor({
 
       {/* Tab/Banner title */}
       <div className="bg-[#4E1119] text-[#FAF8F5] px-5 py-3 flex justify-between items-center select-none">
-        <div>
-          <h3 className="font-serif font-medium tracking-wide text-[15px]">
-            {section.title}
-          </h3>
-          <p className="text-[10px] text-[#E1CDAC] uppercase tracking-wider font-semibold">
-            {section.subtitle}
-          </p>
+        <div className="flex items-center gap-3">
+          {isEditingTitle ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="text"
+                value={titleInput}
+                onChange={(e) => setTitleInput(e.target.value)}
+                className="text-sm font-bold text-zinc-900 bg-white border border-[#C09553] rounded px-2 py-0.5 focus:outline-none"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateSection({ ...section, title: titleInput.trim() || section.title });
+                  setIsEditingTitle(false);
+                }}
+                className="text-white hover:text-green-300 p-1 cursor-pointer"
+                title="Salvar título"
+              >
+                <Check className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditingTitle(false)}
+                className="text-zinc-400 hover:text-white p-1 cursor-pointer"
+                title="Cancelar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-serif font-medium tracking-wide text-[15px]">
+                  {section.title}
+                </h3>
+                {(section.isExtra || section.id.startsWith('extra-')) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTitleInput(section.title);
+                      setIsEditingTitle(true);
+                    }}
+                    className="text-[#E1CDAC] hover:text-white transition-colors cursor-pointer"
+                    title="Renomear quadrante/foto"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-[#E1CDAC] uppercase tracking-wider font-semibold">
+                {section.subtitle}
+              </p>
+            </div>
+          )}
         </div>
         
-        {section.markers.length > 0 && (
-          <span className="text-[10px] font-bold bg-[#FAF8F5]/10 text-[#C09553] border border-[#C09553]/40 rounded-full px-2.5 py-1 font-mono">
-            R$ {calculateSectionTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {section.markers.length > 0 && (
+            <span className="text-[10px] font-bold bg-[#FAF8F5]/10 text-[#C09553] border border-[#C09553]/40 rounded-full px-2.5 py-1 font-mono">
+              R$ {calculateSectionTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </span>
+          )}
+
+          {(section.isExtra || section.id.startsWith('extra-')) && onDeleteSection && (
+            <button
+              type="button"
+              onClick={() => onDeleteSection(section.id)}
+              className="px-2.5 py-1 bg-red-600/30 hover:bg-red-600 text-red-200 hover:text-white text-xs font-bold rounded-lg border border-red-500/50 transition-colors flex items-center gap-1 cursor-pointer"
+              title="Excluir esta foto avulsa"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Excluir</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="p-5 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-white">
@@ -1170,6 +1243,21 @@ export default function PhotoEditor({
             </div>
           )}
 
+          {/* Campo de Identificação / Do que se trata esta foto */}
+          <div className="bg-[#FAF8F5] border border-[#E6DEC9] rounded-xl p-3 space-y-1.5 shadow-2xs">
+            <label className="text-[10px] font-bold text-[#8B0000] uppercase tracking-wider flex items-center gap-1.5 font-sans">
+              <FileText className="w-3.5 h-3.5 text-[#C09553]" />
+              <span>Identificação / Do que se trata esta foto:</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: Fratura dente 21, Raio-X periapical, Sorriso de frente, Tomografia..."
+              value={section.description || ''}
+              onChange={(e) => onUpdateSection({ ...section, description: e.target.value })}
+              className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-lg px-3 py-1.5 text-xs text-zinc-800 placeholder-zinc-400 focus:outline-none transition-all"
+            />
+          </div>
+
         </div>
 
         {/* Teeth Selector and Treatment Mapping Box (RHS) */}
@@ -1178,7 +1266,7 @@ export default function PhotoEditor({
           {/* Teeth Select Grid */}
           <div className="border border-zinc-100 rounded-xl p-4 bg-[#FAF8F5]/40">
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-2.5">
-              1. Selecionar Dentes a Tratar
+              {(section.isExtra || section.id.startsWith('extra-')) ? '1. Selecionar Dentes a Tratar (Opcional)' : '1. Selecionar Dentes a Tratar'}
             </span>
             
             <div className="flex flex-wrap gap-1.5 justify-start">

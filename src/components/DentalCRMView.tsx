@@ -283,6 +283,13 @@ export default function DentalCRMView({
   const [loadingBatchGallery, setLoadingBatchGallery] = useState(false);
   const [processingBatchSelection, setProcessingBatchSelection] = useState(false);
 
+  // Avulsa Photo State (Planning/Budget)
+  const [showAddAvulsoPhotoModal, setShowAddAvulsoPhotoModal] = useState(false);
+  const [avulsoPhotoTitle, setAvulsoPhotoTitle] = useState('');
+  const [avulsoPhotoDesc, setAvulsoPhotoDesc] = useState('');
+  const [avulsoPhotoDataUrl, setAvulsoPhotoDataUrl] = useState<string | null>(null);
+  const [isProcessingAvulsoPhoto, setIsProcessingAvulsoPhoto] = useState(false);
+
   const handleOpenBatchPhotos = async () => {
     setShowBatchPhotoModal(true);
     if (selectedPatient) {
@@ -5443,6 +5450,21 @@ export default function DentalCRMView({
                                 <Upload className="w-3.5 h-3.5" />
                                 + Fotos (Lote)
                               </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowAddAvulsoPhotoModal(true);
+                                  setAvulsoPhotoTitle('');
+                                  setAvulsoPhotoDesc('');
+                                  setAvulsoPhotoDataUrl(null);
+                                }}
+                                className="px-3 py-1 bg-[#FAF8F5] text-[#8B0000] text-xs font-bold rounded-lg transition-colors border-2 border-[#C09553]/30 hover:border-[#C09553] hover:bg-[#8B0000] hover:text-white flex items-center gap-1.5 shadow-sm cursor-pointer select-none"
+                                title="Adicionar foto avulsa (ex: Sorriso, Raio-X, Perfil) com campo de identificação"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                                + Foto Avulsa
+                              </button>
                             </div>
                             <span className="text-[10px] text-zinc-400">{activeSections.filter(s => s.image).length} de {activeSections.length} fotos carregadas</span>
                           </div>
@@ -5606,6 +5628,122 @@ export default function DentalCRMView({
                             </div>
                           )}
 
+                          {showAddAvulsoPhotoModal && (
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+                              <div className="bg-[#FAF8F5] rounded-xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
+                                <div className="p-4 border-b border-[#E6DEC9] flex justify-between items-center bg-white rounded-t-xl">
+                                  <div className="flex items-center gap-2">
+                                    <Camera className="w-5 h-5 text-[#8B0000]" />
+                                    <h2 className="text-base font-bold text-[#4E1119]">Adicionar Foto Avulsa ao Planejamento</h2>
+                                  </div>
+                                  <button onClick={() => setShowAddAvulsoPhotoModal(false)} className="text-zinc-400 hover:text-red-500 transition-colors">
+                                    <X className="w-5 h-5"/>
+                                  </button>
+                                </div>
+                                <div className="p-5 space-y-4">
+                                  <div>
+                                    <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wide mb-1">
+                                      Título da Foto *
+                                    </label>
+                                    <input
+                                      type="text"
+                                      placeholder="Ex: Raio-X Dente 21, Sorriso Frontal, Tomografia, Perfil..."
+                                      value={avulsoPhotoTitle}
+                                      onChange={(e) => setAvulsoPhotoTitle(e.target.value)}
+                                      className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-lg px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none"
+                                      autoFocus
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wide mb-1">
+                                      Identificação / Descrição (Do que se trata)
+                                    </label>
+                                    <textarea
+                                      rows={2}
+                                      placeholder="Ex: Observa-se restauração infiltrada na face mesial..."
+                                      value={avulsoPhotoDesc}
+                                      onChange={(e) => setAvulsoPhotoDesc(e.target.value)}
+                                      className="w-full bg-white border border-zinc-200 focus:border-[#8B0000] focus:ring-1 focus:ring-[#8B0000] rounded-lg px-3 py-2 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none resize-none"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wide mb-1">
+                                      Foto *
+                                    </label>
+                                    {avulsoPhotoDataUrl ? (
+                                      <div className="relative aspect-video rounded-xl overflow-hidden border-2 border-[#C09553] bg-zinc-950 group">
+                                        <img src={avulsoPhotoDataUrl} alt="Preview" className="w-full h-full object-cover" />
+                                        <button
+                                          type="button"
+                                          onClick={() => setAvulsoPhotoDataUrl(null)}
+                                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1.5 hover:bg-red-700 transition-colors shadow cursor-pointer"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <label className="border-2 border-dashed border-[#C09553] bg-amber-50/40 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-amber-50/70 transition-colors">
+                                        {isProcessingAvulsoPhoto ? (
+                                          <Loader2 className="w-6 h-6 text-[#8B0000] animate-spin" />
+                                        ) : (
+                                          <>
+                                            <Upload className="w-6 h-6 text-[#C09553] mb-2" />
+                                            <span className="font-bold text-[#8B0000] text-sm">Selecionar foto do computador</span>
+                                            <input
+                                              type="file"
+                                              accept="image/*"
+                                              className="hidden"
+                                              onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) return;
+                                                setIsProcessingAvulsoPhoto(true);
+                                                try {
+                                                  const dataUrl = await compressFileToDataUrl(file, 1024, 0.7);
+                                                  setAvulsoPhotoDataUrl(dataUrl);
+                                                  if (!avulsoPhotoTitle) {
+                                                    const baseName = file.name.replace(/\.[^/.]+$/, '');
+                                                    setAvulsoPhotoTitle(baseName.replace(/[_-]/g, ' '));
+                                                  }
+                                                } finally {
+                                                  setIsProcessingAvulsoPhoto(false);
+                                                }
+                                              }}
+                                            />
+                                          </>
+                                        )}
+                                      </label>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="p-4 border-t border-[#E6DEC9] bg-white flex justify-end gap-3 items-center">
+                                  <button onClick={() => setShowAddAvulsoPhotoModal(false)} className="px-4 py-2 text-zinc-600 font-medium hover:bg-zinc-100 rounded-lg transition-colors cursor-pointer">
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    disabled={!avulsoPhotoDataUrl || isProcessingAvulsoPhoto}
+                                    onClick={() => {
+                                      const newSection: PhotoSection = {
+                                        id: `extra-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                                        title: avulsoPhotoTitle.trim() || 'Foto Avulsa',
+                                        subtitle: 'Registro Clínico Avulso',
+                                        description: avulsoPhotoDesc.trim(),
+                                        image: avulsoPhotoDataUrl,
+                                        markers: [],
+                                        isExtra: true
+                                      };
+                                      setActiveSections(prev => [...(prev || []), newSection]);
+                                      setShowAddAvulsoPhotoModal(false);
+                                    }}
+                                    className="px-5 py-2 bg-[#8B0000] text-white font-bold rounded-lg hover:bg-[#a32c3d] disabled:opacity-50 transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
+                                  >
+                                    <Plus className="w-4 h-4" />
+                                    Adicionar Foto
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
                           {activeSections.map((section, idx) => (
                             <PhotoEditor
                               key={section.id}
@@ -5616,6 +5754,11 @@ export default function DentalCRMView({
                                 newSections[idx] = updatedSection;
                                 setActiveSections(newSections);
                               }}
+                              onDeleteSection={(section.isExtra || section.id.startsWith('extra-')) ? (secId) => {
+                                if (window.confirm(`Deseja realmente remover a foto "${section.title}" do planejamento?`)) {
+                                  setActiveSections((prevSections) => prevSections.filter((sec) => sec.id !== secId));
+                                }
+                              } : undefined}
                               patientName={selectedPatient?.name || ''}
                               driveFolderId={driveFolderId || ''}
                               onAddProcedure={setProcedures ? (newProc) => {
@@ -5681,6 +5824,7 @@ export default function DentalCRMView({
                       <div className={activeDetailTab === 'plan_negotiation' ? 'block' : 'hidden'}>
                       <NegotiationTab
                         sections={activeSections || []}
+                        onUpdateSections={setActiveSections}
                         procedures={procedures || []}
                         proposal={activeProposal || { patientName: selectedPatient?.name || '', status: 'Em Andamento', notes: '', discountPercent: 5, pixDiscountLabel: '5% DESCONTO NO PIX', installments: 12, installmentsLabel: 'Parcelamento em até 12x (com taxas)', customDiscountAmount: 0, showTotalBySection: false }}
                         setProposal={setActiveProposal}

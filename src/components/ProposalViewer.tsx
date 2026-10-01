@@ -427,9 +427,15 @@ export default function ProposalViewer({
                     <h3 className="text-base font-serif font-semibold text-[#4E1119] tracking-tight uppercase">
                       {section.title}
                     </h3>
-                    <p className="text-[11px] text-[#B48C4D] uppercase tracking-wider font-semibold font-sans mb-3">
-                      DENTES POSTERIORES / ANTERIORES
-                    </p>
+                    {section.description ? (
+                      <p className="text-xs text-zinc-600 font-medium italic mb-2">
+                        {section.description}
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-[#B48C4D] uppercase tracking-wider font-semibold font-sans mb-3">
+                        {section.subtitle || 'DENTES POSTERIORES / ANTERIORES'}
+                      </p>
+                    )}
                     <div className="h-[1px] bg-gradient-to-r from-[#C29D64] to-transparent w-full" />
                   </div>
 

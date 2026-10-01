@@ -354,9 +354,16 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
               >
                 {/* Visual Quad Representation (Col Span 6) */}
                 <div className="md:col-span-6 space-y-2">
-                  <span className="text-[11px] font-bold text-[#B48C4D] uppercase tracking-wider block font-sans">
-                    FOTO: {section.title}
-                  </span>
+                  <div>
+                    <span className="text-[11px] font-bold text-[#B48C4D] uppercase tracking-wider block font-sans">
+                      FOTO: {section.title}
+                    </span>
+                    {section.description && (
+                      <p className="text-xs text-zinc-600 font-medium italic mt-0.5">
+                        {section.description}
+                      </p>
+                    )}
+                  </div>
                   
                   {/* Absolute visual representation layer matching editor */}
                   <div className="relative w-full aspect-video sm:aspect-[4/3] rounded-2xl overflow-hidden shadow-md border border-[#E6DEC9] bg-zinc-950">

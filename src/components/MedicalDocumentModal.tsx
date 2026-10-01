@@ -352,8 +352,22 @@ export default function MedicalDocumentModal({
            }
 
         } else {
+           // Identificação da Paciente no Receituário
+           doc.setFontSize(11);
+           doc.setFont("helvetica", "bold");
+           doc.text("Para: ", 20, 94);
+
+           const prefixWidth = doc.getTextWidth("Para: ");
+           const patientText = (patientName || '__________________________________________').toUpperCase();
+           const splitPatient = doc.splitTextToSize(patientText, 170 - prefixWidth);
+           doc.text(splitPatient, 20 + prefixWidth, 94);
+
+           // Conteúdo da receita (medicamentos e posologia)
+           doc.setFontSize(11);
+           doc.setFont("helvetica", "normal");
+           const contentStartY = 94 + (splitPatient.length * 6) + 4;
            const splitContent = doc.splitTextToSize(content, 170);
-           doc.text(splitContent, 20, 100);
+           doc.text(splitContent, 20, contentStartY);
         }
 
         // 4. Signature
