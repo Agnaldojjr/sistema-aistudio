@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CRMPatient, CRMClinicalHistory, CRMAppointment } from '../types';
-import { uploadPatientFileToSupabase, listPatientFilesFromSupabase } from '../lib/supabaseStorage';
+import { uploadPatientFileToSupabase, listPatientFilesFromSupabase } from '../lib/storage';
 
 interface AppointmentClinicalDrawerProps {
   isOpen: boolean;
@@ -76,7 +76,7 @@ export default function AppointmentClinicalDrawer({
     setPhotos(galeriaList || []);
   }, [galeriaList]);
 
-  // Load photos directly from Supabase Storage if patient name is available
+  // Load photos directly from Nuvem (R2) if patient name is available
   useEffect(() => {
     if (isOpen && patient?.name) {
       setIsLoadingPhotos(true);
@@ -173,7 +173,7 @@ export default function AppointmentClinicalDrawer({
       if (onRefreshData) onRefreshData();
     } catch (err: any) {
       console.error('Erro no upload de foto clínica:', err);
-      setUploadError(err.message || 'Erro ao enviar foto para o Supabase Storage.');
+      setUploadError(err.message || 'Erro ao enviar foto para o Nuvem (R2).');
     } finally {
       setIsUploadingPhoto(false);
       e.target.value = '';
@@ -508,7 +508,7 @@ export default function AppointmentClinicalDrawer({
 
                 <div>
                   <p className="text-xs font-bold text-zinc-800">
-                    {isUploadingPhoto ? 'Enviando foto para o Supabase Storage...' : 'Clique ou arraste uma foto clínica aqui'}
+                    {isUploadingPhoto ? 'Enviando foto para o Nuvem (R2)...' : 'Clique ou arraste uma foto clínica aqui'}
                   </p>
                   <p className="text-[10px] text-zinc-500 mt-0.5">
                     Radiografias, Fotos Pré/Pós Tratamento, Tomografias (PNG, JPG, PDF)

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Search, FileText, Loader2, CalendarPlus, FolderOpen, ChevronLeft, ImageIcon, MessageCircle, Phone, Trash2, ShieldAlert, Pencil, Check, User, Camera, Upload, RefreshCw, Cake, CalendarClock, AlertCircle, Zap, ZapOff, Focus, LayoutGrid } from 'lucide-react';
 import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
-import { listPatientFilesFromSupabase, uploadPatientFileToSupabase, deletePatientFileFromSupabase, downloadFileAsDataUrlFromSupabase, renamePatientFileInSupabase } from '../lib/supabaseStorage';
+import { listPatientFilesFromSupabase, uploadPatientFileToSupabase, deletePatientFileFromSupabase, downloadFileAsDataUrlFromSupabase, renamePatientFileInSupabase } from '../lib/storage';
 import { ClinicSettings } from '../types';
 import ImageMarkupEditor from './ImageMarkupEditor';
 

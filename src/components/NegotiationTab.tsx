@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from '../types';
 import { usePatientContext } from '../context/PatientContext';
-import { uploadPatientFileToSupabase, getPatientFileUrlFromSupabase } from '../lib/supabaseStorage';
+import { uploadPatientFileToSupabase, getPatientFileUrlFromSupabase } from '../lib/storage';
 import { compressFileToDataUrl, compressImage } from '../lib/imageUtils';
 import { useAutoSaveBudget } from '../hooks/useAutoSaveBudget';
 import { jsPDF } from 'jspdf';

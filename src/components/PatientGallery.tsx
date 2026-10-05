@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Eye, Download, ChevronLeft, ChevronRight, X, Image as ImageIcon, RotateCw, Columns, SplitSquareHorizontal, Move } from 'lucide-react';
 import html2canvas from 'html2canvas';
-import { uploadPatientFileToSupabase } from '../lib/supabaseStorage';
+import { uploadPatientFileToSupabase } from '../lib/storage';
 import PhotoLightboxWithEditor from './PhotoLightboxWithEditor';
 
 export interface GalleryPhoto {

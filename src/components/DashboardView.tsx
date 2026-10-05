@@ -224,7 +224,7 @@ export default function DashboardView({
 
   const enrichPatients = async (patientsList: any[]) => {
     try {
-      const { getPatientFileUrlFromSupabase } = await import('../lib/supabaseStorage');
+      const { getPatientFileUrlFromSupabase } = await import('../lib/storage');
       const enriched = await Promise.all((patientsList || []).map(async (p: any) => {
         let totalVal = parseFloat(p.appProperties?.total || "0");
         if (isNaN(totalVal) || totalVal === 0) {

@@ -26,7 +26,7 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import { createCalendarEvent } from '../lib/calendar';
-import { uploadPatientFileToSupabase } from '../lib/supabaseStorage';
+import { uploadPatientFileToSupabase } from '../lib/storage';
 import { compressImage, compressFileToDataUrl } from '../lib/imageUtils';
 import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from '../types';
 import { getDefaultToothCoordinates } from '../constants';

@@ -36,7 +36,7 @@ import DentalContractModal from './DentalContractModal';
 import PatientGallery from './PatientGallery';
 import * as XLSX from 'xlsx';
 import { getSupabaseCRMDatabase } from '../lib/supabaseCrm';
-import { uploadPatientFileToSupabase } from '../lib/supabaseStorage';
+import { uploadPatientFileToSupabase } from '../lib/storage';
 import { createCalendarEvent } from '../lib/calendar';
 import { usePatientContext } from '../context/PatientContext';
 
@@ -942,7 +942,7 @@ export default function PatientDocumentsTab({ proposal, clinicSettings, setClini
             procedures: []
           };
 
-          // Save to Supabase Storage
+          // Save to Nuvem (R2)
           const jsonStr = JSON.stringify(stateToSave);
           const fileBlob = new Blob([jsonStr], { type: 'application/json' });
           await uploadPatientFileToSupabase((pd as any)?.id || patientName, fileBlob, 'orcamento_imported.json');

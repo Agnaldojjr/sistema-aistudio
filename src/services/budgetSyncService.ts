@@ -1,4 +1,4 @@
-import { uploadPatientFileToSupabase } from '../lib/supabaseStorage';
+import { uploadPatientFileToSupabase } from '../lib/storage';
 
 export type BudgetSyncStatus = 
   | 'idle'
@@ -335,7 +335,7 @@ export function saveBudgetLocally(
 }
 
 /**
- * Envia o orçamento diretamente para a nuvem (Supabase Storage)
+ * Envia o orçamento diretamente para a nuvem (Nuvem (R2))
  */
 export async function uploadBudgetToCloud(
   patientId: string,

@@ -8,7 +8,7 @@ import { Upload, Eye, EyeOff, LayoutGrid, Sparkles, HelpCircle, AlertCircle, Inf
 import { PhotoSection, ToothMarker, Procedure } from '../types';
 import { DEMO_SVG_PLACEHOLDERS, getDefaultToothCoordinates } from '../constants';
 import { compressImage, compressFileToDataUrl } from '../lib/imageUtils';
-import { listPatientFilesFromSupabase, downloadFileAsDataUrlFromSupabase, uploadPatientFileToSupabase } from '../lib/supabaseStorage';
+import { listPatientFilesFromSupabase, downloadFileAsDataUrlFromSupabase, uploadPatientFileToSupabase } from '../lib/storage';
 import ImageMarkupEditor from './ImageMarkupEditor';
 
 interface PhotoEditorProps {

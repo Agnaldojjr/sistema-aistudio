@@ -58,7 +58,7 @@ import {
   renamePatientFileInSupabase,
   getPatientFileUrlFromSupabase,
   downloadFileAsDataUrlFromSupabase
-} from '../lib/supabaseStorage';
+} from '../lib/storage';
 import { compressFileToDataUrl, compressImage } from '../lib/imageUtils';
 import ImageMarkupEditor from './ImageMarkupEditor';
 import { AIAssistedWhatsApp } from './AIAssistedWhatsApp';
@@ -5216,7 +5216,7 @@ export default function DentalCRMView({
                                         }
 
                                         try {
-                                          const { uploadPatientFileToSupabase } = await import('../lib/supabaseStorage');
+                                          const { uploadPatientFileToSupabase } = await import('../lib/storage');
                                           if (driveFolderId) {
                                             await uploadPatientFileToSupabase(
                                               driveFolderId,

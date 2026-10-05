@@ -1,6 +1,5 @@
 import { supabase } from './supabase';
-
-const BUCKET_NAME = 'patient_files';
+import { uploadFile, getFileUrl, deleteFile, listFiles, moveFile, bucketName } from './r2';
 
 /**
  * Função utilitária para garantir um formato seguro de nome de pasta
@@ -19,7 +18,7 @@ function getSafeFilename(filename: string): string {
 }
 
 /**
- * Faz o upload de um arquivo para o bucket do Supabase
+ * Faz o upload de um arquivo para o bucket R2
  */
 export async function uploadPatientFileToSupabase(patientIdentifier: string, file: File | Blob, filename: string, subfolder?: string) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
@@ -32,18 +31,13 @@ export async function uploadPatientFileToSupabase(patientIdentifier: string, fil
   const finalFilename = getSafeFilename(filename);
   const filePath = filename.includes('/') ? filename : `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
 
-  const { data, error } = await supabase.storage
-    .from(BUCKET_NAME)
-    .upload(filePath, file, {
-      upsert: true
-    });
-
-  if (error) {
-    console.error('Erro ao fazer upload para o Supabase Storage:', error);
+  try {
+    await uploadFile(file, filePath);
+    return { path: filePath };
+  } catch (error) {
+    console.error('Erro ao fazer upload para o Cloudflare R2:', error);
     throw error;
   }
-
-  return data;
 }
 
 /**
@@ -56,27 +50,38 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
   const userId = session.user.id;
   const idPath = getSafePatientPath(patientId);
   const basePath = `${userId}/${idPath}`;
-  let path = subfolder ? `${basePath}/${subfolder.replace(/^\/|\/$/g, '')}` : basePath;
+  let path = subfolder ? `${basePath}/${subfolder.replace(/^\/|\/$/g, '')}/` : `${basePath}/`;
 
   const fetchFilesInPath = async (targetPath: string, subPrefix: string = '') => {
-    const { data, error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .list(targetPath);
-    if (error || !data) return [];
-    return data
-      .filter(f => f.name !== '.emptyFolderPlaceholder')
-      .map(f => ({
-        ...f,
-        storagePath: `${targetPath}/${f.name}`,
-        displayName: subPrefix ? `${subPrefix}/${f.name}` : f.name,
-        subfolder: subPrefix || undefined,
-      }));
+    try {
+      // Ensure targetPath ends with / for prefix search
+      const prefix = targetPath.endsWith('/') ? targetPath : `${targetPath}/`;
+      const files = await listFiles(prefix);
+      
+      return files
+        .filter(f => f.Key && !f.Key.endsWith('.emptyFolderPlaceholder'))
+        .map(f => {
+          const nameParts = f.Key!.split('/');
+          const name = nameParts[nameParts.length - 1];
+          return {
+            name: name,
+            storagePath: f.Key!,
+            displayName: subPrefix ? `${subPrefix}/${name}` : name,
+            subfolder: subPrefix || undefined,
+            created_at: f.LastModified?.toISOString() || new Date().toISOString(),
+            updated_at: f.LastModified?.toISOString() || new Date().toISOString(),
+          };
+        });
+    } catch (e) {
+      console.error('Error listing R2 files:', e);
+      return [];
+    }
   };
 
   let rawFiles = await fetchFilesInPath(path, subfolder || '');
 
   if (!subfolder) {
-    const subfolderFiles = await fetchFilesInPath(`${basePath}/Orcamentos`, 'Orcamentos');
+    const subfolderFiles = await fetchFilesInPath(`${basePath}/Orcamentos/`, 'Orcamentos');
     rawFiles = [...rawFiles, ...subfolderFiles];
   }
 
@@ -85,18 +90,18 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
     const legacyFolder = getSafePatientPath(fallbackPatientName);
     if (legacyFolder !== idPath) {
       const legacyBasePath = `${userId}/${legacyFolder}`;
-      const legacyPath = subfolder ? `${legacyBasePath}/${subfolder.replace(/^\/|\/$/g, '')}` : legacyBasePath;
+      const legacyPath = subfolder ? `${legacyBasePath}/${subfolder.replace(/^\/|\/$/g, '')}/` : `${legacyBasePath}/`;
       
       let fallbackFiles = await fetchFilesInPath(legacyPath, subfolder || '');
       if (!subfolder) {
-        const fallbackSub = await fetchFilesInPath(`${legacyBasePath}/Orcamentos`, 'Orcamentos');
+        const fallbackSub = await fetchFilesInPath(`${legacyBasePath}/Orcamentos/`, 'Orcamentos');
         fallbackFiles = [...fallbackFiles, ...fallbackSub];
       }
       
       if (fallbackFiles.length > 0) {
-        console.warn(`[TELEMETRIA-MIGRACAO] Fallback acionado: O paciente ID ${patientId} possui arquivos na pasta legada (${legacyFolder}).`);
+        console.warn(`[TELEMETRIA-MIGRACAO] Fallback acionado para R2.`);
         
-        // Deduplicar: só adiciona o fallback se não existir um arquivo com o mesmo nome na pasta ID
+        // Deduplicar
         const existingKeys = new Set(rawFiles.map(f => f.storagePath.replace(`${userId}/${idPath}/`, '')));
         const uniqueFallback = fallbackFiles.filter(f => {
           const legacyKey = f.storagePath.replace(`${userId}/${legacyFolder}/`, '');
@@ -109,89 +114,86 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
   }
 
   if (rawFiles.length > 0) {
-    const filePaths = rawFiles.map(f => f.storagePath);
-    
-    const { data: signedUrlsData, error: signedUrlsError } = await supabase.storage
-      .from(BUCKET_NAME)
-      .createSignedUrls(filePaths, 3600);
-
-    if (signedUrlsError) {
-      console.error('Erro ao gerar URLs assinadas:', signedUrlsError);
-      // TELEMETRIA: Não retorne array vazio. Retorne os arquivos sem thumbnail, 
-      // para descobrirmos se o erro é aqui (os arquivos aparecerão sem imagem).
-    }
-    
-    const fileObjects = rawFiles.map((f, i) => ({
-      id: f.storagePath,
-      name: f.displayName,
-      thumbnailLink: signedUrlsData?.[i]?.signedUrl || null,
-      createdTime: f.created_at,
-      modifiedTime: f.updated_at || f.created_at,
-      mimeType: f.metadata?.mimetype || (f.name.endsWith('.pdf') ? 'application/pdf' : f.name.endsWith('.json') ? 'application/json' : 'application/octet-stream'),
-      subfolder: f.subfolder
+    const fileObjects = await Promise.all(rawFiles.map(async (f) => {
+      let thumbnailLink = null;
+      try {
+        thumbnailLink = await getFileUrl(f.storagePath, 3600);
+      } catch (e) {
+        console.error('Erro ao gerar URL assinada:', e);
+      }
+      
+      return {
+        id: f.storagePath,
+        name: f.displayName,
+        thumbnailLink,
+        createdTime: f.created_at,
+        modifiedTime: f.updated_at,
+        mimeType: f.name.endsWith('.pdf') ? 'application/pdf' : f.name.endsWith('.json') ? 'application/json' : 'application/octet-stream',
+        subfolder: f.subfolder
+      };
     }));
 
     const enrichedFiles = await Promise.all(fileObjects.map(async (file) => {
       if (file.name.toLowerCase().endsWith('.json') && file.thumbnailLink) {
         try {
           const r = await fetch(file.thumbnailLink);
-            if (r.ok) {
-              const fileData = await r.json();
-              
-              let total = 0;
-              if (fileData.simulations && fileData.selectedPlanIndex !== undefined && fileData.simulations[fileData.selectedPlanIndex]) {
-                total = fileData.simulations[fileData.selectedPlanIndex].custoTotal;
-              } else {
-                const sections = fileData.sections || [];
-                const procedures = fileData.procedures || [];
-                sections.forEach((sec: any) => {
-                  sec.markers?.forEach((marker: any) => {
-                    if (marker.procedureInstances && marker.procedureInstances.length > 0) {
-                      marker.procedureInstances.forEach((inst: any) => {
-                        total += (inst.includeFinancial !== false ? (inst.price || 0) : 0);
-                      });
-                    } else if (marker.procedures) {
-                      marker.procedures.forEach((pid: any) => {
-                        const proc = procedures.find((p: any) => p.id === pid);
-                        total += (proc ? (proc.price || 0) : 0);
-                      });
-                    }
-                  });
+          if (r.ok) {
+            const fileData = await r.json();
+            let total = 0;
+            if (fileData.simulations && fileData.selectedPlanIndex !== undefined && fileData.simulations[fileData.selectedPlanIndex]) {
+              total = fileData.simulations[fileData.selectedPlanIndex].custoTotal;
+            } else {
+              const sections = fileData.sections || [];
+              const procedures = fileData.procedures || [];
+              sections.forEach((sec: any) => {
+                sec.markers?.forEach((marker: any) => {
+                  if (marker.procedureInstances && marker.procedureInstances.length > 0) {
+                    marker.procedureInstances.forEach((inst: any) => {
+                      total += (inst.includeFinancial !== false ? (inst.price || 0) : 0);
+                    });
+                  } else if (marker.procedures) {
+                    marker.procedures.forEach((pid: any) => {
+                      const proc = procedures.find((p: any) => p.id === pid);
+                      total += (proc ? (proc.price || 0) : 0);
+                    });
+                  }
                 });
-              }
-
-              return {
-                ...file,
-                appProperties: {
-                  status: fileData.proposal?.status || 'Aberto',
-                  total: total
-                },
-                content: fileData
-              };
+              });
             }
-          } catch (e) {
-            console.warn("Failed to fetch/parse JSON content for", file.name, e);
-          }
-        }
-        return file;
-      }));
 
-      return enrichedFiles;
+            return {
+              ...file,
+              appProperties: {
+                status: fileData.proposal?.status || 'Aberto',
+                total: total
+              },
+              content: fileData
+            };
+          }
+        } catch (e) {
+          console.warn("Failed to fetch/parse JSON content for", file.name, e);
+        }
+      }
+      return file;
+    }));
+
+    return enrichedFiles;
   }
 
   // TELEMETRIA: Se chegou aqui, retornou 0 arquivos
   try {
     const errorLog = JSON.stringify({
-      patientId, fallbackPatientName, idPath, userId, msg: "Zero files found for both paths"
+      patientId, fallbackPatientName, idPath, userId, msg: "Zero files found for both paths (R2)"
     });
-    await supabase.storage.from(BUCKET_NAME).upload(`${userId}/telemetry_logs_${Date.now()}_${idPath}.json`, errorLog);
+    const blob = new Blob([errorLog], { type: 'application/json' });
+    await uploadFile(blob, `${userId}/telemetry_logs_${Date.now()}_${idPath}.json`);
   } catch(e) {}
 
   return [];
 }
 
 /**
- * Deleta um arquivo específico do paciente
+ * Deleta um arquivo específico do paciente no R2
  */
 export async function deletePatientFileFromSupabase(patientIdentifier: string, filename: string, subfolder?: string) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
@@ -211,39 +213,39 @@ export async function deletePatientFileFromSupabase(patientIdentifier: string, f
     filePath = `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
   }
 
-  const { error } = await supabase.storage
-    .from(BUCKET_NAME)
-    .remove([filePath]);
-
-  if (error) {
-    // If not found and no subfolder was passed, try fallback to Orcamentos/
+  try {
+    await deleteFile(filePath);
+  } catch (error) {
     if (!subfolder && !filename.includes('/')) {
       const fallbackPath = `${userId}/${targetFolder}/Orcamentos/${finalFilename}`;
-      await supabase.storage.from(BUCKET_NAME).remove([fallbackPath]);
-      return;
+      try {
+        await deleteFile(fallbackPath);
+        return;
+      } catch (fallbackError) {
+        console.error('Erro no fallback delete:', fallbackError);
+      }
     }
-    console.error('Erro ao deletar arquivo:', error);
+    console.error('Erro ao deletar arquivo no R2:', error);
     throw error;
   }
 }
 
 /**
- * Baixa um arquivo e converte para Data URL (útil para Canvas/Edição)
+ * Baixa um arquivo e converte para Data URL
  */
 export async function downloadFileAsDataUrlFromSupabase(filePath: string): Promise<string> {
-  const { data, error } = await supabase.storage
-    .from(BUCKET_NAME)
-    .download(filePath);
-
-  if (error) {
-    throw error;
+  const url = await getFileUrl(filePath, 60);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Erro ao baixar arquivo do R2');
   }
+  const blob = await response.blob();
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = reject;
-    reader.readAsDataURL(data);
+    reader.readAsDataURL(blob);
   });
 }
 
@@ -255,22 +257,19 @@ export async function getPatientFileUrlFromSupabase(patientIdentifier: string, f
   const targetFolder = getSafePatientPath(patientIdentifier);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
   const finalFilename = getSafeFilename(filename);
+  
   const filePath = filename.startsWith(`${userId}/`)
     ? filename
     : (filename.includes('/')
       ? `${userId}/${targetFolder}/${filename.replace(/^\/+/, '')}`
       : `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`);
 
-  const { data, error } = await supabase.storage.from(BUCKET_NAME).createSignedUrl(filePath, expiresIn);
-  if (error) {
-    // Se o arquivo ainda não existe no storage, apenas retorna null sem poluir o console com erros vermelhos
-    if (error.message?.includes('Object not found') || (error as any).statusCode === '404' || (error as any).status === 404) {
-      return null;
-    }
-    console.warn('Aviso ao obter URL do Supabase:', error.message || error);
+  try {
+    return await getFileUrl(filePath, expiresIn);
+  } catch (error: any) {
+    console.warn('Aviso ao obter URL do R2:', error.message || error);
     return null;
   }
-  return data?.signedUrl;
 }
 
 export async function renamePatientFileInSupabase(patientIdentifier: string, oldFilename: string, newFilename: string, subfolder?: string) {
@@ -286,39 +285,36 @@ export async function renamePatientFileInSupabase(patientIdentifier: string, old
   let newPath: string;
 
   if (oldFilename.startsWith(`${userId}/`)) {
-    // oldFilename is already the complete storagePath (e.g. from file.id)
     oldPath = oldFilename;
     const parentDir = oldPath.substring(0, oldPath.lastIndexOf('/'));
     newPath = `${parentDir}/${safeNewBaseName}`;
   } else if (oldFilename.includes('/')) {
-    // Relative path with subfolder (e.g. "Orcamentos/orcamento_salvo_123.json")
     const cleanOld = oldFilename.replace(/^\/+/, '');
     oldPath = `${userId}/${targetFolder}/${cleanOld}`;
     const parentDir = oldPath.substring(0, oldPath.lastIndexOf('/'));
     newPath = `${parentDir}/${safeNewBaseName}`;
   } else {
-    // Simple filename without slashes
     const finalOldFilename = getSafeFilename(oldFilename);
     oldPath = `${userId}/${targetFolder}/${subfolderPath}${finalOldFilename}`;
     newPath = `${userId}/${targetFolder}/${subfolderPath}${safeNewBaseName}`;
   }
 
-  // Check if oldPath and newPath are identical
   if (oldPath === newPath) return;
 
-  const { error } = await supabase.storage.from(BUCKET_NAME).move(oldPath, newPath);
-
-  if (error) {
-    // Fallback: If oldPath was assumed at root but actually lives in Orcamentos/
+  try {
+    await moveFile(oldPath, newPath);
+  } catch (error) {
     if (!oldFilename.includes('Orcamentos') && !subfolder) {
       const fallbackOld = `${userId}/${targetFolder}/Orcamentos/${getSafeFilename(oldFilename)}`;
       const fallbackNew = `${userId}/${targetFolder}/Orcamentos/${safeNewBaseName}`;
-      const fallbackResult = await supabase.storage.from(BUCKET_NAME).move(fallbackOld, fallbackNew);
-      if (!fallbackResult.error) {
+      try {
+        await moveFile(fallbackOld, fallbackNew);
         return;
+      } catch (fallbackError) {
+        console.error('Erro fallback move R2:', fallbackError);
       }
     }
-    console.error('Erro ao renomear arquivo no Supabase Storage:', error);
+    console.error('Erro ao renomear arquivo no R2:', error);
     throw error;
   }
 }
