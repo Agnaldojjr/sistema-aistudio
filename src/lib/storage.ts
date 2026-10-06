@@ -113,7 +113,19 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
     }
   }
 
-  if (rawFiles.length > 0) {
+      // --- ROOT UPLOAD FALLBACK ---
+    if (rawFiles.length === 0) {
+      const rootBasePath = `${idPath}`;
+      const rootPath = subfolder ? `${rootBasePath}/${subfolder.replace(/^\/|\/$/g, '')}/` : `${rootBasePath}/`;
+      let rootFiles = await fetchFilesInPath(rootPath, subfolder || '');
+      if (!subfolder) {
+        const rootSub = await fetchFilesInPath(`${rootBasePath}/Orcamentos/`, 'Orcamentos');
+        rootFiles = [...rootFiles, ...rootSub];
+      }
+      if (rootFiles.length > 0) { rawFiles = rootFiles; }
+    }
+
+    if (rawFiles.length > 0) {
     const fileObjects = await Promise.all(rawFiles.map(async (f) => {
       let thumbnailLink = null;
       try {
