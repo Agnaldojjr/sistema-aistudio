@@ -1,0 +1,2343 @@
+{
+  "exportedAt": "2026-10-07T12:09:56.364Z",
+  "userId": "78d7e8b0-9a7a-4eb3-8ba6-37a5ce401b46",
+  "totalPatients": 79,
+  "totalGalleryPhotos": 211,
+  "patients": [
+    {
+      "id": "ADRIANO_MEIRELES_XAVIER",
+      "name": "ADRIANO MEIRELES XAVIER",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.938Z",
+      "updatedAt": "2026-10-07T12:09:55.597Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ADRIANO_MEIRELES_XAVIER/smile_edited_1785534187912.jpg"
+    },
+    {
+      "id": "1386293",
+      "name": "AGNALDO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.931Z",
+      "updatedAt": "2026-10-07T12:09:55.217Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1386293/panoramic_upload_1783535368731_POST_14.png"
+    },
+    {
+      "id": "AGNALDO",
+      "name": "AGNALDO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.938Z",
+      "updatedAt": "2026-10-06T22:54:24.938Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1791373611648_747",
+      "name": "ALESSANDRO AVALIAÇÃO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-07T11:46:51.648Z",
+      "updatedAt": "2026-10-07T11:46:51.648Z",
+      "observations": "Cadastrado automaticamente via Google Calendar",
+      "medicalRecord": "",
+      "codigo_paciente": "COD-5238",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "1366505",
+      "name": "ALICE EMANUELE FERREIRA COSTA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.931Z",
+      "updatedAt": "2026-10-07T12:09:55.218Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1366505/panoramic_upload_1782324021198_aeba10f6-2773-418d-876c-6633b1a62a74.jpg"
+    },
+    {
+      "id": "ALICE_EMANUELE_FERREIRA_COSTA",
+      "name": "ALICE EMANUELE FERREIRA COSTA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.938Z",
+      "updatedAt": "2026-10-06T22:54:24.938Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "1403523",
+      "name": "ALINE BEATRIZ BATISTA LOURENÇO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.931Z",
+      "updatedAt": "2026-10-07T12:09:55.177Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "Aline_Beatriz_Batista_Loureno",
+      "name": "ALINE BEATRIZ BATISTA LOURENO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.938Z",
+      "updatedAt": "2026-10-07T12:09:55.220Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "BRUNO_LEANDRO_MARTINS_MIRANDA",
+      "name": "BRUNO LEANDRO MARTINS MIRANDA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.940Z",
+      "updatedAt": "2026-10-07T12:09:55.221Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1791328345815",
+      "name": "CLAUDIA MARIA",
+      "phone": "31985131303",
+      "mobile": "31985131303",
+      "createdAt": "2026-10-06T23:12:25.815Z",
+      "updatedAt": "2026-10-06T23:12:25.815Z",
+      "observations": "",
+      "medicalRecord": "",
+      "codigo_paciente": "COD-2540",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "1309889",
+      "name": "DANIELA COSTA FERNANDES DA SILVA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.919Z",
+      "updatedAt": "2026-10-07T12:09:55.174Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1791206176707_125",
+      "name": "DR. AGNALDO FERREIRA DENTISTA (HUDSON JUNIO VIEIRA)",
+      "phone": "31975028207",
+      "mobile": "31975028207",
+      "createdAt": "2026-10-05T13:16:16.707Z",
+      "updatedAt": "2026-10-05T13:16:16.707Z",
+      "observations": "Cadastrado automaticamente via Google Calendar",
+      "medicalRecord": "",
+      "codigo_paciente": "COD-8397",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1791206176706_439",
+      "name": "EDUARDO - LIMPEZA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-05T13:16:16.706Z",
+      "updatedAt": "2026-10-05T13:16:16.706Z",
+      "observations": "Cadastrado automaticamente via Google Calendar",
+      "medicalRecord": "",
+      "codigo_paciente": "COD-9584",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "ELAISA_DE_SOUZA",
+      "name": "ELAISA DE SOUZA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.976Z",
+      "updatedAt": "2026-10-07T12:09:55.645Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/smile_edited_1784725005750.jpg"
+    },
+    {
+      "id": "pat_1786536721015_860",
+      "name": "ELAISA DE SOUZA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.165Z",
+      "updatedAt": "2026-10-06T22:54:25.165Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "ELIANE_MENDES_DA_CRUZ",
+      "name": "ELIANE MENDES DA CRUZ",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.976Z",
+      "updatedAt": "2026-10-07T12:09:55.623Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELIANE_MENDES_DA_CRUZ/smile_edited_1786393479956.jpg"
+    },
+    {
+      "id": "ERALDO",
+      "name": "ERALDO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.976Z",
+      "updatedAt": "2026-10-07T12:09:55.272Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA",
+      "name": "FELIPPE DOUGLAS BRANCO DE OLIVEIRA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.977Z",
+      "updatedAt": "2026-10-07T12:09:55.273Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA/IMG_0151.jpeg"
+    },
+    {
+      "id": "FGSDF",
+      "name": "FGSDF",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.977Z",
+      "updatedAt": "2026-10-07T12:09:55.274Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "1624130",
+      "name": "GIOVANA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.938Z",
+      "updatedAt": "2026-10-07T12:09:55.274Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "GIOVANA",
+      "name": "GIOVANA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.977Z",
+      "updatedAt": "2026-10-06T22:54:24.977Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "JADERSON_COMBO",
+      "name": "JADERSON COMBO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.978Z",
+      "updatedAt": "2026-10-07T12:09:55.274Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "JADERSON_GONSALVES_MACHANDO",
+      "name": "JADERSON GONSALVES MACHANDO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.979Z",
+      "updatedAt": "2026-10-07T12:09:55.697Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/JADERSON_GONSALVES_MACHANDO/IMG_0602.jpeg"
+    },
+    {
+      "id": "pat_1791036347575_546",
+      "cpf": "13053016680",
+      "name": "JOSE VITOR COSTA CRUZ",
+      "phone": "31992372612",
+      "gender": "Masculino",
+      "mobile": "31992372612",
+      "birthDate": "1997-11-07",
+      "createdAt": "2026-10-03T14:05:47.575Z",
+      "updatedAt": "2026-10-07T12:09:55.748Z",
+      "observations": "Cadastrado automaticamente via Google Calendar",
+      "maritalStatus": "Solteiro(a)",
+      "medicalRecord": "",
+      "codigo_paciente": "COD-1910",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1791036347575_546/IMG_2111.jpeg"
+    },
+    {
+      "id": "pat_1791035273497",
+      "name": "JOZE VICTOR",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-03T13:47:53.497Z",
+      "updatedAt": "2026-10-03T13:47:53.497Z",
+      "observations": "",
+      "medicalRecord": "",
+      "codigo_paciente": "COD-5724",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1791035337819",
+      "name": "JOZE VICTOR",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-03T13:48:57.819Z",
+      "updatedAt": "2026-10-03T13:48:57.819Z",
+      "observations": "",
+      "medicalRecord": "",
+      "codigo_paciente": "COD-3214",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1791373611647_980",
+      "name": "JULIANA - AVALIAÇÃO E LIMPEZA",
+      "phone": " 31 9713-1853",
+      "mobile": " 31 9713-1853",
+      "createdAt": "2026-10-07T11:46:51.647Z",
+      "updatedAt": "2026-10-07T11:49:39.851Z",
+      "observations": "Cadastrado automaticamente via Google Calendar",
+      "medicalRecord": "",
+      "codigo_paciente": "COD-3836",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1791206176706_482",
+      "name": "JÚLIO CÉSAR - 3 CLAREAMENTO E RESINAS",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-05T13:16:16.706Z",
+      "updatedAt": "2026-10-05T13:16:16.706Z",
+      "observations": "Cadastrado automaticamente via Google Calendar",
+      "medicalRecord": "",
+      "codigo_paciente": "COD-6626",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "1394056",
+      "name": "JULIO CESAR BOMFIM CIDREIRA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.931Z",
+      "updatedAt": "2026-10-07T12:09:55.176Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "JUSSARA",
+      "name": "JUSSARA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.981Z",
+      "updatedAt": "2026-10-07T12:09:55.459Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1784853182830_588",
+      "name": "JUSSARA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.093Z",
+      "updatedAt": "2026-10-06T22:54:25.093Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "LEIDIANE_MARIA_DA_SILVA_LEONARDO",
+      "name": "LEIDIANE MARIA DA SILVA LEONARDO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.981Z",
+      "updatedAt": "2026-10-07T12:09:55.663Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/LEIDIANE_MARIA_DA_SILVA_LEONARDO/IMG_0544.jpeg"
+    },
+    {
+      "id": "LETICIA",
+      "name": "LETICIA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.983Z",
+      "updatedAt": "2026-10-07T12:09:55.324Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1787777726691_504",
+      "name": "LIMPEZA E AVALIAÇÃO",
+      "phone": "+55 31 8513-1303",
+      "mobile": "+55 31 8513-1303",
+      "createdAt": "2026-08-26T20:55:26.691Z",
+      "updatedAt": "2026-08-26T20:55:26.691Z",
+      "observations": "Cadastrado automaticamente via Google Calendar",
+      "medicalRecord": "",
+      "codigo_paciente": "COD-3928",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "1617968",
+      "name": "LOURDES APARECIDA DE BARROS",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.931Z",
+      "updatedAt": "2026-10-07T12:09:55.325Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1617968/panoramic_upload_1784053647564_Impressao.jpeg"
+    },
+    {
+      "id": "LOURDES_APARECIDA_DE_BARROS",
+      "name": "LOURDES APARECIDA DE BARROS",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.984Z",
+      "updatedAt": "2026-10-06T22:54:24.984Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1791042467833_493",
+      "rg": "4044136309",
+      "cpf": "79167802087",
+      "name": "LUCIANO GOMES AMANTE",
+      "phone": "51993878638",
+      "gender": "Masculino",
+      "mobile": "51993878638",
+      "rgIssuer": "ssp rs",
+      "birthDate": "1976-06-11",
+      "createdAt": "2026-10-03T15:47:47.833Z",
+      "updatedAt": "2026-10-07T12:09:55.755Z",
+      "observations": "Cadastrado automaticamente via Google Calendar",
+      "maritalStatus": "Solteiro(a)",
+      "medicalRecord": "",
+      "codigo_paciente": "COD-2464",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "1554841",
+      "name": "LUCIMARA DOS SANTOS FIRMINO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.931Z",
+      "updatedAt": "2026-10-07T12:09:55.326Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1554841/upper_upload_1782921826975_IMG_3212.JPG"
+    },
+    {
+      "id": "LUCIMARA_DOS_SANTOS_FIRMINO",
+      "name": "LUCIMARA DOS SANTOS FIRMINO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.984Z",
+      "updatedAt": "2026-10-06T22:54:24.984Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "name": "MARCOS ANTONIO SANTOS DE SOUZA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.042Z",
+      "updatedAt": "2026-10-07T12:09:55.359Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/smile_edited_1784125207172.jpg"
+    },
+    {
+      "id": "MARCOS_GOMES_DE_SOUZA",
+      "name": "MARCOS GOMES DE SOUZA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.079Z",
+      "updatedAt": "2026-10-07T12:09:55.474Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_GOMES_DE_SOUZA/IMG_0034.jpeg"
+    },
+    {
+      "id": "pat_1784853182830_676",
+      "name": "MARCOS GOMES DE SOUZA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.129Z",
+      "updatedAt": "2026-10-06T22:54:25.129Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "MARIA_DAS_DORES",
+      "name": "MARIA DAS DORES",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.089Z",
+      "updatedAt": "2026-10-07T12:09:55.625Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARIA_DAS_DORES/lower_edited_1785783950685.jpg"
+    },
+    {
+      "id": "MAURICIO",
+      "name": "MAURICIO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.090Z",
+      "updatedAt": "2026-10-07T12:09:55.379Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "MAURICIO_DOS_SANTOS",
+      "name": "MAURICIO DOS SANTOS",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.090Z",
+      "updatedAt": "2026-10-07T12:09:55.564Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/smile_edited_1785168175471.jpg"
+    },
+    {
+      "id": "pat_1784851599833_475",
+      "name": "PAT 1784851599833 475",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.090Z",
+      "updatedAt": "2026-10-07T12:09:55.458Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784851599833_475/IMG_0151.jpeg"
+    },
+    {
+      "id": "pat_1784943158521_235",
+      "name": "PAT 1784943158521 235",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.129Z",
+      "updatedAt": "2026-10-07T12:09:55.496Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784943158521_235/IMG_0184.jpeg"
+    },
+    {
+      "id": "pat_1785139975421_721",
+      "name": "PAT 1785139975421 721",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.130Z",
+      "updatedAt": "2026-10-07T12:09:55.498Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1785163605854_926",
+      "name": "PAT 1785163605854 926",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.130Z",
+      "updatedAt": "2026-10-06T22:54:25.130Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1785501510444_298",
+      "name": "PAT 1785501510444 298",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.130Z",
+      "updatedAt": "2026-10-06T22:54:25.130Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1785772093122",
+      "name": "PAT 1785772093122",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.131Z",
+      "updatedAt": "2026-10-06T22:54:25.131Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1785772446238",
+      "name": "PAT 1785772446238",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.131Z",
+      "updatedAt": "2026-10-06T22:54:25.131Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1786536721016_994",
+      "name": "PAT 1786536721016 994",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.165Z",
+      "updatedAt": "2026-10-06T22:54:25.165Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1786802346895_786",
+      "name": "PAT 1786802346895 786",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.166Z",
+      "updatedAt": "2026-10-06T22:54:25.166Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1787946784165_769",
+      "name": "PAT 1787946784165 769",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.166Z",
+      "updatedAt": "2026-10-07T12:09:55.718Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1787946784165_769/IMG_1200.jpeg"
+    },
+    {
+      "id": "pat_1788464546274_69",
+      "name": "PAT 1788464546274 69",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.167Z",
+      "updatedAt": "2026-10-07T12:09:55.723Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788464546274_69/IMG_1331.jpeg"
+    },
+    {
+      "id": "pat_1788629182426",
+      "name": "PAT 1788629182426",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.168Z",
+      "updatedAt": "2026-10-07T12:09:55.724Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788629182426/IMG_1511.jpeg"
+    },
+    {
+      "id": "pat_1788793404946",
+      "name": "PAT 1788793404946",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.168Z",
+      "updatedAt": "2026-10-07T12:09:55.725Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1789577293621_520",
+      "name": "PAT 1789577293621 520",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.168Z",
+      "updatedAt": "2026-10-07T12:09:55.726Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789577293621_520/smile_edited_1789581086584.jpg"
+    },
+    {
+      "id": "pat_1789577293622_317",
+      "name": "PAT 1789577293622 317",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.168Z",
+      "updatedAt": "2026-10-07T12:09:55.729Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789577293622_317/IMG_1693.jpeg"
+    },
+    {
+      "id": "pat_1789654148918_43",
+      "name": "PAT 1789654148918 43",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.169Z",
+      "updatedAt": "2026-10-07T12:09:55.730Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1789991141859_153",
+      "name": "PAT 1789991141859 153",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.169Z",
+      "updatedAt": "2026-10-07T12:09:55.731Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789991141859_153/smile_edited_1790172499609.jpg"
+    },
+    {
+      "id": "pat_1790340975849_867",
+      "name": "PAT 1790340975849 867",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.169Z",
+      "updatedAt": "2026-10-07T12:09:55.735Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1790599131573_479",
+      "name": "PAT 1790599131573 479",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.169Z",
+      "updatedAt": "2026-10-07T12:09:55.737Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1790599302999_10",
+      "name": "PAT 1790599302999 10",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.170Z",
+      "updatedAt": "2026-10-07T12:09:55.739Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1790610338870_477",
+      "name": "PAT 1790610338870 477",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.171Z",
+      "updatedAt": "2026-10-07T12:09:55.740Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1790857058157_434",
+      "name": "PAT 1790857058157 434",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.171Z",
+      "updatedAt": "2026-10-07T12:09:55.746Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1790857058157_434/IMG_2044.jpeg"
+    },
+    {
+      "id": "RAFAELA",
+      "name": "RAFAELA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.172Z",
+      "updatedAt": "2026-10-07T12:09:55.755Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "RAYSSA_MARQUES_OLIVEIRA",
+      "name": "RAYSSA MARQUES OLIVEIRA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.206Z",
+      "updatedAt": "2026-10-07T12:09:55.777Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RAYSSA_MARQUES_OLIVEIRA/edited-1784753580001.jpg"
+    },
+    {
+      "id": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "name": "RITA DE CASSIA PEREIRA DE AMORIM",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.265Z",
+      "updatedAt": "2026-10-07T12:09:55.809Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/smile_edited_1784224773010.jpg"
+    },
+    {
+      "id": "STEFANY_PRISCILLA_FERREIRA",
+      "name": "STEFANY PRISCILLA FERREIRA",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.324Z",
+      "updatedAt": "2026-10-07T12:09:55.843Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/STEFANY_PRISCILLA_FERREIRA/smile_edited_1783969581438.jpg"
+    },
+    {
+      "id": "TANIA_LUCIA_BRITO",
+      "name": "TANIA LUCIA BRITO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.324Z",
+      "updatedAt": "2026-10-07T12:09:55.864Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/TANIA_LUCIA_BRITO/IMG_0184.jpeg"
+    },
+    {
+      "id": "temp-1790601450920",
+      "name": "TEMP-1790601450920",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.324Z",
+      "updatedAt": "2026-10-07T12:09:55.865Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "pat_1791206176707_447",
+      "name": "TERAPIA COM THIAGO GRANDINO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-05T13:16:16.707Z",
+      "updatedAt": "2026-10-05T13:16:16.707Z",
+      "observations": "Cadastrado automaticamente via Google Calendar",
+      "medicalRecord": "",
+      "codigo_paciente": "COD-7215",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "THIAF_TOMAZ",
+      "name": "THIAF TOMAZ",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.325Z",
+      "updatedAt": "2026-10-07T12:09:55.866Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR"
+    },
+    {
+      "id": "THIAGO_TOMAZ",
+      "name": "THIAGO TOMAZ",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.326Z",
+      "updatedAt": "2026-10-07T12:09:55.867Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/THIAGO_TOMAZ/snapshot_2026-07-09_20_24_17.jpg"
+    },
+    {
+      "id": "THIAGO_TOMAZ_DE_SOUZA_CHAVEIRO",
+      "name": "THIAGO TOMAZ DE SOUZA CHAVEIRO",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.328Z",
+      "updatedAt": "2026-10-07T12:09:55.868Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/THIAGO_TOMAZ_DE_SOUZA_CHAVEIRO/snapshot_2026-07-09_20_32_50.jpg"
+    },
+    {
+      "id": "1619845",
+      "name": "VANDERMON DA SILVA LOPES",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:24.937Z",
+      "updatedAt": "2026-10-07T12:09:55.872Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1619845/IMG_3764.jpeg"
+    },
+    {
+      "id": "WELYNTON_BAPTISTA_RODRIGUES",
+      "name": "WELYNTON BAPTISTA RODRIGUES",
+      "phone": "",
+      "mobile": "",
+      "createdAt": "2026-10-06T22:54:25.330Z",
+      "updatedAt": "2026-10-07T12:09:55.875Z",
+      "observations": "Restaurado do backup do Cloudflare",
+      "healthInsurance": "PARTICULAR",
+      "photoUrl": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/WELYNTON_BAPTISTA_RODRIGUES/smile_edited_1783794902464.jpg"
+    }
+  ],
+  "galeria": [
+    {
+      "id": "gal_1366505_1791374995175_8563",
+      "patientId": "1366505",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1366505/panoramic_upload_1782324021198_aeba10f6-2773-418d-876c-6633b1a62a74.jpg",
+      "description": "panoramic_upload_1782324021198_aeba10f6-2773-418d-876c-6633b1a62a74.jpg",
+      "date": "2026-10-07T12:09:55.175Z"
+    },
+    {
+      "id": "gal_1386293_1791374995175_9794",
+      "patientId": "1386293",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1386293/panoramic_upload_1783535368731_POST_14.png",
+      "description": "panoramic_upload_1783535368731_POST_14.png",
+      "date": "2026-10-07T12:09:55.175Z"
+    },
+    {
+      "id": "gal_1386293_1791374995175_6114",
+      "patientId": "1386293",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1386293/upper_capture_1782683531368.jpg",
+      "description": "upper_capture_1782683531368.jpg",
+      "date": "2026-10-07T12:09:55.175Z"
+    },
+    {
+      "id": "gal_1554841_1791374995177_9519",
+      "patientId": "1554841",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1554841/upper_upload_1782921826975_IMG_3212.JPG",
+      "description": "upper_upload_1782921826975_IMG_3212.JPG",
+      "date": "2026-10-07T12:09:55.177Z"
+    },
+    {
+      "id": "gal_1617968_1791374995178_4976",
+      "patientId": "1617968",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1617968/panoramic_upload_1784053647564_Impressao.jpeg",
+      "description": "panoramic_upload_1784053647564_Impressao.jpeg",
+      "date": "2026-10-07T12:09:55.178Z"
+    },
+    {
+      "id": "gal_1619845_1791374995183_1098",
+      "patientId": "1619845",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1619845/IMG_3764.jpeg",
+      "description": "IMG_3764.jpeg",
+      "date": "2026-10-07T12:09:55.183Z"
+    },
+    {
+      "id": "gal_1619845_1791374995183_7937",
+      "patientId": "1619845",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1619845/IMG_3765.jpeg",
+      "description": "IMG_3765.jpeg",
+      "date": "2026-10-07T12:09:55.183Z"
+    },
+    {
+      "id": "gal_1619845_1791374995183_5769",
+      "patientId": "1619845",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1619845/IMG_3768.jpeg",
+      "description": "IMG_3768.jpeg",
+      "date": "2026-10-07T12:09:55.183Z"
+    },
+    {
+      "id": "gal_1619845_1791374995183_9079",
+      "patientId": "1619845",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1619845/IMG_3770.jpeg",
+      "description": "IMG_3770.jpeg",
+      "date": "2026-10-07T12:09:55.183Z"
+    },
+    {
+      "id": "gal_1619845_1791374995183_3079",
+      "patientId": "1619845",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1619845/IMG_3772.jpeg",
+      "description": "IMG_3772.jpeg",
+      "date": "2026-10-07T12:09:55.183Z"
+    },
+    {
+      "id": "gal_1619845_1791374995183_3430",
+      "patientId": "1619845",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1619845/panoramic_upload_1783105268434_11.png",
+      "description": "panoramic_upload_1783105268434_11.png",
+      "date": "2026-10-07T12:09:55.183Z"
+    },
+    {
+      "id": "gal_1619845_1791374995183_5006",
+      "patientId": "1619845",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1619845/panoramic_upload_1783105357961_11.png",
+      "description": "panoramic_upload_1783105357961_11.png",
+      "date": "2026-10-07T12:09:55.183Z"
+    },
+    {
+      "id": "gal_1619845_1791374995183_1321",
+      "patientId": "1619845",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1619845/upper_upload_1783103748966_VANDERMON%20DA%20SILVA%20LOPES%20-%2000021611%20-%2010-06-2026.jpg",
+      "description": "upper_upload_1783103748966_VANDERMON DA SILVA LOPES - 00021611 - 10-06-2026.jpg",
+      "date": "2026-10-07T12:09:55.183Z"
+    },
+    {
+      "id": "gal_1619845_1791374995183_569",
+      "patientId": "1619845",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1619845/upper_upload_1783103765274_VANDERMON%20DA%20SILVA%20LOPES%20PAN.png",
+      "description": "upper_upload_1783103765274_VANDERMON DA SILVA LOPES PAN.png",
+      "date": "2026-10-07T12:09:55.183Z"
+    },
+    {
+      "id": "gal_1619845_1791374995183_1186",
+      "patientId": "1619845",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1619845/upper_upload_1783103825499_VANDERMON%20DA%20SILVA%20LOPES%20-%2000021611%20-%2010-06-2026.jpg",
+      "description": "upper_upload_1783103825499_VANDERMON DA SILVA LOPES - 00021611 - 10-06-2026.jpg",
+      "date": "2026-10-07T12:09:55.183Z"
+    },
+    {
+      "id": "gal_1619845_1791374995183_1401",
+      "patientId": "1619845",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/1619845/upper_upload_1783103856803_11.png",
+      "description": "upper_upload_1783103856803_11.png",
+      "date": "2026-10-07T12:09:55.183Z"
+    },
+    {
+      "id": "gal_ADRIANO_MEIRELES_XAVIER_1791374995217_6612",
+      "patientId": "ADRIANO_MEIRELES_XAVIER",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ADRIANO_MEIRELES_XAVIER/IMG_0202.jpeg",
+      "description": "IMG_0202.jpeg",
+      "date": "2026-10-07T12:09:55.217Z"
+    },
+    {
+      "id": "gal_ADRIANO_MEIRELES_XAVIER_1791374995217_352",
+      "patientId": "ADRIANO_MEIRELES_XAVIER",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ADRIANO_MEIRELES_XAVIER/IMG_0203.jpeg",
+      "description": "IMG_0203.jpeg",
+      "date": "2026-10-07T12:09:55.217Z"
+    },
+    {
+      "id": "gal_ADRIANO_MEIRELES_XAVIER_1791374995217_6828",
+      "patientId": "ADRIANO_MEIRELES_XAVIER",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ADRIANO_MEIRELES_XAVIER/IMG_0204.jpeg",
+      "description": "IMG_0204.jpeg",
+      "date": "2026-10-07T12:09:55.217Z"
+    },
+    {
+      "id": "gal_ADRIANO_MEIRELES_XAVIER_1791374995217_6247",
+      "patientId": "ADRIANO_MEIRELES_XAVIER",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ADRIANO_MEIRELES_XAVIER/IMG_0205.jpeg",
+      "description": "IMG_0205.jpeg",
+      "date": "2026-10-07T12:09:55.217Z"
+    },
+    {
+      "id": "gal_ADRIANO_MEIRELES_XAVIER_1791374995217_410",
+      "patientId": "ADRIANO_MEIRELES_XAVIER",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ADRIANO_MEIRELES_XAVIER/IMG_0206.jpeg",
+      "description": "IMG_0206.jpeg",
+      "date": "2026-10-07T12:09:55.217Z"
+    },
+    {
+      "id": "gal_ADRIANO_MEIRELES_XAVIER_1791374995217_5995",
+      "patientId": "ADRIANO_MEIRELES_XAVIER",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ADRIANO_MEIRELES_XAVIER/lower_edited_1785534160176.jpg",
+      "description": "lower_edited_1785534160176.jpg",
+      "date": "2026-10-07T12:09:55.217Z"
+    },
+    {
+      "id": "gal_ADRIANO_MEIRELES_XAVIER_1791374995217_1482",
+      "patientId": "ADRIANO_MEIRELES_XAVIER",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ADRIANO_MEIRELES_XAVIER/smile_edited_1785534187912.jpg",
+      "description": "smile_edited_1785534187912.jpg",
+      "date": "2026-10-07T12:09:55.217Z"
+    },
+    {
+      "id": "gal_ADRIANO_MEIRELES_XAVIER_1791374995217_2118",
+      "patientId": "ADRIANO_MEIRELES_XAVIER",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ADRIANO_MEIRELES_XAVIER/upper_edited_1785534141974.jpg",
+      "description": "upper_edited_1785534141974.jpg",
+      "date": "2026-10-07T12:09:55.217Z"
+    },
+    {
+      "id": "gal_ELAISA_DE_SOUZA_1791374995243_9760",
+      "patientId": "ELAISA_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/IMG_0022.jpeg",
+      "description": "IMG_0022.jpeg",
+      "date": "2026-10-07T12:09:55.243Z"
+    },
+    {
+      "id": "gal_ELAISA_DE_SOUZA_1791374995243_6881",
+      "patientId": "ELAISA_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/IMG_0023.jpeg",
+      "description": "IMG_0023.jpeg",
+      "date": "2026-10-07T12:09:55.243Z"
+    },
+    {
+      "id": "gal_ELAISA_DE_SOUZA_1791374995243_1154",
+      "patientId": "ELAISA_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/IMG_0024.jpeg",
+      "description": "IMG_0024.jpeg",
+      "date": "2026-10-07T12:09:55.243Z"
+    },
+    {
+      "id": "gal_ELAISA_DE_SOUZA_1791374995243_3407",
+      "patientId": "ELAISA_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/IMG_0025.jpeg",
+      "description": "IMG_0025.jpeg",
+      "date": "2026-10-07T12:09:55.243Z"
+    },
+    {
+      "id": "gal_ELAISA_DE_SOUZA_1791374995243_8041",
+      "patientId": "ELAISA_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/IMG_0026.jpeg",
+      "description": "IMG_0026.jpeg",
+      "date": "2026-10-07T12:09:55.243Z"
+    },
+    {
+      "id": "gal_ELAISA_DE_SOUZA_1791374995243_9186",
+      "patientId": "ELAISA_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/IMG_0027.jpeg",
+      "description": "IMG_0027.jpeg",
+      "date": "2026-10-07T12:09:55.243Z"
+    },
+    {
+      "id": "gal_ELAISA_DE_SOUZA_1791374995243_560",
+      "patientId": "ELAISA_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/IMG_0029.jpeg",
+      "description": "IMG_0029.jpeg",
+      "date": "2026-10-07T12:09:55.243Z"
+    },
+    {
+      "id": "gal_ELAISA_DE_SOUZA_1791374995243_6165",
+      "patientId": "ELAISA_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/IMG_0030.jpeg",
+      "description": "IMG_0030.jpeg",
+      "date": "2026-10-07T12:09:55.243Z"
+    },
+    {
+      "id": "gal_ELAISA_DE_SOUZA_1791374995243_4814",
+      "patientId": "ELAISA_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/IMG_0033.jpeg",
+      "description": "IMG_0033.jpeg",
+      "date": "2026-10-07T12:09:55.243Z"
+    },
+    {
+      "id": "gal_ELAISA_DE_SOUZA_1791374995243_3669",
+      "patientId": "ELAISA_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/lower_edited_1784724986575.jpg",
+      "description": "lower_edited_1784724986575.jpg",
+      "date": "2026-10-07T12:09:55.243Z"
+    },
+    {
+      "id": "gal_ELAISA_DE_SOUZA_1791374995243_2888",
+      "patientId": "ELAISA_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/lower_edited_1784725517021.jpg",
+      "description": "lower_edited_1784725517021.jpg",
+      "date": "2026-10-07T12:09:55.243Z"
+    },
+    {
+      "id": "gal_ELAISA_DE_SOUZA_1791374995243_5220",
+      "patientId": "ELAISA_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELAISA_DE_SOUZA/smile_edited_1784725005750.jpg",
+      "description": "smile_edited_1784725005750.jpg",
+      "date": "2026-10-07T12:09:55.243Z"
+    },
+    {
+      "id": "gal_ELIANE_MENDES_DA_CRUZ_1791374995271_6039",
+      "patientId": "ELIANE_MENDES_DA_CRUZ",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELIANE_MENDES_DA_CRUZ/IMG_0513.jpeg",
+      "description": "IMG_0513.jpeg",
+      "date": "2026-10-07T12:09:55.271Z"
+    },
+    {
+      "id": "gal_ELIANE_MENDES_DA_CRUZ_1791374995271_8803",
+      "patientId": "ELIANE_MENDES_DA_CRUZ",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELIANE_MENDES_DA_CRUZ/IMG_0514.jpeg",
+      "description": "IMG_0514.jpeg",
+      "date": "2026-10-07T12:09:55.271Z"
+    },
+    {
+      "id": "gal_ELIANE_MENDES_DA_CRUZ_1791374995271_6077",
+      "patientId": "ELIANE_MENDES_DA_CRUZ",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELIANE_MENDES_DA_CRUZ/IMG_0515.jpeg",
+      "description": "IMG_0515.jpeg",
+      "date": "2026-10-07T12:09:55.271Z"
+    },
+    {
+      "id": "gal_ELIANE_MENDES_DA_CRUZ_1791374995271_5562",
+      "patientId": "ELIANE_MENDES_DA_CRUZ",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELIANE_MENDES_DA_CRUZ/lower_edited_1786393463122.jpg",
+      "description": "lower_edited_1786393463122.jpg",
+      "date": "2026-10-07T12:09:55.271Z"
+    },
+    {
+      "id": "gal_ELIANE_MENDES_DA_CRUZ_1791374995271_7998",
+      "patientId": "ELIANE_MENDES_DA_CRUZ",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELIANE_MENDES_DA_CRUZ/smile_edited_1786393479956.jpg",
+      "description": "smile_edited_1786393479956.jpg",
+      "date": "2026-10-07T12:09:55.271Z"
+    },
+    {
+      "id": "gal_ELIANE_MENDES_DA_CRUZ_1791374995271_1663",
+      "patientId": "ELIANE_MENDES_DA_CRUZ",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/ELIANE_MENDES_DA_CRUZ/upper_edited_1786393455242.jpg",
+      "description": "upper_edited_1786393455242.jpg",
+      "date": "2026-10-07T12:09:55.271Z"
+    },
+    {
+      "id": "gal_FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA_1791374995273_6406",
+      "patientId": "FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA/IMG_0151.jpeg",
+      "description": "IMG_0151.jpeg",
+      "date": "2026-10-07T12:09:55.273Z"
+    },
+    {
+      "id": "gal_FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA_1791374995273_1620",
+      "patientId": "FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA/IMG_0152.jpeg",
+      "description": "IMG_0152.jpeg",
+      "date": "2026-10-07T12:09:55.273Z"
+    },
+    {
+      "id": "gal_FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA_1791374995273_9802",
+      "patientId": "FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA/IMG_0153.jpeg",
+      "description": "IMG_0153.jpeg",
+      "date": "2026-10-07T12:09:55.273Z"
+    },
+    {
+      "id": "gal_FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA_1791374995273_5547",
+      "patientId": "FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA/IMG_0154.jpeg",
+      "description": "IMG_0154.jpeg",
+      "date": "2026-10-07T12:09:55.273Z"
+    },
+    {
+      "id": "gal_FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA_1791374995273_9788",
+      "patientId": "FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA/lower_edited_1785358366828.jpg",
+      "description": "lower_edited_1785358366828.jpg",
+      "date": "2026-10-07T12:09:55.273Z"
+    },
+    {
+      "id": "gal_FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA_1791374995273_356",
+      "patientId": "FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/FELIPPE_DOUGLAS_BRANCO_DE_OLIVEIRA/upper_edited_1785358126733.jpg",
+      "description": "upper_edited_1785358126733.jpg",
+      "date": "2026-10-07T12:09:55.273Z"
+    },
+    {
+      "id": "gal_JADERSON_GONSALVES_MACHANDO_1791374995320_2452",
+      "patientId": "JADERSON_GONSALVES_MACHANDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/JADERSON_GONSALVES_MACHANDO/IMG_0602.jpeg",
+      "description": "IMG_0602.jpeg",
+      "date": "2026-10-07T12:09:55.320Z"
+    },
+    {
+      "id": "gal_JADERSON_GONSALVES_MACHANDO_1791374995320_4963",
+      "patientId": "JADERSON_GONSALVES_MACHANDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/JADERSON_GONSALVES_MACHANDO/IMG_0603.jpeg",
+      "description": "IMG_0603.jpeg",
+      "date": "2026-10-07T12:09:55.320Z"
+    },
+    {
+      "id": "gal_JADERSON_GONSALVES_MACHANDO_1791374995320_4096",
+      "patientId": "JADERSON_GONSALVES_MACHANDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/JADERSON_GONSALVES_MACHANDO/IMG_0606.jpeg",
+      "description": "IMG_0606.jpeg",
+      "date": "2026-10-07T12:09:55.320Z"
+    },
+    {
+      "id": "gal_JADERSON_GONSALVES_MACHANDO_1791374995320_1234",
+      "patientId": "JADERSON_GONSALVES_MACHANDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/JADERSON_GONSALVES_MACHANDO/IMG_0607.jpeg",
+      "description": "IMG_0607.jpeg",
+      "date": "2026-10-07T12:09:55.320Z"
+    },
+    {
+      "id": "gal_JADERSON_GONSALVES_MACHANDO_1791374995320_2332",
+      "patientId": "JADERSON_GONSALVES_MACHANDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/JADERSON_GONSALVES_MACHANDO/IMG_0608.jpeg",
+      "description": "IMG_0608.jpeg",
+      "date": "2026-10-07T12:09:55.320Z"
+    },
+    {
+      "id": "gal_JADERSON_GONSALVES_MACHANDO_1791374995320_1938",
+      "patientId": "JADERSON_GONSALVES_MACHANDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/JADERSON_GONSALVES_MACHANDO/IMG_0610.jpeg",
+      "description": "IMG_0610.jpeg",
+      "date": "2026-10-07T12:09:55.320Z"
+    },
+    {
+      "id": "gal_JADERSON_GONSALVES_MACHANDO_1791374995320_4225",
+      "patientId": "JADERSON_GONSALVES_MACHANDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/JADERSON_GONSALVES_MACHANDO/IMG_0615.jpeg",
+      "description": "IMG_0615.jpeg",
+      "date": "2026-10-07T12:09:55.320Z"
+    },
+    {
+      "id": "gal_JADERSON_GONSALVES_MACHANDO_1791374995320_4213",
+      "patientId": "JADERSON_GONSALVES_MACHANDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/JADERSON_GONSALVES_MACHANDO/IMG_0618.jpeg",
+      "description": "IMG_0618.jpeg",
+      "date": "2026-10-07T12:09:55.320Z"
+    },
+    {
+      "id": "gal_JADERSON_GONSALVES_MACHANDO_1791374995320_5680",
+      "patientId": "JADERSON_GONSALVES_MACHANDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/JADERSON_GONSALVES_MACHANDO/upper_edited_1786805888682.jpg",
+      "description": "upper_edited_1786805888682.jpg",
+      "date": "2026-10-07T12:09:55.320Z"
+    },
+    {
+      "id": "gal_JADERSON_GONSALVES_MACHANDO_1791374995320_3639",
+      "patientId": "JADERSON_GONSALVES_MACHANDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/JADERSON_GONSALVES_MACHANDO/upper_edited_1786809302255.jpg",
+      "description": "upper_edited_1786809302255.jpg",
+      "date": "2026-10-07T12:09:55.320Z"
+    },
+    {
+      "id": "gal_LEIDIANE_MARIA_DA_SILVA_LEONARDO_1791374995323_4681",
+      "patientId": "LEIDIANE_MARIA_DA_SILVA_LEONARDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/LEIDIANE_MARIA_DA_SILVA_LEONARDO/IMG_0544.jpeg",
+      "description": "IMG_0544.jpeg",
+      "date": "2026-10-07T12:09:55.323Z"
+    },
+    {
+      "id": "gal_LEIDIANE_MARIA_DA_SILVA_LEONARDO_1791374995323_934",
+      "patientId": "LEIDIANE_MARIA_DA_SILVA_LEONARDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/LEIDIANE_MARIA_DA_SILVA_LEONARDO/IMG_0545.jpeg",
+      "description": "IMG_0545.jpeg",
+      "date": "2026-10-07T12:09:55.323Z"
+    },
+    {
+      "id": "gal_LEIDIANE_MARIA_DA_SILVA_LEONARDO_1791374995323_1261",
+      "patientId": "LEIDIANE_MARIA_DA_SILVA_LEONARDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/LEIDIANE_MARIA_DA_SILVA_LEONARDO/IMG_0546.jpeg",
+      "description": "IMG_0546.jpeg",
+      "date": "2026-10-07T12:09:55.323Z"
+    },
+    {
+      "id": "gal_LEIDIANE_MARIA_DA_SILVA_LEONARDO_1791374995323_6726",
+      "patientId": "LEIDIANE_MARIA_DA_SILVA_LEONARDO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/LEIDIANE_MARIA_DA_SILVA_LEONARDO/lower_edited_1786548492847.jpg",
+      "description": "lower_edited_1786548492847.jpg",
+      "date": "2026-10-07T12:09:55.323Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_3679",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/edited-1784125005449.jpg",
+      "description": "edited-1784125005449.jpg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_4445",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/IMG_3930.jpeg",
+      "description": "IMG_3930.jpeg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_3336",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/IMG_3931.jpeg",
+      "description": "IMG_3931.jpeg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_6217",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/IMG_3932.jpeg",
+      "description": "IMG_3932.jpeg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_3530",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/IMG_3933.jpeg",
+      "description": "IMG_3933.jpeg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_5509",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/IMG_3934.jpeg",
+      "description": "IMG_3934.jpeg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_9480",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/IMG_3935.jpeg",
+      "description": "IMG_3935.jpeg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_2211",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/IMG_3936.jpeg",
+      "description": "IMG_3936.jpeg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_4529",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/IMG_3937.jpeg",
+      "description": "IMG_3937.jpeg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_230",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/lower_edited_1784125172520.jpg",
+      "description": "lower_edited_1784125172520.jpg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_1122",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/lower_edited_1784125349730.jpg",
+      "description": "lower_edited_1784125349730.jpg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_6979",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/lower_edited_1784125678688.jpg",
+      "description": "lower_edited_1784125678688.jpg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_2184",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/lower_edited_1784128766094.jpg",
+      "description": "lower_edited_1784128766094.jpg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_1770",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/smile_edited_1784125207172.jpg",
+      "description": "smile_edited_1784125207172.jpg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_6856",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/smile_edited_1784125360847.jpg",
+      "description": "smile_edited_1784125360847.jpg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_2898",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/upper_edited_1784125147595.jpg",
+      "description": "upper_edited_1784125147595.jpg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_9037",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/upper_edited_1784125339445.jpg",
+      "description": "upper_edited_1784125339445.jpg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_3517",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/upper_edited_1784125408021.jpg",
+      "description": "upper_edited_1784125408021.jpg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_2170",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/upper_edited_1784125440590.jpg",
+      "description": "upper_edited_1784125440590.jpg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_ANTONIO_SANTOS_DE_SOUZA_1791374995359_2934",
+      "patientId": "MARCOS_ANTONIO_SANTOS_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_ANTONIO_SANTOS_DE_SOUZA/upper_edited_1784128788434.jpg",
+      "description": "upper_edited_1784128788434.jpg",
+      "date": "2026-10-07T12:09:55.359Z"
+    },
+    {
+      "id": "gal_MARCOS_GOMES_DE_SOUZA_1791374995375_6703",
+      "patientId": "MARCOS_GOMES_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_GOMES_DE_SOUZA/IMG_0034.jpeg",
+      "description": "IMG_0034.jpeg",
+      "date": "2026-10-07T12:09:55.375Z"
+    },
+    {
+      "id": "gal_MARCOS_GOMES_DE_SOUZA_1791374995375_9803",
+      "patientId": "MARCOS_GOMES_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_GOMES_DE_SOUZA/IMG_0035.jpeg",
+      "description": "IMG_0035.jpeg",
+      "date": "2026-10-07T12:09:55.375Z"
+    },
+    {
+      "id": "gal_MARCOS_GOMES_DE_SOUZA_1791374995375_6888",
+      "patientId": "MARCOS_GOMES_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_GOMES_DE_SOUZA/IMG_0036.jpeg",
+      "description": "IMG_0036.jpeg",
+      "date": "2026-10-07T12:09:55.375Z"
+    },
+    {
+      "id": "gal_MARCOS_GOMES_DE_SOUZA_1791374995375_1197",
+      "patientId": "MARCOS_GOMES_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_GOMES_DE_SOUZA/IMG_0037.jpeg",
+      "description": "IMG_0037.jpeg",
+      "date": "2026-10-07T12:09:55.375Z"
+    },
+    {
+      "id": "gal_MARCOS_GOMES_DE_SOUZA_1791374995375_5794",
+      "patientId": "MARCOS_GOMES_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_GOMES_DE_SOUZA/IMG_0038.jpeg",
+      "description": "IMG_0038.jpeg",
+      "date": "2026-10-07T12:09:55.375Z"
+    },
+    {
+      "id": "gal_MARCOS_GOMES_DE_SOUZA_1791374995375_9966",
+      "patientId": "MARCOS_GOMES_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_GOMES_DE_SOUZA/IMG_0039.jpeg",
+      "description": "IMG_0039.jpeg",
+      "date": "2026-10-07T12:09:55.375Z"
+    },
+    {
+      "id": "gal_MARCOS_GOMES_DE_SOUZA_1791374995375_7547",
+      "patientId": "MARCOS_GOMES_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_GOMES_DE_SOUZA/IMG_0040.jpeg",
+      "description": "IMG_0040.jpeg",
+      "date": "2026-10-07T12:09:55.375Z"
+    },
+    {
+      "id": "gal_MARCOS_GOMES_DE_SOUZA_1791374995375_4757",
+      "patientId": "MARCOS_GOMES_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_GOMES_DE_SOUZA/IMG_0042.jpeg",
+      "description": "IMG_0042.jpeg",
+      "date": "2026-10-07T12:09:55.375Z"
+    },
+    {
+      "id": "gal_MARCOS_GOMES_DE_SOUZA_1791374995375_6996",
+      "patientId": "MARCOS_GOMES_DE_SOUZA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARCOS_GOMES_DE_SOUZA/lower_edited_1784745843801.jpg",
+      "description": "lower_edited_1784745843801.jpg",
+      "date": "2026-10-07T12:09:55.375Z"
+    },
+    {
+      "id": "gal_MARIA_DAS_DORES_1791374995378_839",
+      "patientId": "MARIA_DAS_DORES",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARIA_DAS_DORES/lower_edited_1785783950685.jpg",
+      "description": "lower_edited_1785783950685.jpg",
+      "date": "2026-10-07T12:09:55.378Z"
+    },
+    {
+      "id": "gal_MARIA_DAS_DORES_1791374995378_9021",
+      "patientId": "MARIA_DAS_DORES",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MARIA_DAS_DORES/lower_upload_1785783937882_1.jpeg",
+      "description": "lower_upload_1785783937882_1.jpeg",
+      "date": "2026-10-07T12:09:55.378Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_5228",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/IMG_0119.jpeg",
+      "description": "IMG_0119.jpeg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_7291",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/IMG_0120.jpeg",
+      "description": "IMG_0120.jpeg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_131",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/IMG_0121.jpeg",
+      "description": "IMG_0121.jpeg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_6380",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/IMG_0122.jpeg",
+      "description": "IMG_0122.jpeg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_7861",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/IMG_0123.jpeg",
+      "description": "IMG_0123.jpeg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_2500",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/IMG_0124.jpeg",
+      "description": "IMG_0124.jpeg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_2903",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/IMG_0125.jpeg",
+      "description": "IMG_0125.jpeg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_4254",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/IMG_0126.jpeg",
+      "description": "IMG_0126.jpeg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_9655",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/lower_edited_1785168147626.jpg",
+      "description": "lower_edited_1785168147626.jpg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_3053",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/panoramic_upload_1785168205613_WhatsApp%20Image%202026-07-27%20at%2012.59.59.jpeg",
+      "description": "panoramic_upload_1785168205613_WhatsApp Image 2026-07-27 at 12.59.59.jpeg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_9624",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/smile_edited_1785168175471.jpg",
+      "description": "smile_edited_1785168175471.jpg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_3256",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/upper_edited_1785168120365.jpg",
+      "description": "upper_edited_1785168120365.jpg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_MAURICIO_DOS_SANTOS_1791374995457_399",
+      "patientId": "MAURICIO_DOS_SANTOS",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/MAURICIO_DOS_SANTOS/upper_edited_1785170426145.jpg",
+      "description": "upper_edited_1785170426145.jpg",
+      "date": "2026-10-07T12:09:55.457Z"
+    },
+    {
+      "id": "gal_pat_1784851599833_475_1791374995458_4040",
+      "patientId": "pat_1784851599833_475",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784851599833_475/IMG_0151.jpeg",
+      "description": "IMG_0151.jpeg",
+      "date": "2026-10-07T12:09:55.458Z"
+    },
+    {
+      "id": "gal_pat_1784851599833_475_1791374995458_3747",
+      "patientId": "pat_1784851599833_475",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784851599833_475/IMG_0152.jpeg",
+      "description": "IMG_0152.jpeg",
+      "date": "2026-10-07T12:09:55.458Z"
+    },
+    {
+      "id": "gal_pat_1784851599833_475_1791374995458_7728",
+      "patientId": "pat_1784851599833_475",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784851599833_475/IMG_0153.jpeg",
+      "description": "IMG_0153.jpeg",
+      "date": "2026-10-07T12:09:55.458Z"
+    },
+    {
+      "id": "gal_pat_1784851599833_475_1791374995458_1352",
+      "patientId": "pat_1784851599833_475",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784851599833_475/IMG_0154.jpeg",
+      "description": "IMG_0154.jpeg",
+      "date": "2026-10-07T12:09:55.458Z"
+    },
+    {
+      "id": "gal_pat_1784851599833_475_1791374995458_3610",
+      "patientId": "pat_1784851599833_475",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784851599833_475/lower_edited_1785358366828.jpg",
+      "description": "lower_edited_1785358366828.jpg",
+      "date": "2026-10-07T12:09:55.458Z"
+    },
+    {
+      "id": "gal_pat_1784851599833_475_1791374995458_6813",
+      "patientId": "pat_1784851599833_475",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784851599833_475/upper_edited_1785358126733.jpg",
+      "description": "upper_edited_1785358126733.jpg",
+      "date": "2026-10-07T12:09:55.458Z"
+    },
+    {
+      "id": "gal_pat_1784943158521_235_1791374995496_6165",
+      "patientId": "pat_1784943158521_235",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784943158521_235/IMG_0184.jpeg",
+      "description": "IMG_0184.jpeg",
+      "date": "2026-10-07T12:09:55.496Z"
+    },
+    {
+      "id": "gal_pat_1784943158521_235_1791374995496_4612",
+      "patientId": "pat_1784943158521_235",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784943158521_235/IMG_0185.jpeg",
+      "description": "IMG_0185.jpeg",
+      "date": "2026-10-07T12:09:55.496Z"
+    },
+    {
+      "id": "gal_pat_1784943158521_235_1791374995496_4052",
+      "patientId": "pat_1784943158521_235",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784943158521_235/IMG_0186.jpeg",
+      "description": "IMG_0186.jpeg",
+      "date": "2026-10-07T12:09:55.496Z"
+    },
+    {
+      "id": "gal_pat_1784943158521_235_1791374995496_2214",
+      "patientId": "pat_1784943158521_235",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784943158521_235/IMG_0187.jpeg",
+      "description": "IMG_0187.jpeg",
+      "date": "2026-10-07T12:09:55.496Z"
+    },
+    {
+      "id": "gal_pat_1784943158521_235_1791374995496_1173",
+      "patientId": "pat_1784943158521_235",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784943158521_235/IMG_0188.jpeg",
+      "description": "IMG_0188.jpeg",
+      "date": "2026-10-07T12:09:55.496Z"
+    },
+    {
+      "id": "gal_pat_1784943158521_235_1791374995496_6452",
+      "patientId": "pat_1784943158521_235",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784943158521_235/IMG_0190.jpeg",
+      "description": "IMG_0190.jpeg",
+      "date": "2026-10-07T12:09:55.496Z"
+    },
+    {
+      "id": "gal_pat_1784943158521_235_1791374995496_6263",
+      "patientId": "pat_1784943158521_235",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1784943158521_235/lower_edited_1785504988467.jpg",
+      "description": "lower_edited_1785504988467.jpg",
+      "date": "2026-10-07T12:09:55.496Z"
+    },
+    {
+      "id": "gal_pat_1787946784165_769_1791374995719_2827",
+      "patientId": "pat_1787946784165_769",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1787946784165_769/IMG_1200.jpeg",
+      "description": "IMG_1200.jpeg",
+      "date": "2026-10-07T12:09:55.719Z"
+    },
+    {
+      "id": "gal_pat_1787946784165_769_1791374995719_3039",
+      "patientId": "pat_1787946784165_769",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1787946784165_769/IMG_1201.jpeg",
+      "description": "IMG_1201.jpeg",
+      "date": "2026-10-07T12:09:55.719Z"
+    },
+    {
+      "id": "gal_pat_1787946784165_769_1791374995719_6299",
+      "patientId": "pat_1787946784165_769",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1787946784165_769/lower_edited_1787950180852.jpg",
+      "description": "lower_edited_1787950180852.jpg",
+      "date": "2026-10-07T12:09:55.719Z"
+    },
+    {
+      "id": "gal_pat_1787946784165_769_1791374995719_6961",
+      "patientId": "pat_1787946784165_769",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1787946784165_769/upper_edited_1787950155226.jpg",
+      "description": "upper_edited_1787950155226.jpg",
+      "date": "2026-10-07T12:09:55.719Z"
+    },
+    {
+      "id": "gal_pat_1788464546274_69_1791374995723_3139",
+      "patientId": "pat_1788464546274_69",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788464546274_69/IMG_1331.jpeg",
+      "description": "IMG_1331.jpeg",
+      "date": "2026-10-07T12:09:55.723Z"
+    },
+    {
+      "id": "gal_pat_1788464546274_69_1791374995723_9203",
+      "patientId": "pat_1788464546274_69",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788464546274_69/IMG_1332.jpeg",
+      "description": "IMG_1332.jpeg",
+      "date": "2026-10-07T12:09:55.723Z"
+    },
+    {
+      "id": "gal_pat_1788464546274_69_1791374995723_8447",
+      "patientId": "pat_1788464546274_69",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788464546274_69/IMG_1333.jpeg",
+      "description": "IMG_1333.jpeg",
+      "date": "2026-10-07T12:09:55.723Z"
+    },
+    {
+      "id": "gal_pat_1788464546274_69_1791374995723_9492",
+      "patientId": "pat_1788464546274_69",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788464546274_69/IMG_1336.jpeg",
+      "description": "IMG_1336.jpeg",
+      "date": "2026-10-07T12:09:55.723Z"
+    },
+    {
+      "id": "gal_pat_1788464546274_69_1791374995723_1125",
+      "patientId": "pat_1788464546274_69",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788464546274_69/IMG_1338.jpeg",
+      "description": "IMG_1338.jpeg",
+      "date": "2026-10-07T12:09:55.723Z"
+    },
+    {
+      "id": "gal_pat_1788464546274_69_1791374995723_7083",
+      "patientId": "pat_1788464546274_69",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788464546274_69/IMG_1339.jpeg",
+      "description": "IMG_1339.jpeg",
+      "date": "2026-10-07T12:09:55.723Z"
+    },
+    {
+      "id": "gal_pat_1788464546274_69_1791374995723_3354",
+      "patientId": "pat_1788464546274_69",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788464546274_69/IMG_1340.jpeg",
+      "description": "IMG_1340.jpeg",
+      "date": "2026-10-07T12:09:55.723Z"
+    },
+    {
+      "id": "gal_pat_1788464546274_69_1791374995723_6958",
+      "patientId": "pat_1788464546274_69",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788464546274_69/IMG_1341.jpeg",
+      "description": "IMG_1341.jpeg",
+      "date": "2026-10-07T12:09:55.723Z"
+    },
+    {
+      "id": "gal_pat_1788464546274_69_1791374995723_9105",
+      "patientId": "pat_1788464546274_69",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788464546274_69/IMG_1342.jpeg",
+      "description": "IMG_1342.jpeg",
+      "date": "2026-10-07T12:09:55.723Z"
+    },
+    {
+      "id": "gal_pat_1788629182426_1791374995724_9342",
+      "patientId": "pat_1788629182426",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788629182426/IMG_1511.jpeg",
+      "description": "IMG_1511.jpeg",
+      "date": "2026-10-07T12:09:55.724Z"
+    },
+    {
+      "id": "gal_pat_1788629182426_1791374995724_588",
+      "patientId": "pat_1788629182426",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788629182426/IMG_1512.jpeg",
+      "description": "IMG_1512.jpeg",
+      "date": "2026-10-07T12:09:55.724Z"
+    },
+    {
+      "id": "gal_pat_1788629182426_1791374995724_6235",
+      "patientId": "pat_1788629182426",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788629182426/IMG_1513.jpeg",
+      "description": "IMG_1513.jpeg",
+      "date": "2026-10-07T12:09:55.724Z"
+    },
+    {
+      "id": "gal_pat_1788629182426_1791374995724_6806",
+      "patientId": "pat_1788629182426",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788629182426/IMG_1514.jpeg",
+      "description": "IMG_1514.jpeg",
+      "date": "2026-10-07T12:09:55.724Z"
+    },
+    {
+      "id": "gal_pat_1788629182426_1791374995724_7245",
+      "patientId": "pat_1788629182426",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788629182426/IMG_1515.jpeg",
+      "description": "IMG_1515.jpeg",
+      "date": "2026-10-07T12:09:55.724Z"
+    },
+    {
+      "id": "gal_pat_1788629182426_1791374995724_9729",
+      "patientId": "pat_1788629182426",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1788629182426/upper_edited_1788629673975.jpg",
+      "description": "upper_edited_1788629673975.jpg",
+      "date": "2026-10-07T12:09:55.724Z"
+    },
+    {
+      "id": "gal_pat_1789577293621_520_1791374995726_8421",
+      "patientId": "pat_1789577293621_520",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789577293621_520/IMG_1682.jpeg",
+      "description": "IMG_1682.jpeg",
+      "date": "2026-10-07T12:09:55.726Z"
+    },
+    {
+      "id": "gal_pat_1789577293621_520_1791374995726_6702",
+      "patientId": "pat_1789577293621_520",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789577293621_520/IMG_1683.jpeg",
+      "description": "IMG_1683.jpeg",
+      "date": "2026-10-07T12:09:55.726Z"
+    },
+    {
+      "id": "gal_pat_1789577293621_520_1791374995726_1978",
+      "patientId": "pat_1789577293621_520",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789577293621_520/IMG_1684.jpeg",
+      "description": "IMG_1684.jpeg",
+      "date": "2026-10-07T12:09:55.726Z"
+    },
+    {
+      "id": "gal_pat_1789577293621_520_1791374995726_2032",
+      "patientId": "pat_1789577293621_520",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789577293621_520/lower_edited_1789580991111.jpg",
+      "description": "lower_edited_1789580991111.jpg",
+      "date": "2026-10-07T12:09:55.726Z"
+    },
+    {
+      "id": "gal_pat_1789577293621_520_1791374995726_7292",
+      "patientId": "pat_1789577293621_520",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789577293621_520/smile_edited_1789581086584.jpg",
+      "description": "smile_edited_1789581086584.jpg",
+      "date": "2026-10-07T12:09:55.726Z"
+    },
+    {
+      "id": "gal_pat_1789577293622_317_1791374995729_8702",
+      "patientId": "pat_1789577293622_317",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789577293622_317/IMG_1693.jpeg",
+      "description": "IMG_1693.jpeg",
+      "date": "2026-10-07T12:09:55.729Z"
+    },
+    {
+      "id": "gal_pat_1789577293622_317_1791374995729_9034",
+      "patientId": "pat_1789577293622_317",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789577293622_317/IMG_1694.jpeg",
+      "description": "IMG_1694.jpeg",
+      "date": "2026-10-07T12:09:55.729Z"
+    },
+    {
+      "id": "gal_pat_1789577293622_317_1791374995729_5163",
+      "patientId": "pat_1789577293622_317",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789577293622_317/IMG_1695.jpeg",
+      "description": "IMG_1695.jpeg",
+      "date": "2026-10-07T12:09:55.729Z"
+    },
+    {
+      "id": "gal_pat_1789577293622_317_1791374995729_5488",
+      "patientId": "pat_1789577293622_317",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789577293622_317/IMG_1699.jpeg",
+      "description": "IMG_1699.jpeg",
+      "date": "2026-10-07T12:09:55.729Z"
+    },
+    {
+      "id": "gal_pat_1789577293622_317_1791374995729_3216",
+      "patientId": "pat_1789577293622_317",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789577293622_317/IMG_1700.jpeg",
+      "description": "IMG_1700.jpeg",
+      "date": "2026-10-07T12:09:55.729Z"
+    },
+    {
+      "id": "gal_pat_1789991141859_153_1791374995731_3736",
+      "patientId": "pat_1789991141859_153",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789991141859_153/IMG_1885.jpeg",
+      "description": "IMG_1885.jpeg",
+      "date": "2026-10-07T12:09:55.731Z"
+    },
+    {
+      "id": "gal_pat_1789991141859_153_1791374995731_1159",
+      "patientId": "pat_1789991141859_153",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789991141859_153/IMG_1886.jpeg",
+      "description": "IMG_1886.jpeg",
+      "date": "2026-10-07T12:09:55.731Z"
+    },
+    {
+      "id": "gal_pat_1789991141859_153_1791374995731_7801",
+      "patientId": "pat_1789991141859_153",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789991141859_153/IMG_1887.jpeg",
+      "description": "IMG_1887.jpeg",
+      "date": "2026-10-07T12:09:55.731Z"
+    },
+    {
+      "id": "gal_pat_1789991141859_153_1791374995731_3924",
+      "patientId": "pat_1789991141859_153",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789991141859_153/lower_edited_1790172815157.jpg",
+      "description": "lower_edited_1790172815157.jpg",
+      "date": "2026-10-07T12:09:55.731Z"
+    },
+    {
+      "id": "gal_pat_1789991141859_153_1791374995731_4295",
+      "patientId": "pat_1789991141859_153",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789991141859_153/smile_edited_1790172499609.jpg",
+      "description": "smile_edited_1790172499609.jpg",
+      "date": "2026-10-07T12:09:55.731Z"
+    },
+    {
+      "id": "gal_pat_1789991141859_153_1791374995731_6024",
+      "patientId": "pat_1789991141859_153",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1789991141859_153/upper_edited_1790172509978.jpg",
+      "description": "upper_edited_1790172509978.jpg",
+      "date": "2026-10-07T12:09:55.731Z"
+    },
+    {
+      "id": "gal_pat_1790857058157_434_1791374995746_9313",
+      "patientId": "pat_1790857058157_434",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1790857058157_434/IMG_2044.jpeg",
+      "description": "IMG_2044.jpeg",
+      "date": "2026-10-07T12:09:55.746Z"
+    },
+    {
+      "id": "gal_pat_1790857058157_434_1791374995746_7670",
+      "patientId": "pat_1790857058157_434",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1790857058157_434/IMG_2045.jpeg",
+      "description": "IMG_2045.jpeg",
+      "date": "2026-10-07T12:09:55.746Z"
+    },
+    {
+      "id": "gal_pat_1790857058157_434_1791374995746_9323",
+      "patientId": "pat_1790857058157_434",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1790857058157_434/IMG_2046.jpeg",
+      "description": "IMG_2046.jpeg",
+      "date": "2026-10-07T12:09:55.746Z"
+    },
+    {
+      "id": "gal_pat_1790857058157_434_1791374995746_1355",
+      "patientId": "pat_1790857058157_434",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1790857058157_434/IMG_2047.jpeg",
+      "description": "IMG_2047.jpeg",
+      "date": "2026-10-07T12:09:55.746Z"
+    },
+    {
+      "id": "gal_pat_1790857058157_434_1791374995746_1493",
+      "patientId": "pat_1790857058157_434",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1790857058157_434/IMG_2048.jpeg",
+      "description": "IMG_2048.jpeg",
+      "date": "2026-10-07T12:09:55.746Z"
+    },
+    {
+      "id": "gal_pat_1790857058157_434_1791374995746_7395",
+      "patientId": "pat_1790857058157_434",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1790857058157_434/IMG_2049.jpeg",
+      "description": "IMG_2049.jpeg",
+      "date": "2026-10-07T12:09:55.747Z"
+    },
+    {
+      "id": "gal_pat_1790857058157_434_1791374995747_6516",
+      "patientId": "pat_1790857058157_434",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1790857058157_434/IMG_2050.jpeg",
+      "description": "IMG_2050.jpeg",
+      "date": "2026-10-07T12:09:55.747Z"
+    },
+    {
+      "id": "gal_pat_1790857058157_434_1791374995747_8523",
+      "patientId": "pat_1790857058157_434",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1790857058157_434/IMG_2051.jpeg",
+      "description": "IMG_2051.jpeg",
+      "date": "2026-10-07T12:09:55.747Z"
+    },
+    {
+      "id": "gal_pat_1790857058157_434_1791374995747_5684",
+      "patientId": "pat_1790857058157_434",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1790857058157_434/IMG_2052.jpeg",
+      "description": "IMG_2052.jpeg",
+      "date": "2026-10-07T12:09:55.747Z"
+    },
+    {
+      "id": "gal_pat_1791036347575_546_1791374995748_5737",
+      "patientId": "pat_1791036347575_546",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1791036347575_546/IMG_2111.jpeg",
+      "description": "IMG_2111.jpeg",
+      "date": "2026-10-07T12:09:55.748Z"
+    },
+    {
+      "id": "gal_pat_1791036347575_546_1791374995748_2769",
+      "patientId": "pat_1791036347575_546",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/pat_1791036347575_546/IMG_2112.jpeg",
+      "description": "IMG_2112.jpeg",
+      "date": "2026-10-07T12:09:55.748Z"
+    },
+    {
+      "id": "gal_RAYSSA_MARQUES_OLIVEIRA_1791374995777_2841",
+      "patientId": "RAYSSA_MARQUES_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RAYSSA_MARQUES_OLIVEIRA/edited-1784753580001.jpg",
+      "description": "edited-1784753580001.jpg",
+      "date": "2026-10-07T12:09:55.777Z"
+    },
+    {
+      "id": "gal_RAYSSA_MARQUES_OLIVEIRA_1791374995777_3345",
+      "patientId": "RAYSSA_MARQUES_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RAYSSA_MARQUES_OLIVEIRA/IMG_0053.jpeg",
+      "description": "IMG_0053.jpeg",
+      "date": "2026-10-07T12:09:55.777Z"
+    },
+    {
+      "id": "gal_RAYSSA_MARQUES_OLIVEIRA_1791374995777_5199",
+      "patientId": "RAYSSA_MARQUES_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RAYSSA_MARQUES_OLIVEIRA/IMG_0054.jpeg",
+      "description": "IMG_0054.jpeg",
+      "date": "2026-10-07T12:09:55.777Z"
+    },
+    {
+      "id": "gal_RAYSSA_MARQUES_OLIVEIRA_1791374995777_7029",
+      "patientId": "RAYSSA_MARQUES_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RAYSSA_MARQUES_OLIVEIRA/IMG_0055.jpeg",
+      "description": "IMG_0055.jpeg",
+      "date": "2026-10-07T12:09:55.777Z"
+    },
+    {
+      "id": "gal_RAYSSA_MARQUES_OLIVEIRA_1791374995777_1673",
+      "patientId": "RAYSSA_MARQUES_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RAYSSA_MARQUES_OLIVEIRA/IMG_0056.jpeg",
+      "description": "IMG_0056.jpeg",
+      "date": "2026-10-07T12:09:55.777Z"
+    },
+    {
+      "id": "gal_RAYSSA_MARQUES_OLIVEIRA_1791374995777_2884",
+      "patientId": "RAYSSA_MARQUES_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RAYSSA_MARQUES_OLIVEIRA/panoramic_edited_1784753627908.jpg",
+      "description": "panoramic_edited_1784753627908.jpg",
+      "date": "2026-10-07T12:09:55.777Z"
+    },
+    {
+      "id": "gal_RAYSSA_MARQUES_OLIVEIRA_1791374995777_4485",
+      "patientId": "RAYSSA_MARQUES_OLIVEIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RAYSSA_MARQUES_OLIVEIRA/upper_edited_1784753696679.jpg",
+      "description": "upper_edited_1784753696679.jpg",
+      "date": "2026-10-07T12:09:55.777Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_8620",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/IMG_3945.jpeg",
+      "description": "IMG_3945.jpeg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_5092",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/IMG_3946.jpeg",
+      "description": "IMG_3946.jpeg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_206",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/IMG_3947.jpeg",
+      "description": "IMG_3947.jpeg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_4426",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/IMG_3948.jpeg",
+      "description": "IMG_3948.jpeg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_3454",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/IMG_3949.jpeg",
+      "description": "IMG_3949.jpeg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_3423",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/IMG_3950.jpeg",
+      "description": "IMG_3950.jpeg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_9440",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/IMG_3951.jpeg",
+      "description": "IMG_3951.jpeg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_3844",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/IMG_3952.jpeg",
+      "description": "IMG_3952.jpeg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_1218",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/IMG_3953.jpeg",
+      "description": "IMG_3953.jpeg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_7075",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/lower_edited_1784140733903.jpg",
+      "description": "lower_edited_1784140733903.jpg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_6149",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/lower_edited_1784141035843.jpg",
+      "description": "lower_edited_1784141035843.jpg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_2096",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/smile_edited_1784224773010.jpg",
+      "description": "smile_edited_1784224773010.jpg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_RITA_DE_CASSIA_PEREIRA_DE_AMORIM_1791374995809_7035",
+      "patientId": "RITA_DE_CASSIA_PEREIRA_DE_AMORIM",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/RITA_DE_CASSIA_PEREIRA_DE_AMORIM/upper_edited_1784140692633.jpg",
+      "description": "upper_edited_1784140692633.jpg",
+      "date": "2026-10-07T12:09:55.809Z"
+    },
+    {
+      "id": "gal_STEFANY_PRISCILLA_FERREIRA_1791374995843_8077",
+      "patientId": "STEFANY_PRISCILLA_FERREIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/STEFANY_PRISCILLA_FERREIRA/IMG_3915.jpeg",
+      "description": "IMG_3915.jpeg",
+      "date": "2026-10-07T12:09:55.843Z"
+    },
+    {
+      "id": "gal_STEFANY_PRISCILLA_FERREIRA_1791374995843_5595",
+      "patientId": "STEFANY_PRISCILLA_FERREIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/STEFANY_PRISCILLA_FERREIRA/IMG_3916.jpeg",
+      "description": "IMG_3916.jpeg",
+      "date": "2026-10-07T12:09:55.843Z"
+    },
+    {
+      "id": "gal_STEFANY_PRISCILLA_FERREIRA_1791374995843_873",
+      "patientId": "STEFANY_PRISCILLA_FERREIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/STEFANY_PRISCILLA_FERREIRA/IMG_3917.jpeg",
+      "description": "IMG_3917.jpeg",
+      "date": "2026-10-07T12:09:55.843Z"
+    },
+    {
+      "id": "gal_STEFANY_PRISCILLA_FERREIRA_1791374995843_9899",
+      "patientId": "STEFANY_PRISCILLA_FERREIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/STEFANY_PRISCILLA_FERREIRA/IMG_3918.jpeg",
+      "description": "IMG_3918.jpeg",
+      "date": "2026-10-07T12:09:55.843Z"
+    },
+    {
+      "id": "gal_STEFANY_PRISCILLA_FERREIRA_1791374995843_9599",
+      "patientId": "STEFANY_PRISCILLA_FERREIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/STEFANY_PRISCILLA_FERREIRA/IMG_3919.jpeg",
+      "description": "IMG_3919.jpeg",
+      "date": "2026-10-07T12:09:55.843Z"
+    },
+    {
+      "id": "gal_STEFANY_PRISCILLA_FERREIRA_1791374995843_6087",
+      "patientId": "STEFANY_PRISCILLA_FERREIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/STEFANY_PRISCILLA_FERREIRA/lower_edited_1783969650797.jpg",
+      "description": "lower_edited_1783969650797.jpg",
+      "date": "2026-10-07T12:09:55.843Z"
+    },
+    {
+      "id": "gal_STEFANY_PRISCILLA_FERREIRA_1791374995843_4666",
+      "patientId": "STEFANY_PRISCILLA_FERREIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/STEFANY_PRISCILLA_FERREIRA/smile_edited_1783969581438.jpg",
+      "description": "smile_edited_1783969581438.jpg",
+      "date": "2026-10-07T12:09:55.843Z"
+    },
+    {
+      "id": "gal_STEFANY_PRISCILLA_FERREIRA_1791374995843_7392",
+      "patientId": "STEFANY_PRISCILLA_FERREIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/STEFANY_PRISCILLA_FERREIRA/snapshot_2026-07-13_18_28_53.jpg",
+      "description": "snapshot_2026-07-13_18_28_53.jpg",
+      "date": "2026-10-07T12:09:55.843Z"
+    },
+    {
+      "id": "gal_STEFANY_PRISCILLA_FERREIRA_1791374995843_6032",
+      "patientId": "STEFANY_PRISCILLA_FERREIRA",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/STEFANY_PRISCILLA_FERREIRA/upper_edited_1783969772157.jpg",
+      "description": "upper_edited_1783969772157.jpg",
+      "date": "2026-10-07T12:09:55.843Z"
+    },
+    {
+      "id": "gal_TANIA_LUCIA_BRITO_1791374995864_5421",
+      "patientId": "TANIA_LUCIA_BRITO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/TANIA_LUCIA_BRITO/IMG_0184.jpeg",
+      "description": "IMG_0184.jpeg",
+      "date": "2026-10-07T12:09:55.864Z"
+    },
+    {
+      "id": "gal_TANIA_LUCIA_BRITO_1791374995864_6229",
+      "patientId": "TANIA_LUCIA_BRITO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/TANIA_LUCIA_BRITO/IMG_0185.jpeg",
+      "description": "IMG_0185.jpeg",
+      "date": "2026-10-07T12:09:55.864Z"
+    },
+    {
+      "id": "gal_TANIA_LUCIA_BRITO_1791374995864_2961",
+      "patientId": "TANIA_LUCIA_BRITO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/TANIA_LUCIA_BRITO/IMG_0186.jpeg",
+      "description": "IMG_0186.jpeg",
+      "date": "2026-10-07T12:09:55.864Z"
+    },
+    {
+      "id": "gal_TANIA_LUCIA_BRITO_1791374995864_4253",
+      "patientId": "TANIA_LUCIA_BRITO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/TANIA_LUCIA_BRITO/IMG_0187.jpeg",
+      "description": "IMG_0187.jpeg",
+      "date": "2026-10-07T12:09:55.864Z"
+    },
+    {
+      "id": "gal_TANIA_LUCIA_BRITO_1791374995864_8317",
+      "patientId": "TANIA_LUCIA_BRITO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/TANIA_LUCIA_BRITO/IMG_0188.jpeg",
+      "description": "IMG_0188.jpeg",
+      "date": "2026-10-07T12:09:55.864Z"
+    },
+    {
+      "id": "gal_TANIA_LUCIA_BRITO_1791374995864_5517",
+      "patientId": "TANIA_LUCIA_BRITO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/TANIA_LUCIA_BRITO/IMG_0190.jpeg",
+      "description": "IMG_0190.jpeg",
+      "date": "2026-10-07T12:09:55.864Z"
+    },
+    {
+      "id": "gal_TANIA_LUCIA_BRITO_1791374995864_8902",
+      "patientId": "TANIA_LUCIA_BRITO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/TANIA_LUCIA_BRITO/lower_edited_1785504988467.jpg",
+      "description": "lower_edited_1785504988467.jpg",
+      "date": "2026-10-07T12:09:55.864Z"
+    },
+    {
+      "id": "gal_THIAGO_TOMAZ_1791374995867_4984",
+      "patientId": "THIAGO_TOMAZ",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/THIAGO_TOMAZ/snapshot_2026-07-09_20_24_17.jpg",
+      "description": "snapshot_2026-07-09_20_24_17.jpg",
+      "date": "2026-10-07T12:09:55.867Z"
+    },
+    {
+      "id": "gal_THIAGO_TOMAZ_1791374995867_368",
+      "patientId": "THIAGO_TOMAZ",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/THIAGO_TOMAZ/snapshot_2026-07-09_20_25_28.jpg",
+      "description": "snapshot_2026-07-09_20_25_28.jpg",
+      "date": "2026-10-07T12:09:55.867Z"
+    },
+    {
+      "id": "gal_THIAGO_TOMAZ_1791374995867_8485",
+      "patientId": "THIAGO_TOMAZ",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/THIAGO_TOMAZ/snapshot_2026-07-09_20_25_58.jpg",
+      "description": "snapshot_2026-07-09_20_25_58.jpg",
+      "date": "2026-10-07T12:09:55.867Z"
+    },
+    {
+      "id": "gal_THIAGO_TOMAZ_DE_SOUZA_CHAVEIRO_1791374995868_5945",
+      "patientId": "THIAGO_TOMAZ_DE_SOUZA_CHAVEIRO",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/THIAGO_TOMAZ_DE_SOUZA_CHAVEIRO/snapshot_2026-07-09_20_32_50.jpg",
+      "description": "snapshot_2026-07-09_20_32_50.jpg",
+      "date": "2026-10-07T12:09:55.868Z"
+    },
+    {
+      "id": "gal_WELYNTON_BAPTISTA_RODRIGUES_1791374995875_4648",
+      "patientId": "WELYNTON_BAPTISTA_RODRIGUES",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/WELYNTON_BAPTISTA_RODRIGUES/IMG_3905.jpeg",
+      "description": "IMG_3905.jpeg",
+      "date": "2026-10-07T12:09:55.875Z"
+    },
+    {
+      "id": "gal_WELYNTON_BAPTISTA_RODRIGUES_1791374995875_3177",
+      "patientId": "WELYNTON_BAPTISTA_RODRIGUES",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/WELYNTON_BAPTISTA_RODRIGUES/IMG_3906.jpeg",
+      "description": "IMG_3906.jpeg",
+      "date": "2026-10-07T12:09:55.875Z"
+    },
+    {
+      "id": "gal_WELYNTON_BAPTISTA_RODRIGUES_1791374995875_1019",
+      "patientId": "WELYNTON_BAPTISTA_RODRIGUES",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/WELYNTON_BAPTISTA_RODRIGUES/IMG_3907.jpeg",
+      "description": "IMG_3907.jpeg",
+      "date": "2026-10-07T12:09:55.875Z"
+    },
+    {
+      "id": "gal_WELYNTON_BAPTISTA_RODRIGUES_1791374995875_451",
+      "patientId": "WELYNTON_BAPTISTA_RODRIGUES",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/WELYNTON_BAPTISTA_RODRIGUES/lower_edited_1783794841943.jpg",
+      "description": "lower_edited_1783794841943.jpg",
+      "date": "2026-10-07T12:09:55.875Z"
+    },
+    {
+      "id": "gal_WELYNTON_BAPTISTA_RODRIGUES_1791374995875_4760",
+      "patientId": "WELYNTON_BAPTISTA_RODRIGUES",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/WELYNTON_BAPTISTA_RODRIGUES/smile_edited_1783794902464.jpg",
+      "description": "smile_edited_1783794902464.jpg",
+      "date": "2026-10-07T12:09:55.875Z"
+    },
+    {
+      "id": "gal_WELYNTON_BAPTISTA_RODRIGUES_1791374995875_14",
+      "patientId": "WELYNTON_BAPTISTA_RODRIGUES",
+      "url": "https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev/WELYNTON_BAPTISTA_RODRIGUES/upper_edited_1783794780270.jpg",
+      "description": "upper_edited_1783794780270.jpg",
+      "date": "2026-10-07T12:09:55.875Z"
+    }
+  ]
+}

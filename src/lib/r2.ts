@@ -24,10 +24,13 @@ export const s3Client = new S3Client({
  * Uploads a file to Cloudflare R2
  */
 export async function uploadFile(file: File | Blob, path: string, contentType?: string) {
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = new Uint8Array(arrayBuffer);
+
   const command = new PutObjectCommand({
     Bucket: bucketName,
     Key: path,
-    Body: file,
+    Body: buffer,
     ContentType: contentType || file.type || 'application/octet-stream',
   });
 
