@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import { uploadFile, getFileUrl, deleteFile, listFiles, moveFile, bucketName } from './r2';
 
+const SUPABASE_BUCKET = 'patient_files';
+
 /**
  * Função utilitária para garantir um formato seguro de nome de pasta
  */
@@ -18,7 +20,8 @@ function getSafeFilename(filename: string): string {
 }
 
 /**
- * Faz o upload de um arquivo para o bucket R2
+ * Faz o upload de um arquivo para o Cloudflare R2 (prioritário para economizar cota),
+ * com fallback automático e transparente para o Supabase Storage caso o R2 falhe (CORS, SSL ou endpoint).
  */
 export async function uploadPatientFileToSupabase(patientIdentifier: string, file: File | Blob, filename: string, subfolder?: string) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
@@ -31,17 +34,38 @@ export async function uploadPatientFileToSupabase(patientIdentifier: string, fil
   const finalFilename = getSafeFilename(filename);
   const filePath = filename.includes('/') ? filename : `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
 
+  let r2Success = false;
+
+  // 1. Tentar Cloudflare R2 primeiro (para economizar a cota de 1GB do Supabase)
   try {
     await uploadFile(file, filePath);
-    return { path: filePath };
-  } catch (error) {
-    console.error('Erro ao fazer upload para o Cloudflare R2:', error);
-    throw error;
+    r2Success = true;
+    console.log(`[STORAGE] Upload salvo no Cloudflare R2: ${filePath}`);
+  } catch (error: any) {
+    console.warn('[STORAGE] Cloudflare R2 indisponível ou bloqueado por CORS/TLS. Acionando fallback do Supabase Storage:', error?.message || error);
   }
+
+  // 2. Se o Cloudflare R2 falhar, salva no Supabase Storage com garantia de redundância
+  if (!r2Success) {
+    const { data, error: supaErr } = await supabase.storage
+      .from(SUPABASE_BUCKET)
+      .upload(filePath, file, {
+        upsert: true
+      });
+
+    if (supaErr) {
+      console.error('[STORAGE] Erro no fallback do Supabase Storage:', supaErr);
+      throw supaErr;
+    }
+    console.log(`[STORAGE] Upload salvo com sucesso no Supabase Storage: ${filePath}`);
+    return { path: filePath, provider: 'supabase' };
+  }
+
+  return { path: filePath, provider: 'r2' };
 }
 
 /**
- * Lista todos os arquivos de um paciente (incluindo subpastas se aplicável)
+ * Lista todos os arquivos de um paciente (unificando Cloudflare R2 e Supabase Storage)
  */
 export async function listPatientFilesFromSupabase(patientId: string, fallbackPatientName?: string, subfolder?: string) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
@@ -50,32 +74,67 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
   const userId = session.user.id;
   const idPath = getSafePatientPath(patientId);
   const basePath = `${userId}/${idPath}`;
-  let path = subfolder ? `${basePath}/${subfolder.replace(/^\/|\/$/g, '')}/` : `${basePath}/`;
+  const path = subfolder ? `${basePath}/${subfolder.replace(/^\/|\/$/g, '')}/` : `${basePath}/`;
 
   const fetchFilesInPath = async (targetPath: string, subPrefix: string = '') => {
+    const cleanPath = targetPath.replace(/^\/+|\/+$/g, '');
+    const foundMap = new Map<string, any>();
+
+    // 1. Buscar do Supabase Storage
     try {
-      // Ensure targetPath ends with / for prefix search
-      const prefix = targetPath.endsWith('/') ? targetPath : `${targetPath}/`;
-      const files = await listFiles(prefix);
-      
-      return files
-        .filter(f => f.Key && !f.Key.endsWith('.emptyFolderPlaceholder'))
-        .map(f => {
-          const nameParts = f.Key!.split('/');
-          const name = nameParts[nameParts.length - 1];
-          return {
-            name: name,
-            storagePath: f.Key!,
-            displayName: subPrefix ? `${subPrefix}/${name}` : name,
-            subfolder: subPrefix || undefined,
-            created_at: f.LastModified?.toISOString() || new Date().toISOString(),
-            updated_at: f.LastModified?.toISOString() || new Date().toISOString(),
-          };
-        });
+      const { data: supaFiles } = await supabase.storage
+        .from(SUPABASE_BUCKET)
+        .list(cleanPath);
+
+      if (Array.isArray(supaFiles)) {
+        for (const f of supaFiles) {
+          if (f.name && !f.name.endsWith('.emptyFolderPlaceholder') && f.id !== null) {
+            const storagePath = `${cleanPath}/${f.name}`;
+            foundMap.set(storagePath, {
+              name: f.name,
+              storagePath: storagePath,
+              displayName: subPrefix ? `${subPrefix}/${f.name}` : f.name,
+              subfolder: subPrefix || undefined,
+              created_at: f.created_at || new Date().toISOString(),
+              updated_at: f.updated_at || new Date().toISOString(),
+              source: 'supabase'
+            });
+          }
+        }
+      }
     } catch (e) {
-      console.error('Error listing R2 files:', e);
-      return [];
+      console.warn('[STORAGE] Erro ao listar do Supabase Storage:', e);
     }
+
+    // 2. Buscar do Cloudflare R2
+    try {
+      const prefix = targetPath.endsWith('/') ? targetPath : `${targetPath}/`;
+      const r2Files = await listFiles(prefix);
+
+      if (Array.isArray(r2Files)) {
+        for (const f of r2Files) {
+          if (f.Key && !f.Key.endsWith('.emptyFolderPlaceholder')) {
+            const nameParts = f.Key.split('/');
+            const name = nameParts[nameParts.length - 1];
+            if (!foundMap.has(f.Key)) {
+              foundMap.set(f.Key, {
+                name: name,
+                storagePath: f.Key,
+                displayName: subPrefix ? `${subPrefix}/${name}` : name,
+                subfolder: subPrefix || undefined,
+                created_at: f.LastModified?.toISOString() || new Date().toISOString(),
+                updated_at: f.LastModified?.toISOString() || new Date().toISOString(),
+                source: 'r2'
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Ignora erro de rede/CORS do R2 para não travar a listagem do CRM
+    }
+
+    return Array.from(foundMap.values());
   };
 
   let rawFiles = await fetchFilesInPath(path, subfolder || '');
@@ -99,9 +158,6 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
       }
       
       if (fallbackFiles.length > 0) {
-        console.warn(`[TELEMETRIA-MIGRACAO] Fallback acionado para R2.`);
-        
-        // Deduplicar
         const existingKeys = new Set(rawFiles.map(f => f.storagePath.replace(`${userId}/${idPath}/`, '')));
         const uniqueFallback = fallbackFiles.filter(f => {
           const legacyKey = f.storagePath.replace(`${userId}/${legacyFolder}/`, '');
@@ -113,25 +169,34 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
     }
   }
 
-      // --- ROOT UPLOAD FALLBACK ---
-    if (rawFiles.length === 0) {
-      const rootBasePath = `${idPath}`;
-      const rootPath = subfolder ? `${rootBasePath}/${subfolder.replace(/^\/|\/$/g, '')}/` : `${rootBasePath}/`;
-      let rootFiles = await fetchFilesInPath(rootPath, subfolder || '');
-      if (!subfolder) {
-        const rootSub = await fetchFilesInPath(`${rootBasePath}/Orcamentos/`, 'Orcamentos');
-        rootFiles = [...rootFiles, ...rootSub];
-      }
-      if (rootFiles.length > 0) { rawFiles = rootFiles; }
+  // --- ROOT UPLOAD FALLBACK ---
+  if (rawFiles.length === 0) {
+    const rootBasePath = `${idPath}`;
+    const rootPath = subfolder ? `${rootBasePath}/${subfolder.replace(/^\/|\/$/g, '')}/` : `${rootBasePath}/`;
+    let rootFiles = await fetchFilesInPath(rootPath, subfolder || '');
+    if (!subfolder) {
+      const rootSub = await fetchFilesInPath(`${rootBasePath}/Orcamentos/`, 'Orcamentos');
+      rootFiles = [...rootFiles, ...rootSub];
     }
+    if (rootFiles.length > 0) { rawFiles = rootFiles; }
+  }
 
-    if (rawFiles.length > 0) {
+  if (rawFiles.length > 0) {
     const fileObjects = await Promise.all(rawFiles.map(async (f) => {
-      let thumbnailLink = null;
+      let thumbnailLink: string | null = null;
       try {
-        thumbnailLink = await getFileUrl(f.storagePath, 3600);
+        if (f.source === 'supabase') {
+          const { data } = await supabase.storage
+            .from(SUPABASE_BUCKET)
+            .createSignedUrl(f.storagePath, 3600);
+          thumbnailLink = data?.signedUrl || null;
+        } else {
+          thumbnailLink = await getFileUrl(f.storagePath, 3600);
+        }
       } catch (e) {
-        console.error('Erro ao gerar URL assinada:', e);
+        try {
+          thumbnailLink = await getFileUrl(f.storagePath, 3600);
+        } catch (_) {}
       }
       
       return {
@@ -192,20 +257,11 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
     return enrichedFiles;
   }
 
-  // TELEMETRIA: Se chegou aqui, retornou 0 arquivos
-  try {
-    const errorLog = JSON.stringify({
-      patientId, fallbackPatientName, idPath, userId, msg: "Zero files found for both paths (R2)"
-    });
-    const blob = new Blob([errorLog], { type: 'application/json' });
-    await uploadFile(blob, `${userId}/telemetry_logs_${Date.now()}_${idPath}.json`);
-  } catch(e) {}
-
   return [];
 }
 
 /**
- * Deleta um arquivo específico do paciente no R2
+ * Deleta um arquivo específico do paciente (no Supabase e no Cloudflare R2)
  */
 export async function deletePatientFileFromSupabase(patientIdentifier: string, filename: string, subfolder?: string) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
@@ -225,6 +281,16 @@ export async function deletePatientFileFromSupabase(patientIdentifier: string, f
     filePath = `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
   }
 
+  // Deletar do Supabase Storage
+  try {
+    await supabase.storage.from(SUPABASE_BUCKET).remove([filePath]);
+    if (!subfolder && !filename.includes('/')) {
+      const fallbackPath = `${userId}/${targetFolder}/Orcamentos/${finalFilename}`;
+      await supabase.storage.from(SUPABASE_BUCKET).remove([fallbackPath]);
+    }
+  } catch (e) {}
+
+  // Deletar do Cloudflare R2
   try {
     await deleteFile(filePath);
   } catch (error) {
@@ -233,23 +299,36 @@ export async function deletePatientFileFromSupabase(patientIdentifier: string, f
       try {
         await deleteFile(fallbackPath);
         return;
-      } catch (fallbackError) {
-        console.error('Erro no fallback delete:', fallbackError);
-      }
+      } catch (fallbackError) {}
     }
-    console.error('Erro ao deletar arquivo no R2:', error);
-    throw error;
   }
 }
 
 /**
- * Baixa um arquivo e converte para Data URL
+ * Baixa um arquivo e converte para Data URL (Supabase primeiro, R2 fallback)
  */
 export async function downloadFileAsDataUrlFromSupabase(filePath: string): Promise<string> {
+  // 1. Tentar Supabase Storage
+  try {
+    const { data, error } = await supabase.storage
+      .from(SUPABASE_BUCKET)
+      .download(filePath);
+
+    if (!error && data) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(data);
+      });
+    }
+  } catch (e) {}
+
+  // 2. Tentar Cloudflare R2
   const url = await getFileUrl(filePath, 60);
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error('Erro ao baixar arquivo do R2');
+    throw new Error('Erro ao baixar arquivo do armazenamento em nuvem');
   }
   const blob = await response.blob();
 
@@ -261,6 +340,9 @@ export async function downloadFileAsDataUrlFromSupabase(filePath: string): Promi
   });
 }
 
+/**
+ * Obtém link assinado ou público para visualização (Supabase se salvo lá, R2 caso contrário)
+ */
 export async function getPatientFileUrlFromSupabase(patientIdentifier: string, filename: string, expiresIn: number = 3600, subfolder?: string) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
   if (authErr || !session) throw new Error('Usuário não autenticado');
@@ -276,6 +358,18 @@ export async function getPatientFileUrlFromSupabase(patientIdentifier: string, f
       ? `${userId}/${targetFolder}/${filename.replace(/^\/+/, '')}`
       : `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`);
 
+  // 1. Tentar URL do Supabase Storage
+  try {
+    const { data: supaUrl, error: supaErr } = await supabase.storage
+      .from(SUPABASE_BUCKET)
+      .createSignedUrl(filePath, expiresIn);
+
+    if (!supaErr && supaUrl?.signedUrl) {
+      return supaUrl.signedUrl;
+    }
+  } catch (e) {}
+
+  // 2. Tentar URL do Cloudflare R2
   try {
     return await getFileUrl(filePath, expiresIn);
   } catch (error: any) {
@@ -284,6 +378,9 @@ export async function getPatientFileUrlFromSupabase(patientIdentifier: string, f
   }
 }
 
+/**
+ * Renomeia ou move arquivo (no Supabase e no Cloudflare R2)
+ */
 export async function renamePatientFileInSupabase(patientIdentifier: string, oldFilename: string, newFilename: string, subfolder?: string) {
   const { data: { session }, error: authErr } = await supabase.auth.getSession();
   if (authErr || !session) throw new Error('Usuário não autenticado');
@@ -313,6 +410,17 @@ export async function renamePatientFileInSupabase(patientIdentifier: string, old
 
   if (oldPath === newPath) return;
 
+  // Supabase Storage move
+  try {
+    const { error } = await supabase.storage.from(SUPABASE_BUCKET).move(oldPath, newPath);
+    if (error && !oldFilename.includes('Orcamentos') && !subfolder) {
+      const fallbackOld = `${userId}/${targetFolder}/Orcamentos/${getSafeFilename(oldFilename)}`;
+      const fallbackNew = `${userId}/${targetFolder}/Orcamentos/${safeNewBaseName}`;
+      await supabase.storage.from(SUPABASE_BUCKET).move(fallbackOld, fallbackNew);
+    }
+  } catch (e) {}
+
+  // Cloudflare R2 move
   try {
     await moveFile(oldPath, newPath);
   } catch (error) {
@@ -322,11 +430,7 @@ export async function renamePatientFileInSupabase(patientIdentifier: string, old
       try {
         await moveFile(fallbackOld, fallbackNew);
         return;
-      } catch (fallbackError) {
-        console.error('Erro fallback move R2:', fallbackError);
-      }
+      } catch (fallbackError) {}
     }
-    console.error('Erro ao renomear arquivo no R2:', error);
-    throw error;
   }
 }

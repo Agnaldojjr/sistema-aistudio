@@ -81,7 +81,9 @@ export const supabase = !isDemoMode
           upload: async () => ({ data: { path: 'demo-path' }, error: null }),
           list: async () => ({ data: [], error: null }),
           remove: async () => ({ data: [], error: null }),
-          download: async () => ({ data: new Blob(), error: null })
+          download: async () => ({ data: new Blob(), error: null }),
+          createSignedUrl: async () => ({ data: { signedUrl: 'blob:demo-signed-url' }, error: null }),
+          move: async () => ({ data: null, error: null })
         })
       }
     } as any;

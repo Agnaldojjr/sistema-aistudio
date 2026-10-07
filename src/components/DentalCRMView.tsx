@@ -48,7 +48,7 @@ import ClinicalAttendanceManager from './ClinicalAttendanceManager';
 import { jsPDF } from 'jspdf';
 import { supabase } from '../lib/supabase';
 import * as XLSX from 'xlsx';
-import { CRMPatient, CRMAppointment, CRMClinicalHistory, CRMCommunication } from '../types';
+import { CRMPatient, CRMAppointment, CRMClinicalHistory, CRMCommunication, PhotoSection } from '../types';
 import { fetchAddressByCep, formatCep } from '../lib/cep';
 import { z } from 'zod';
 import {

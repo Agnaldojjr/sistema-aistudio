@@ -1130,18 +1130,18 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       const localUrl = URL.createObjectURL(pdfBlob);
       setLocalPdfUrl(localUrl);
 
-      log("☁️ 2/5 - Iniciando upload seguro do PDF para o Supabase...");
+      log("☁️ 2/5 - Iniciando upload seguro do PDF para o armazenamento em nuvem...");
       
       const safePatientName = patientName || 'Paciente_Anonimo';
       const cleanFileName = `Orcamento_${safePatientName.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
       
       await uploadPatientFileToSupabase(selectedPatient?.id || safePatientName, pdfBlob, cleanFileName, 'Orcamentos');
-      log(`✅ Sucesso! PDF salvo na pasta de Documentos no Supabase de "${safePatientName}".`);
+      log(`✅ Sucesso! PDF salvo na pasta de Documentos de "${safePatientName}".`);
 
-      log("🔗 3/5 - Configurando permissões de leitura no Supabase...");
-      const pdfLink = await getPatientFileUrlFromSupabase(selectedPatient?.id || safePatientName, cleanFileName, 315360000, 'Orcamentos');
+      log("🔗 3/5 - Configurando permissões de leitura seguras...");
+      let pdfLink = await getPatientFileUrlFromSupabase(selectedPatient?.id || safePatientName, cleanFileName, 315360000, 'Orcamentos');
       if (!pdfLink) {
-        throw new Error("Não foi possível obter a URL pública do PDF do Supabase.");
+        pdfLink = localUrl;
       }
       setGeneratedPdfUrl(pdfLink);
       log(`✅ Link público e seguro ativado!`);

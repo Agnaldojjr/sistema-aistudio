@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, FileText, Smartphone, Download, Loader2, Sparkles, ChevronRight, Plus, Printer, Check } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { PatientData, ClinicSettings } from '../types';
+import letterheadTemplateA4 from '../assets/receituario_template_a4.png';
 
 interface MedicalDocumentModalProps {
   type: 'receituario' | 'atestado' | 'declaracao';
@@ -127,6 +128,7 @@ export default function MedicalDocumentModal({
   const [departureTime, setDepartureTime] = useState(initialDepartureTime || '');
   
   // Opções para impressão física no consultório
+  const [includeOfficialLetterhead, setIncludeOfficialLetterhead] = useState(true);
   const [includeDigitalSignature, setIncludeDigitalSignature] = useState(true);
   const [printTwoCopies, setPrintTwoCopies] = useState(false);
 
@@ -223,181 +225,180 @@ export default function MedicalDocumentModal({
         format: 'a4'
       });
 
-      // 1. Carrega o logo AF em SVG -> PNG
-      const afSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="300" height="300">
-        <path d="M50 10 L20 80 L35 80 L50 40 L65 80 L80 80 Z M30 65 L70 65" stroke="#8A1F27" stroke-width="4" fill="none" />
-        <path d="M50 10 L50 90 M50 50 L75 50 M50 25 L70 25" stroke="#8A1F27" stroke-width="4" fill="none" />
-      </svg>`;
-      const svgBase64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(afSvg)));
-      
-      const imgData = await new Promise<string>((resolve) => {
-        const img = new Image();
-        img.crossOrigin = "Anonymous";
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = 300;
-          canvas.height = 300;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, 300, 300);
-            resolve(canvas.toDataURL('image/png'));
-          } else {
-            resolve('');
-          }
-        };
-        img.onerror = () => resolve('');
-        img.src = svgBase64;
-      });
+      // Carrega o fundo timbrado oficial em alta definição
+      let letterheadImg = '';
+      if (includeOfficialLetterhead) {
+        letterheadImg = await new Promise<string>((resolve) => {
+          const img = new Image();
+          img.crossOrigin = "Anonymous";
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth || img.width;
+            canvas.height = img.naturalHeight || img.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0);
+              resolve(canvas.toDataURL('image/png'));
+            } else {
+              resolve('');
+            }
+          };
+          img.onerror = () => {
+            const fallbackImg = new Image();
+            fallbackImg.crossOrigin = "Anonymous";
+            fallbackImg.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = fallbackImg.naturalWidth || fallbackImg.width;
+              canvas.height = fallbackImg.naturalHeight || fallbackImg.height;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(fallbackImg, 0, 0);
+                resolve(canvas.toDataURL('image/png'));
+              } else {
+                resolve('');
+              }
+            };
+            fallbackImg.onerror = () => resolve('');
+            fallbackImg.src = '/receituario_template_a4.png';
+          };
+          img.src = letterheadTemplateA4 || '/receituario_template_a4.png';
+        });
+      }
 
       const renderDocumentPage = (viaLabel?: string) => {
+        // 1. Fundo do Timbre Oficial da Clínica
+        if (includeOfficialLetterhead && letterheadImg) {
+          doc.addImage(letterheadImg, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+        }
+
+        // 2. Indicador de Via (1ª Via / 2ª Via)
         if (viaLabel) {
           doc.setFontSize(8);
           doc.setFont("helvetica", "bold");
-          doc.setTextColor(120, 120, 120);
-          doc.text(`[ ${viaLabel} ]`, 195, 12, { align: 'right' });
+          doc.setTextColor(140, 140, 140);
+          doc.text(`[ ${viaLabel} ]`, 185, 14, { align: 'right' });
         }
 
-        if (imgData) {
-          doc.addImage(imgData, 'PNG', 85, 10, 40, 40); // centered top
-          
-          // Draw subtle watermarks on the right edge
-          doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
-          for (let i = 0; i < 12; i++) {
-            doc.addImage(imgData, 'PNG', 190, 10 + (i * 22), 10, 10);
-          }
-          doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
-        }
-
-        // 2. Main Title (DR. AGNALDO FERREIRA)
-        doc.setTextColor(138, 31, 39); // #8A1F27
-        doc.setFontSize(16);
-        doc.setFont("helvetica", "bold");
-        const docName = clinicSettings.doctorName || 'DR. AGNALDO FERREIRA';
-        doc.text(docName.toUpperCase(), 105, 55, { align: 'center', charSpace: 1.5 });
-        
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "normal");
-        doc.text((clinicSettings.doctorRole || 'CIRURGIÃO DENTISTA').toUpperCase(), 105, 60, { align: 'center', charSpace: 1 });
-        doc.text(clinicSettings.cro || 'CRO-MG 58714', 105, 64, { align: 'center', charSpace: 1 });
-
-        // 3. Document Type & Body
+        // 3. Título Centralizado do Documento
         doc.setFontSize(18);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(0, 0, 0); // Black
+        doc.setTextColor(30, 30, 30);
         if (type === 'atestado') {
-          doc.text('ATESTADO', 105, 80, { align: 'center', charSpace: 2 });
+          doc.text('ATESTADO', 105, 96, { align: 'center', charSpace: 2 });
         } else if (type === 'declaracao') {
           doc.setFontSize(15);
-          doc.text('DECLARAÇÃO DE COMPARECIMENTO', 105, 80, { align: 'center', charSpace: 1 });
+          doc.text('DECLARAÇÃO DE COMPARECIMENTO', 105, 96, { align: 'center', charSpace: 1 });
         } else {
-          doc.text('RECEITUÁRIO', 105, 80, { align: 'center', charSpace: 2 });
+          doc.text('RECEITUÁRIO', 105, 96, { align: 'center', charSpace: 2 });
         }
-
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "normal");
 
         if (type === 'atestado' || type === 'declaracao') {
-           const prefix = type === 'atestado' ? 'Atesto que o(a) paciente ' : 'Declaro que o(a) paciente ';
-           const today = new Date().toLocaleDateString('pt-BR');
-           const paragraphText = `${prefix}${patientName || '__________________________________________'}, esteve neste consultório recebendo atendimento odontológico no período das ${arrivalTime || '___:___'} às ${departureTime || '___:___'} horas, do dia ${today}${type === 'declaracao' ? ' devendo retornar as suas atividades normais.' : '.'}`;
-           
-           const splitParagraph = doc.splitTextToSize(paragraphText, 170);
-           doc.text(splitParagraph, 20, 100);
+          doc.setFontSize(12);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(30, 30, 30);
+          const prefix = type === 'atestado' ? 'Atesto que o(a) paciente ' : 'Declaro que o(a) paciente ';
+          const today = new Date().toLocaleDateString('pt-BR');
+          const paragraphText = `${prefix}${patientName || '__________________________________________'}, esteve neste consultório recebendo atendimento odontológico no período das ${arrivalTime || '___:___'} às ${departureTime || '___:___'} horas, do dia ${today}${type === 'declaracao' ? ' devendo retornar as suas atividades normais.' : '.'}`;
+          
+          const splitParagraph = doc.splitTextToSize(paragraphText, 158);
+          doc.text(splitParagraph, 24, 115, { lineHeightFactor: 1.4 });
 
-           if (type === 'atestado') {
-             // Checkboxes
-             const boxYStart = 125 + (splitParagraph.length * 6);
-             const boxSize = 3;
-             
-             doc.setLineWidth(0.3);
-             
-             // Retornar as atividades normais.
-             if (atestadoOptions.retornarAtividades) {
-                 doc.setFillColor(0, 0, 0);
-                 doc.rect(20, boxYStart, boxSize, boxSize, 'F');
-             } else {
-                 doc.rect(20, boxYStart, boxSize, boxSize);
-             }
-             doc.text('Retornar as atividades normais.', 25, boxYStart + 2.5);
-             
-             // Permanecer em repouso hoje.
-             if (atestadoOptions.repousoHoje) {
-                 doc.setFillColor(0, 0, 0);
-                 doc.rect(20, boxYStart + 10, boxSize, boxSize, 'F');
-             } else {
-                 doc.rect(20, boxYStart + 10, boxSize, boxSize);
-             }
-             doc.text('Permanecer em repouso hoje.', 25, boxYStart + 12.5);
-             
-             // Permanecer em repouso ___ dias
-             if (atestadoOptions.repousoDias) {
-                 doc.setFillColor(0, 0, 0);
-                 doc.rect(20, boxYStart + 20, boxSize, boxSize, 'F');
-             } else {
-                 doc.rect(20, boxYStart + 20, boxSize, boxSize);
-             }
-             const parsedDays = parseInt(daysOfRest) || 0;
-             doc.text(`Permanecer em repouso ${parsedDays > 0 ? parsedDays : '___'} dias a partir desta data.`, 25, boxYStart + 22.5);
-             
-             // Acompanhante.
-             if (atestadoOptions.acompanhante) {
-                 doc.setFillColor(0, 0, 0);
-                 doc.rect(20, boxYStart + 30, boxSize, boxSize, 'F');
-             } else {
-                 doc.rect(20, boxYStart + 30, boxSize, boxSize);
-             }
-             doc.text('Acompanhante.', 25, boxYStart + 32.5);
-     
-             doc.text(`CID: ${cid || '________________'}`, 20, boxYStart + 50);
-           }
+          if (type === 'atestado') {
+            const boxYStart = 115 + (splitParagraph.length * 7) + 12;
+            const boxSize = 3.5;
+            
+            doc.setLineWidth(0.35);
+            doc.setDrawColor(40, 40, 40);
+            
+            // Retornar as atividades normais.
+            if (atestadoOptions.retornarAtividades) {
+              doc.setFillColor(30, 30, 30);
+              doc.rect(24, boxYStart, boxSize, boxSize, 'F');
+            } else {
+              doc.rect(24, boxYStart, boxSize, boxSize);
+            }
+            doc.text('Retornar as atividades normais.', 30, boxYStart + 2.8);
+            
+            // Permanecer em repouso hoje.
+            if (atestadoOptions.repousoHoje) {
+              doc.setFillColor(30, 30, 30);
+              doc.rect(24, boxYStart + 10, boxSize, boxSize, 'F');
+            } else {
+              doc.rect(24, boxYStart + 10, boxSize, boxSize);
+            }
+            doc.text('Permanecer em repouso hoje.', 30, boxYStart + 12.8);
+            
+            // Permanecer em repouso ___ dias
+            if (atestadoOptions.repousoDias) {
+              doc.setFillColor(30, 30, 30);
+              doc.rect(24, boxYStart + 20, boxSize, boxSize, 'F');
+            } else {
+              doc.rect(24, boxYStart + 20, boxSize, boxSize);
+            }
+            const parsedDays = parseInt(daysOfRest) || 0;
+            doc.text(`Permanecer em repouso ${parsedDays > 0 ? parsedDays : '___'} dias a partir desta data.`, 30, boxYStart + 22.8);
+            
+            // Acompanhante.
+            if (atestadoOptions.acompanhante) {
+              doc.setFillColor(30, 30, 30);
+              doc.rect(24, boxYStart + 30, boxSize, boxSize, 'F');
+            } else {
+              doc.rect(24, boxYStart + 30, boxSize, boxSize);
+            }
+            doc.text('Acompanhante.', 30, boxYStart + 32.8);
+    
+            doc.text(`CID: ${cid || '________________'}`, 24, boxYStart + 48);
+          }
 
         } else {
-           // Identificação da Paciente no Receituário
-           doc.setFontSize(11);
-           doc.setFont("helvetica", "bold");
-           doc.text("Para: ", 20, 94);
+          // Identificação do Paciente no Receituário
+          doc.setFontSize(12);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(20, 20, 20);
+          doc.text("Para: ", 24, 110);
 
-           const prefixWidth = doc.getTextWidth("Para: ");
-           const patientText = (patientName || '__________________________________________').toUpperCase();
-           const splitPatient = doc.splitTextToSize(patientText, 170 - prefixWidth);
-           doc.text(splitPatient, 20 + prefixWidth, 94);
+          const prefixWidth = doc.getTextWidth("Para: ");
+          const patientText = (patientName || '__________________________________________').toUpperCase();
+          const splitPatient = doc.splitTextToSize(patientText, 158 - prefixWidth);
+          doc.text(splitPatient, 24 + prefixWidth, 110);
 
-           // Conteúdo da receita (medicamentos e posologia)
-           doc.setFontSize(11);
-           doc.setFont("helvetica", "normal");
-           const contentStartY = 94 + (splitPatient.length * 6) + 4;
-           const splitContent = doc.splitTextToSize(content, 170);
-           doc.text(splitContent, 20, contentStartY);
+          // Conteúdo da receita (medicamentos e posologia)
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(30, 30, 30);
+          const contentStartY = 110 + (splitPatient.length * 6) + 6;
+          const splitContent = doc.splitTextToSize(content || '', 158);
+          doc.text(splitContent, 24, contentStartY, { lineHeightFactor: 1.35 });
         }
 
-        // 4. Signature
-        const bottomY = 240;
-        doc.setLineWidth(0.5);
+        // 4. Assinatura e Carimbo Centralizados
+        const bottomY = 232;
+        doc.setLineWidth(0.4);
+        doc.setDrawColor(120, 120, 120);
         doc.line(65, bottomY, 145, bottomY);
         
+        const todayStr = new Date().toLocaleDateString('pt-BR');
         if (includeDigitalSignature) {
-          doc.setFontSize(10);
+          doc.setFontSize(10.5);
           doc.setFont("helvetica", "bold");
-          doc.setTextColor(30, 30, 30);
-          doc.text(clinicSettings.doctorName || 'Dr. Agnaldo Ferreira', 105, bottomY + 5, { align: 'center' });
-          doc.setFontSize(8);
+          doc.setTextColor(40, 40, 40);
+          doc.text(clinicSettings.doctorName || 'Dr. Agnaldo Ferreira', 105, bottomY + 5.5, { align: 'center' });
+          doc.setFontSize(8.5);
           doc.setFont("helvetica", "normal");
-          doc.setTextColor(100, 100, 100);
-          doc.text(`${clinicSettings.doctorRole || 'Cirurgião Dentista'} • ${clinicSettings.cro || 'CRO-MG 58714'}`, 105, bottomY + 9, { align: 'center' });
+          doc.setTextColor(90, 90, 90);
+          doc.text(`${clinicSettings.doctorRole || 'Cirurgião Dentista'} • ${clinicSettings.cro || 'CRO-MG 58714'}`, 105, bottomY + 10, { align: 'center' });
+          doc.setFontSize(8);
+          doc.setTextColor(130, 130, 130);
+          doc.text(`Data: ${todayStr}`, 105, bottomY + 14.5, { align: 'center' });
         } else {
           doc.setFontSize(10);
           doc.setFont("helvetica", "normal");
           doc.setTextColor(80, 80, 80);
-          doc.text("Assinatura e Carimbo", 105, bottomY + 5, { align: 'center' });
+          doc.text("Assinatura e Carimbo", 105, bottomY + 5.5, { align: 'center' });
+          doc.setFontSize(8);
+          doc.setTextColor(130, 130, 130);
+          doc.text(`Data: ${todayStr}`, 105, bottomY + 10, { align: 'center' });
         }
-
-        // 5. Footer (Red contact line)
-        doc.setTextColor(138, 31, 39); // #8A1F27
-        doc.setFontSize(9);
-        doc.text(clinicSettings.address, 105, 275, { align: 'center' });
-        
-        const phoneLine = `(31) 98513-1303   dragnaldof@gmail.com   @dr.agnaldoferreira`;
-        doc.text(phoneLine, 105, 280, { align: 'center' });
       };
 
       // Renderiza 1ª Via
@@ -765,42 +766,79 @@ export default function MedicalDocumentModal({
               {/* Right Panel - Receita Viewer */}
               <div className="w-full lg:w-2/3 flex flex-col h-full bg-zinc-100 rounded-xl overflow-hidden border border-zinc-200">
                 <div className="bg-zinc-200 py-2 px-4 shadow-inner border-b border-zinc-300 flex items-center justify-between z-10">
-                   <span className="text-[10px] font-bold text-zinc-500 uppercase">Visualização da Receita</span>
+                   <div className="flex items-center gap-2">
+                     <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">Visualização em Tempo Real (Folha A4)</span>
+                     {includeOfficialLetterhead && (
+                       <span className="px-1.5 py-0.5 bg-[#4E1119] text-white text-[9px] font-bold rounded">Timbre Oficial</span>
+                     )}
+                   </div>
                    <button onClick={() => setContent('')} className="text-[10px] font-bold text-red-600 hover:underline">Limpar</button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto p-4 flex justify-center">
-                  <div className="bg-white w-full max-w-[210mm] min-h-[297mm] shadow-md relative group p-6 sm:p-10" style={{aspectRatio: '210/297'}}>
-                     <div className="flex flex-col h-full">
-                       {/* Header Paper */}
-                       <div className="text-center mb-10 pb-4 border-b border-[#8A1F27]/30">
-                          <h1 className="text-2xl font-bold text-[#8A1F27] tracking-wider mb-1">{clinicSettings.doctorName || 'DR. AGNALDO FERREIRA'}</h1>
-                          <p className="text-[11px] uppercase tracking-widest text-[#8A1F27]">{clinicSettings.doctorRole || 'CIRURGIÃO DENTISTA'}</p>
-                          <p className="text-[10px] text-zinc-500 mt-1">{clinicSettings.cro || 'CRO-MG 58714'}</p>
-                       </div>
-                       
-                       <h2 className="text-xl font-bold text-center tracking-widest mb-6">RECEITUÁRIO</h2>
-                       
-                       <div className="flex-1">
-                         <div className="font-semibold text-sm mb-4">Para: <span className="font-bold underline italic ml-1">{patientName || '________________________'}</span></div>
-                         
-                         <textarea
-                           className="w-full h-[60%] resize-none border-none focus:ring-0 bg-transparent py-0 px-0 mt-2 text-sm leading-relaxed"
-                           placeholder="Selecione um protocolo ou fármaco à esquerda, ou digite livremente aqui..."
-                           value={content}
-                           onChange={(e) => setContent(e.target.value)}
-                         />
-                       </div>
+                <div className="flex-1 overflow-y-auto p-4 flex justify-center items-start bg-zinc-200/60">
+                  <div 
+                    className="w-full max-w-[210mm] shadow-xl relative rounded-xs border border-zinc-300 transition-all select-none overflow-hidden" 
+                    style={{
+                      aspectRatio: '210 / 297',
+                      backgroundImage: includeOfficialLetterhead ? `url(${letterheadTemplateA4 || '/receituario_template_a4.png'})` : 'none',
+                      backgroundColor: '#ffffff',
+                      backgroundSize: '100% 100%',
+                      backgroundRepeat: 'no-repeat'
+                    }}
+                  >
+                    {!includeOfficialLetterhead && (
+                      <div className="absolute top-4 left-6 text-[10px] text-zinc-400 font-mono">
+                        [Modo Folha Pré-Impressa da Gráfica - Fundo ocultado]
+                      </div>
+                    )}
 
-                       {/* Footer Paper */}
-                       <div className="mt-10 pt-4 border-t border-[#8A1F27]/30 text-center">
-                         <div className="w-1/2 mx-auto border-b border-zinc-800 mb-2"></div>
-                         <p className="text-[10px] text-zinc-600 mb-4">Assinatura do Profissional</p>
-                         
-                         <p className="text-[9px] text-[#8A1F27] font-semibold">{clinicSettings.address}</p>
-                         <p className="text-[9px] text-[#8A1F27]">dragnaldof@gmail.com | @dr.agnaldoferreira</p>
-                       </div>
-                     </div>
+                    {/* Título Centralizado */}
+                    <div className="absolute top-[32.3%] left-0 right-0 text-center pointer-events-none">
+                      <h2 className="text-base sm:text-lg md:text-xl font-black text-zinc-800 tracking-[0.2em] uppercase">
+                        RECEITUÁRIO
+                      </h2>
+                    </div>
+
+                    {/* Identificação da Paciente */}
+                    <div className="absolute top-[37%] left-[11.5%] right-[13.5%] pointer-events-none">
+                      <div className="text-xs sm:text-sm font-bold text-zinc-900 flex items-baseline gap-1">
+                        <span>Para:</span>
+                        <span className="font-extrabold underline uppercase tracking-wide truncate">
+                          {patientName || '________________________'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Caixa de Texto do Receituário */}
+                    <div className="absolute top-[41.5%] bottom-[23%] left-[11.5%] right-[13.5%] flex flex-col">
+                      <textarea
+                        className="w-full h-full resize-none border-none focus:ring-0 bg-transparent py-0 px-0 text-xs sm:text-sm font-medium text-zinc-800 leading-relaxed placeholder:text-zinc-400 placeholder:italic select-text cursor-text"
+                        placeholder="Selecione um protocolo ou fármaco à esquerda, ou digite livremente a prescrição aqui..."
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Bloco de Assinatura Centralizado */}
+                    <div className="absolute bottom-[17%] left-0 right-0 flex justify-center pointer-events-none">
+                      <div className="text-center w-56 sm:w-64 pt-1.5 border-t border-zinc-400">
+                        {includeDigitalSignature ? (
+                          <>
+                            <p className="text-[11px] sm:text-xs font-bold text-zinc-800 leading-tight">
+                              {clinicSettings.doctorName || 'Dr. Agnaldo Ferreira'}
+                            </p>
+                            <p className="text-[9px] sm:text-[10px] text-zinc-600 leading-tight mt-0.5">
+                              {clinicSettings.doctorRole || 'Cirurgião Dentista'} • {clinicSettings.cro || 'CRO-MG 58714'}
+                            </p>
+                            <p className="text-[8px] sm:text-[9px] text-zinc-400 mt-0.5">
+                              Data: {new Date().toLocaleDateString('pt-BR')}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-[10px] sm:text-[11px] text-zinc-500 font-medium">Assinatura e Carimbo</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -811,6 +849,16 @@ export default function MedicalDocumentModal({
         {/* Barra de Opções para Impressão Física no Consultório */}
         <div className="px-6 py-2.5 bg-[#FAF8F5] border-t border-zinc-200 flex flex-wrap items-center justify-between gap-4 text-xs shrink-0">
           <div className="flex flex-wrap items-center gap-5">
+            <label className="flex items-center gap-2 cursor-pointer font-medium text-zinc-700 select-none hover:text-zinc-900">
+              <input
+                type="checkbox"
+                checked={includeOfficialLetterhead}
+                onChange={(e) => setIncludeOfficialLetterhead(e.target.checked)}
+                className="w-4 h-4 text-[#4E1119] rounded focus:ring-[#4E1119] cursor-pointer"
+              />
+              <span className="font-semibold text-[#4E1119]">Timbre Oficial da Clínica (Logo, Marca d'água e Rodapé)</span>
+            </label>
+
             <label className="flex items-center gap-2 cursor-pointer font-medium text-zinc-700 select-none hover:text-zinc-900">
               <input
                 type="checkbox"
@@ -831,7 +879,7 @@ export default function MedicalDocumentModal({
               <span>Imprimir em 2 Vias (1ª Via Paciente / 2ª Via Arquivo ou Farmácia)</span>
             </label>
           </div>
-          <span className="text-[11px] text-zinc-400 font-medium">Otimizado para Folha A4 Comum</span>
+          <span className="text-[11px] text-zinc-500 font-medium bg-zinc-100 px-2.5 py-1 rounded-md border border-zinc-200">Formato: Folha A4 (210 x 297 mm)</span>
         </div>
 
         <div className="p-4 border-t border-zinc-200 bg-white flex flex-col sm:flex-row items-center gap-3 justify-end shrink-0">
