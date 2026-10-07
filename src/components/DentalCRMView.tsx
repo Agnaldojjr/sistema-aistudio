@@ -1183,10 +1183,20 @@ export default function DentalCRMView({
   // Sync related lists when selected patient changes
   useEffect(() => {
     if (selectedPatient) {
+      // Limpa dados de plano e propostas do paciente anterior imediatamente
+      setActiveTreatmentPlan(null);
+      setSelectedProposalId('');
+      setSelectedProposalData(null);
+      setSupabaseProposals([]);
+      setSupabaseImages([]);
+
       // refreshPatientSubModules(selectedPatient.id); - This is now handled by the useEffect inside PatientContext!
       syncGoogleSupabaseDataForPatient(selectedPatient);
       syncAnamnesisFromFirestore(selectedPatient.id);
     } else {
+      setActiveTreatmentPlan(null);
+      setSelectedProposalId('');
+      setSelectedProposalData(null);
       setAppointments([]);
       setClinicalHistory([]);
       setCommunications([]);
@@ -1259,6 +1269,7 @@ export default function DentalCRMView({
       loadPlanData();
     } else {
       setSelectedProposalData(null);
+      setActiveTreatmentPlan(null);
     }
   }, [selectedProposalId, driveFolderId]);
 

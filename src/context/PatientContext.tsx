@@ -195,13 +195,26 @@ export function PatientProvider({ children }: { children: ReactNode }) {
       const savedProposal = localStorage.getItem(`agnaldo_dent_proposal_${patientId}`);
       if (savedProposal) {
         try {
-          setActiveProposal(JSON.parse(savedProposal));
+          const parsed = JSON.parse(savedProposal);
+          const currentPatient = (crmData.patients || []).find((p: any) => p.id === patientId);
+          const currentPatientName = (currentPatient?.name || '').trim().toLowerCase();
+          const parsedName = (parsed?.patientName || '').trim().toLowerCase();
+
+          // Validate that the cached proposal belongs to this patient
+          if (parsedName && currentPatientName && parsedName !== currentPatientName) {
+            console.warn(`[PatientContext] Cache em agnaldo_dent_proposal_${patientId} pertence a "${parsed.patientName}", mas o paciente atual é "${currentPatient?.name}". Descartando cache contaminado.`);
+            localStorage.removeItem(`agnaldo_dent_proposal_${patientId}`);
+            const latestTratamento = (crmData.tratamentos || []).filter((t: any) => t.patientId === patientId).pop();
+            if (latestTratamento && latestTratamento.proposal) setActiveProposal(latestTratamento.proposal);
+            else setActiveProposal(INITIAL_PROPOSAL);
+          } else {
+            setActiveProposal(parsed);
+          }
         } catch (e) {
           const latestTratamento = (crmData.tratamentos || []).filter((t: any) => t.patientId === patientId).pop();
           if (latestTratamento && latestTratamento.proposal) setActiveProposal(latestTratamento.proposal);
           else {
-            const pName = (crmData.patients || []).find((p: any) => p.id === patientId)?.name || '';
-            setActiveProposal({ ...INITIAL_PROPOSAL, patientName: pName });
+            setActiveProposal(INITIAL_PROPOSAL);
           }
         }
       } else {
@@ -209,8 +222,7 @@ export function PatientProvider({ children }: { children: ReactNode }) {
         if (latestTratamento && latestTratamento.proposal) {
           setActiveProposal(latestTratamento.proposal);
         } else {
-          const pName = (crmData.patients || []).find((p: any) => p.id === patientId)?.name || '';
-          setActiveProposal({ ...INITIAL_PROPOSAL, patientName: pName });
+          setActiveProposal(INITIAL_PROPOSAL);
         }
       }
     } catch (err) {
@@ -218,11 +230,20 @@ export function PatientProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const prevPatientIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (isPresentation) return;
     if (selectedPatient) {
+      // Se trocou de paciente, reseta imediatamente proposta e seções ativas para não vazar dados do paciente anterior
+      if (prevPatientIdRef.current !== selectedPatient.id) {
+        prevPatientIdRef.current = selectedPatient.id;
+        setActiveSections(INITIAL_SECTIONS);
+        setActiveProposal(INITIAL_PROPOSAL);
+      }
       refreshPatientSubModules(selectedPatient.id);
     } else {
+      prevPatientIdRef.current = null;
       setAppointments([]);
       setClinicalHistory([]);
       setCommunications([]);
@@ -240,6 +261,13 @@ export function PatientProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isPresentation || !selectedPatient) return;
+
+    // GUARD: Não salvar seções se a proposta ativa pertencer a outro paciente
+    const propPatientName = (activeProposal?.patientName || '').trim().toLowerCase();
+    const selPatientName = (selectedPatient?.name || '').trim().toLowerCase();
+    if (propPatientName && selPatientName && propPatientName !== selPatientName) {
+      return;
+    }
 
     // Use BroadcastChannel to bypass localStorage 5MB limits for the pop-up screen
     const channelName = `dental_crm_sync_${selectedPatient.id}`;
@@ -280,11 +308,24 @@ export function PatientProvider({ children }: { children: ReactNode }) {
       channel.close();
       globalChannel.close();
     };
-  }, [activeSections, selectedPatient]);
+  }, [activeSections, selectedPatient, activeProposal]);
 
   useEffect(() => {
     if (isPresentation || !selectedPatient) return;
     
+    const propPatientName = (activeProposal?.patientName || '').trim().toLowerCase();
+    const selPatientName = (selectedPatient?.name || '').trim().toLowerCase();
+
+    // GUARD: Nunca salvar proposta de outro paciente no storage do paciente atual
+    if (propPatientName && selPatientName && propPatientName !== selPatientName) {
+      return;
+    }
+
+    // GUARD: Não salvar template inicial em branco sobre o storage do paciente
+    if (!propPatientName) {
+      return;
+    }
+
     const channelName = `dental_crm_sync_${selectedPatient.id}`;
     const channel = new BroadcastChannel(channelName);
     const globalChannel = new BroadcastChannel('dental_crm_sync_global');

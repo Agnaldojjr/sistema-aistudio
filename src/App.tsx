@@ -194,13 +194,16 @@ function Sidebar({
 interface TopBarProps {
   currentView: AppView;
   proposal: TreatmentProposal;
+  selectedPatient?: CRMPatient | null;
+  sections?: PhotoSection[];
+  currentFileId?: string | null;
   onChangeView: (view: AppView) => void;
   onOpenMobileMenu: () => void;
   isMobileOptimized: boolean;
   setIsMobileOptimized: (v: boolean) => void;
 }
 
-function TopBar({ currentView, proposal, onChangeView, onOpenMobileMenu, isMobileOptimized, setIsMobileOptimized }: TopBarProps) {
+function TopBar({ currentView, proposal, selectedPatient, sections, currentFileId, onChangeView, onOpenMobileMenu, isMobileOptimized, setIsMobileOptimized }: TopBarProps) {
   const VIEW_LABELS: Record<AppView, string> = {
     dashboard: 'Painel Geral',
     financeiro: 'Painel Financeiro',
@@ -208,6 +211,21 @@ function TopBar({ currentView, proposal, onChangeView, onOpenMobileMenu, isMobil
     calendar: 'Agenda',
     settings: 'Configurações',
   };
+
+  const isSamePatient = Boolean(
+    selectedPatient &&
+    selectedPatient.name &&
+    proposal?.patientName &&
+    proposal.patientName.trim().toUpperCase() === selectedPatient.name.trim().toUpperCase()
+  );
+
+  const hasActiveContent = Boolean(
+    isSamePatient && (
+      (sections && sections.some((s) => s.markers && s.markers.length > 0)) ||
+      (currentFileId && currentFileId !== '') ||
+      (proposal.status && proposal.status !== 'Aberto (paciente não pagou)')
+    )
+  );
 
   return (
     <header className="topbar print:hidden">
@@ -220,26 +238,28 @@ function TopBar({ currentView, proposal, onChangeView, onOpenMobileMenu, isMobil
       </button>
 
       {/* Page title */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 flex items-center gap-3">
         <h2 className="text-[15px] font-semibold text-zinc-800 truncate">
           {VIEW_LABELS[currentView]}
         </h2>
         {/* Header Action Button */}
         {currentView === 'dashboard' && (
-          <button onClick={() => onChangeView('calendar')} className="btn-primary w-full shadow-sm group">
-            <span className="flex-1 text-center font-semibold text-[13px] tracking-wide">NOVA CONSULTA</span>
+          <button onClick={() => onChangeView('calendar')} className="btn-primary shadow-sm group">
+            <span className="text-center font-semibold text-[13px] tracking-wide">NOVA CONSULTA</span>
             <ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
           </button>
         )}
-        {currentView === 'crm' && proposal.patientName && (
-          <div className="bg-[#FAF8F5] border border-[#E6DEC9] p-3 rounded-lg shadow-sm">
-            <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1 flex items-center justify-between">
+        {currentView === 'crm' && hasActiveContent && (
+          <div className="hidden sm:flex items-center gap-2 bg-[#FAF8F5] border border-[#E6DEC9] px-2.5 py-1 rounded-lg shadow-2xs">
+            <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">
               Plano Ativo
-              <span className={`px-1.5 py-0.5 rounded text-[9px] ${proposal.status === 'Em Andamento' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                {proposal.status}
-              </span>
-            </p>
-            <p className="text-sm font-bold text-[#8B0000] truncate">{proposal.patientName}</p>
+            </span>
+            <span className="text-xs font-bold text-[#8B0000] truncate max-w-[200px]">
+              {selectedPatient?.name}
+            </span>
+            <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${proposal.status === 'Em Andamento' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+              {proposal.status || 'Ativo'}
+            </span>
           </div>
         )}
       </div>
@@ -396,7 +416,7 @@ export default function App() {
   });
   const [currentFileId, setCurrentFileId] = useState<string | null>(null);
 
-  const { activeSections: sections, setActiveSections: setSections, activeProposal: proposal, setActiveProposal: setProposal } = usePatientContext();
+  const { activeSections: sections, setActiveSections: setSections, activeProposal: proposal, setActiveProposal: setProposal, selectedPatient } = usePatientContext();
 
 
   // Sidebar state
@@ -636,6 +656,9 @@ export default function App() {
           <TopBar
             currentView={currentAppView}
             proposal={proposal}
+            selectedPatient={selectedPatient}
+            sections={sections}
+            currentFileId={currentFileId}
             onChangeView={setCurrentAppView}
             onOpenMobileMenu={() => setMobileSidebarOpen(true)}
             isMobileOptimized={isMobileOptimized}
@@ -689,6 +712,9 @@ export default function App() {
         <TopBar
           currentView={currentAppView}
           proposal={proposal}
+          selectedPatient={selectedPatient}
+          sections={sections}
+          currentFileId={currentFileId}
           onChangeView={setCurrentAppView}
           onOpenMobileMenu={() => setMobileSidebarOpen(true)}
           isMobileOptimized={isMobileOptimized}
