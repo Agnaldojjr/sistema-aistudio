@@ -1,0 +1,49 @@
+name: Weekly CRM Automated Backup
+
+on:
+  schedule:
+    # Executa todo domingo às 03:00 UTC (00:00 Horário de Brasília)
+    - cron: '0 3 * * 0'
+  workflow_dispatch: # Permite disparar o backup manualmente com 1 clique no GitHub Actions
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    name: Gerar Backup Imutável do CRM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar Dependências
+        run: npm install --no-audit --prefer-offline
+
+      - name: Executar Script de Backup Imutável
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DEFAULT_USER_ID: ${{ secrets.DEFAULT_USER_ID || '78d7e8b0-9a7a-4eb3-8ba6-37a5ce401b46' }}
+          VITE_CLOUDFLARE_R2_PUBLIC_URL: ${{ secrets.VITE_CLOUDFLARE_R2_PUBLIC_URL || 'https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev' }}
+        run: npx tsx scripts/backup_to_github.ts
+
+      - name: Commitar e Enviar Backup para o Repositório
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add backups/ crm_backup_pacientes_cloudflare.json
+          if git diff --staged --quiet; then
+            echo "Nenhuma alteração detectada para commit."
+          else
+            git commit -m "backup(crm): snapshot semanal imutavel dos pacientes [skip ci]"
+            git push origin main
+          fi

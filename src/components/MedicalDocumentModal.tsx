@@ -127,8 +127,8 @@ export default function MedicalDocumentModal({
   const [arrivalTime, setArrivalTime] = useState(initialArrivalTime || '');
   const [departureTime, setDepartureTime] = useState(initialDepartureTime || '');
   
-  // Opções para impressão física no consultório
-  const [includeOfficialLetterhead, setIncludeOfficialLetterhead] = useState(true);
+  // Estilo do documento: 'oficial' (timbre idêntico à clínica), 'economico' (texto simples para economizar tinta), 'pre_impresso' (sem timbre para bloco da gráfica)
+  const [docStyle, setDocStyle] = useState<'oficial' | 'economico' | 'pre_impresso'>('oficial');
   const [includeDigitalSignature, setIncludeDigitalSignature] = useState(true);
   const [printTwoCopies, setPrintTwoCopies] = useState(false);
 
@@ -225,9 +225,9 @@ export default function MedicalDocumentModal({
         format: 'a4'
       });
 
-      // Carrega o fundo timbrado oficial em alta definição
+      // Carrega o fundo timbrado oficial em alta definição apenas se o modo oficial estiver ativo
       let letterheadImg = '';
-      if (includeOfficialLetterhead) {
+      if (docStyle === 'oficial') {
         letterheadImg = await new Promise<string>((resolve) => {
           const img = new Image();
           img.crossOrigin = "Anonymous";
@@ -266,9 +266,47 @@ export default function MedicalDocumentModal({
       }
 
       const renderDocumentPage = (viaLabel?: string) => {
+        const isEco = docStyle === 'economico';
+        const isOfficial = docStyle === 'oficial';
+
         // 1. Fundo do Timbre Oficial da Clínica
-        if (includeOfficialLetterhead && letterheadImg) {
+        if (isOfficial && letterheadImg) {
           doc.addImage(letterheadImg, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+        }
+
+        // 1.1 Cabeçalho e Rodapé Econômicos em Texto Normal (Economia de Tinta)
+        if (isEco) {
+          // Cabeçalho simples e limpo
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(15);
+          doc.setTextColor(30, 30, 30);
+          const docName = clinicSettings.doctorName || 'DR. AGNALDO FERREIRA';
+          doc.text(docName.toUpperCase(), 105, 25, { align: 'center', charSpace: 0.5 });
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9.5);
+          doc.setTextColor(70, 70, 70);
+          doc.text(`${(clinicSettings.doctorRole || 'CIRURGIÃO DENTISTA').toUpperCase()}  •  ${clinicSettings.cro || 'CRO-MG 58714'}`, 105, 31, { align: 'center' });
+
+          doc.setLineWidth(0.2);
+          doc.setDrawColor(200, 200, 200);
+          doc.line(24, 36, 186, 36);
+
+          // Rodapé simples com todos os dados do consultório
+          doc.setLineWidth(0.2);
+          doc.setDrawColor(200, 200, 200);
+          doc.line(24, 274, 186, 274);
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8.5);
+          doc.setTextColor(50, 50, 50);
+          doc.text(`Consultório Odontológico ${clinicSettings.doctorName || 'Dr. Agnaldo Ferreira'}`, 105, 279, { align: 'center' });
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7.5);
+          doc.setTextColor(90, 90, 90);
+          doc.text(clinicSettings.address || 'Rua dos Goitacazes, 375 - Sala 1001 - Centro, Belo Horizonte - MG, 30190-050', 105, 283.5, { align: 'center' });
+          doc.text('Tel: (31) 98513-1303   |   E-mail: dragnaldof@gmail.com   |   Instagram: @dr.agnaldoferreira', 105, 287.5, { align: 'center' });
         }
 
         // 2. Indicador de Via (1ª Via / 2ª Via)
@@ -276,23 +314,25 @@ export default function MedicalDocumentModal({
           doc.setFontSize(8);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(140, 140, 140);
-          doc.text(`[ ${viaLabel} ]`, 185, 14, { align: 'right' });
+          doc.text(`[ ${viaLabel} ]`, 185, isEco ? 22 : 14, { align: 'right' });
         }
 
         // 3. Título Centralizado do Documento
+        const titleY = isEco ? 52 : 96;
         doc.setFontSize(18);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(30, 30, 30);
+        doc.setTextColor(20, 20, 20);
         if (type === 'atestado') {
-          doc.text('ATESTADO', 105, 96, { align: 'center', charSpace: 2 });
+          doc.text('ATESTADO', 105, titleY, { align: 'center', charSpace: 2 });
         } else if (type === 'declaracao') {
           doc.setFontSize(15);
-          doc.text('DECLARAÇÃO DE COMPARECIMENTO', 105, 96, { align: 'center', charSpace: 1 });
+          doc.text('DECLARAÇÃO DE COMPARECIMENTO', 105, titleY, { align: 'center', charSpace: 1 });
         } else {
-          doc.text('RECEITUÁRIO', 105, 96, { align: 'center', charSpace: 2 });
+          doc.text('RECEITUÁRIO', 105, titleY, { align: 'center', charSpace: 2 });
         }
 
         if (type === 'atestado' || type === 'declaracao') {
+          const bodyY = isEco ? 68 : 115;
           doc.setFontSize(12);
           doc.setFont("helvetica", "normal");
           doc.setTextColor(30, 30, 30);
@@ -301,10 +341,10 @@ export default function MedicalDocumentModal({
           const paragraphText = `${prefix}${patientName || '__________________________________________'}, esteve neste consultório recebendo atendimento odontológico no período das ${arrivalTime || '___:___'} às ${departureTime || '___:___'} horas, do dia ${today}${type === 'declaracao' ? ' devendo retornar as suas atividades normais.' : '.'}`;
           
           const splitParagraph = doc.splitTextToSize(paragraphText, 158);
-          doc.text(splitParagraph, 24, 115, { lineHeightFactor: 1.4 });
+          doc.text(splitParagraph, 24, bodyY, { lineHeightFactor: 1.4 });
 
           if (type === 'atestado') {
-            const boxYStart = 115 + (splitParagraph.length * 7) + 12;
+            const boxYStart = bodyY + (splitParagraph.length * 7) + 12;
             const boxSize = 3.5;
             
             doc.setLineWidth(0.35);
@@ -352,28 +392,35 @@ export default function MedicalDocumentModal({
 
         } else {
           // Identificação do Paciente no Receituário
+          const patientY = isEco ? 68 : 110;
           doc.setFontSize(12);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(20, 20, 20);
-          doc.text("Para: ", 24, 110);
+          doc.text("Para: ", 24, patientY);
 
           const prefixWidth = doc.getTextWidth("Para: ");
           const patientText = (patientName || '__________________________________________').toUpperCase();
           const splitPatient = doc.splitTextToSize(patientText, 158 - prefixWidth);
-          doc.text(splitPatient, 24 + prefixWidth, 110);
+          doc.text(splitPatient, 24 + prefixWidth, patientY);
+
+          if (isEco) {
+            doc.setLineWidth(0.15);
+            doc.setDrawColor(220, 220, 220);
+            doc.line(24, patientY + (splitPatient.length * 6), 186, patientY + (splitPatient.length * 6));
+          }
 
           // Conteúdo da receita (medicamentos e posologia)
           doc.setFontSize(11);
           doc.setFont("helvetica", "normal");
           doc.setTextColor(30, 30, 30);
-          const contentStartY = 110 + (splitPatient.length * 6) + 6;
+          const contentStartY = patientY + (splitPatient.length * 6) + (isEco ? 8 : 6);
           const splitContent = doc.splitTextToSize(content || '', 158);
           doc.text(splitContent, 24, contentStartY, { lineHeightFactor: 1.35 });
         }
 
         // 4. Assinatura e Carimbo Centralizados
-        const bottomY = 232;
-        doc.setLineWidth(0.4);
+        const bottomY = isEco ? 222 : 232;
+        doc.setLineWidth(0.35);
         doc.setDrawColor(120, 120, 120);
         doc.line(65, bottomY, 145, bottomY);
         
@@ -768,11 +815,17 @@ export default function MedicalDocumentModal({
                 <div className="bg-zinc-200 py-2 px-4 shadow-inner border-b border-zinc-300 flex items-center justify-between z-10">
                    <div className="flex items-center gap-2">
                      <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">Visualização em Tempo Real (Folha A4)</span>
-                     {includeOfficialLetterhead && (
+                     {docStyle === 'oficial' && (
                        <span className="px-1.5 py-0.5 bg-[#4E1119] text-white text-[9px] font-bold rounded">Timbre Oficial</span>
                      )}
+                     {docStyle === 'economico' && (
+                       <span className="px-1.5 py-0.5 bg-emerald-700 text-white text-[9px] font-bold rounded">Modo Econômico</span>
+                     )}
+                     {docStyle === 'pre_impresso' && (
+                       <span className="px-1.5 py-0.5 bg-zinc-700 text-white text-[9px] font-bold rounded">Papel da Gráfica</span>
+                     )}
                    </div>
-                   <button onClick={() => setContent('')} className="text-[10px] font-bold text-red-600 hover:underline">Limpar</button>
+                   <button onClick={() => setContent('')} className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer">Limpar</button>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4 flex justify-center items-start bg-zinc-200/60">
@@ -780,28 +833,47 @@ export default function MedicalDocumentModal({
                     className="w-full max-w-[210mm] shadow-xl relative rounded-xs border border-zinc-300 transition-all select-none overflow-hidden" 
                     style={{
                       aspectRatio: '210 / 297',
-                      backgroundImage: includeOfficialLetterhead ? `url(${letterheadTemplateA4 || '/receituario_template_a4.png'})` : 'none',
+                      backgroundImage: docStyle === 'oficial' ? `url(${letterheadTemplateA4 || '/receituario_template_a4.png'})` : 'none',
                       backgroundColor: '#ffffff',
                       backgroundSize: '100% 100%',
                       backgroundRepeat: 'no-repeat'
                     }}
                   >
-                    {!includeOfficialLetterhead && (
+                    {/* Header Econômico (em texto simples) */}
+                    {docStyle === 'economico' && (
+                      <div className="absolute top-[4%] left-[8%] right-[8%] pb-2.5 border-b border-zinc-300 text-center pointer-events-none">
+                        <h1 className="text-sm sm:text-base md:text-lg font-bold text-zinc-800 tracking-wide uppercase">
+                          {clinicSettings.doctorName || 'DR. AGNALDO FERREIRA'}
+                        </h1>
+                        <p className="text-[10px] sm:text-xs text-zinc-500 font-medium tracking-wide mt-0.5 uppercase">
+                          {clinicSettings.doctorRole || 'CIRURGIÃO DENTISTA'} • {clinicSettings.cro || 'CRO-MG 58714'}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Badge do Papel da Gráfica */}
+                    {docStyle === 'pre_impresso' && (
                       <div className="absolute top-4 left-6 text-[10px] text-zinc-400 font-mono">
-                        [Modo Folha Pré-Impressa da Gráfica - Fundo ocultado]
+                        [Modo Folha Pré-Impressa da Gráfica - Sem fundo nem cabeçalho]
                       </div>
                     )}
 
                     {/* Título Centralizado */}
-                    <div className="absolute top-[32.3%] left-0 right-0 text-center pointer-events-none">
+                    <div 
+                      className="absolute left-0 right-0 text-center pointer-events-none"
+                      style={{ top: docStyle === 'economico' ? '16.5%' : '32.3%' }}
+                    >
                       <h2 className="text-base sm:text-lg md:text-xl font-black text-zinc-800 tracking-[0.2em] uppercase">
                         RECEITUÁRIO
                       </h2>
                     </div>
 
                     {/* Identificação da Paciente */}
-                    <div className="absolute top-[37%] left-[11.5%] right-[13.5%] pointer-events-none">
-                      <div className="text-xs sm:text-sm font-bold text-zinc-900 flex items-baseline gap-1">
+                    <div 
+                      className="absolute left-[11.5%] right-[13.5%] pointer-events-none"
+                      style={{ top: docStyle === 'economico' ? '22%' : '37%' }}
+                    >
+                      <div className={`text-xs sm:text-sm font-bold text-zinc-900 flex items-baseline gap-1 ${docStyle === 'economico' ? 'pb-1 border-b border-zinc-200' : ''}`}>
                         <span>Para:</span>
                         <span className="font-extrabold underline uppercase tracking-wide truncate">
                           {patientName || '________________________'}
@@ -810,7 +882,13 @@ export default function MedicalDocumentModal({
                     </div>
 
                     {/* Caixa de Texto do Receituário */}
-                    <div className="absolute top-[41.5%] bottom-[23%] left-[11.5%] right-[13.5%] flex flex-col">
+                    <div 
+                      className="absolute left-[11.5%] right-[13.5%] flex flex-col"
+                      style={{
+                        top: docStyle === 'economico' ? '26.5%' : '41.5%',
+                        bottom: docStyle === 'economico' ? '25%' : '23%'
+                      }}
+                    >
                       <textarea
                         className="w-full h-full resize-none border-none focus:ring-0 bg-transparent py-0 px-0 text-xs sm:text-sm font-medium text-zinc-800 leading-relaxed placeholder:text-zinc-400 placeholder:italic select-text cursor-text"
                         placeholder="Selecione um protocolo ou fármaco à esquerda, ou digite livremente a prescrição aqui..."
@@ -820,7 +898,10 @@ export default function MedicalDocumentModal({
                     </div>
 
                     {/* Bloco de Assinatura Centralizado */}
-                    <div className="absolute bottom-[17%] left-0 right-0 flex justify-center pointer-events-none">
+                    <div 
+                      className="absolute left-0 right-0 flex justify-center pointer-events-none"
+                      style={{ bottom: docStyle === 'economico' ? '15%' : '17%' }}
+                    >
                       <div className="text-center w-56 sm:w-64 pt-1.5 border-t border-zinc-400">
                         {includeDigitalSignature ? (
                           <>
@@ -839,6 +920,21 @@ export default function MedicalDocumentModal({
                         )}
                       </div>
                     </div>
+
+                    {/* Rodapé Econômico (em texto simples) */}
+                    {docStyle === 'economico' && (
+                      <div className="absolute bottom-[3.5%] left-[8%] right-[8%] pt-2 border-t border-zinc-200 text-center pointer-events-none text-zinc-600">
+                        <p className="text-[9px] sm:text-[10px] font-bold text-zinc-700">
+                          Consultório Odontológico {clinicSettings.doctorName || 'Dr. Agnaldo Ferreira'}
+                        </p>
+                        <p className="text-[8px] sm:text-[9px] text-zinc-500 mt-0.5">
+                          {clinicSettings.address || 'Rua dos Goitacazes, 375 - Sala 1001 - Centro, Belo Horizonte - MG, 30190-050'}
+                        </p>
+                        <p className="text-[8px] sm:text-[9px] text-zinc-400 mt-0.5">
+                          Tel: (31) 98513-1303 | E-mail: dragnaldof@gmail.com | Instagram: @dr.agnaldoferreira
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -848,16 +944,48 @@ export default function MedicalDocumentModal({
 
         {/* Barra de Opções para Impressão Física no Consultório */}
         <div className="px-6 py-2.5 bg-[#FAF8F5] border-t border-zinc-200 flex flex-wrap items-center justify-between gap-4 text-xs shrink-0">
-          <div className="flex flex-wrap items-center gap-5">
-            <label className="flex items-center gap-2 cursor-pointer font-medium text-zinc-700 select-none hover:text-zinc-900">
-              <input
-                type="checkbox"
-                checked={includeOfficialLetterhead}
-                onChange={(e) => setIncludeOfficialLetterhead(e.target.checked)}
-                className="w-4 h-4 text-[#4E1119] rounded focus:ring-[#4E1119] cursor-pointer"
-              />
-              <span className="font-semibold text-[#4E1119]">Timbre Oficial da Clínica (Logo, Marca d'água e Rodapé)</span>
-            </label>
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Seletor de Estilo */}
+            <div className="flex items-center gap-1.5 bg-zinc-200/80 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setDocStyle('oficial')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  docStyle === 'oficial'
+                    ? 'bg-[#4E1119] text-white shadow-xs'
+                    : 'text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100'
+                }`}
+                title="Timbre oficial idêntico ao modelo da clínica (logo AF, marcas d'água laterais e rodapé bordô)"
+              >
+                <span>Timbre Oficial</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDocStyle('economico')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  docStyle === 'economico'
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100'
+                }`}
+                title="Economiza tinta com fonte normal e layout limpo, com todos os dados do consultório"
+              >
+                <span>Econômico (Sem Imagens)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDocStyle('pre_impresso')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  docStyle === 'pre_impresso'
+                    ? 'bg-zinc-800 text-white shadow-xs'
+                    : 'text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100'
+                }`}
+                title="Apenas texto (para quem coloca a folha do bloco físico da gráfica na impressora)"
+              >
+                <span>Papel da Gráfica</span>
+              </button>
+            </div>
 
             <label className="flex items-center gap-2 cursor-pointer font-medium text-zinc-700 select-none hover:text-zinc-900">
               <input
@@ -866,7 +994,7 @@ export default function MedicalDocumentModal({
                 onChange={(e) => setIncludeDigitalSignature(e.target.checked)}
                 className="w-4 h-4 text-[#4E1119] rounded focus:ring-[#4E1119] cursor-pointer"
               />
-              <span>Assinatura/Carimbo do Dr. Agnaldo já impressos</span>
+              <span>Assinatura/Carimbo inclusos</span>
             </label>
 
             <label className="flex items-center gap-2 cursor-pointer font-medium text-zinc-700 select-none hover:text-zinc-900">
@@ -876,7 +1004,7 @@ export default function MedicalDocumentModal({
                 onChange={(e) => setPrintTwoCopies(e.target.checked)}
                 className="w-4 h-4 text-[#4E1119] rounded focus:ring-[#4E1119] cursor-pointer"
               />
-              <span>Imprimir em 2 Vias (1ª Via Paciente / 2ª Via Arquivo ou Farmácia)</span>
+              <span>Imprimir em 2 Vias</span>
             </label>
           </div>
           <span className="text-[11px] text-zinc-500 font-medium bg-zinc-100 px-2.5 py-1 rounded-md border border-zinc-200">Formato: Folha A4 (210 x 297 mm)</span>
