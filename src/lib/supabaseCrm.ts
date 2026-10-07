@@ -21,7 +21,24 @@ export async function getSupabaseCRMDatabase() {
       throw error;
     }
 
-    if (!data || !data.crm_data) {
+    let crmData = data?.crm_data;
+
+    // Resiliência de conta única: se o usuário atual não tiver registro próprio, busca os dados da clínica já restaurados
+    if (!crmData) {
+      const { data: fallbackData } = await supabase
+        .from('clinic_data')
+        .select('crm_data')
+        .not('crm_data', 'is', null)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (fallbackData?.crm_data) {
+        crmData = fallbackData.crm_data;
+      }
+    }
+
+    if (!crmData) {
       // Contingência: verifica se há backup recente em localStorage com pacientes
       try {
         const localBackup = localStorage.getItem('ag_crm_local_backup');
@@ -39,12 +56,12 @@ export async function getSupabaseCRMDatabase() {
 
     // Salva cópia preventiva dos dados válidos retornados
     try {
-      if (Array.isArray(data.crm_data?.patients) && data.crm_data.patients.length > 0) {
-        localStorage.setItem('ag_crm_local_backup', JSON.stringify(data.crm_data));
+      if (Array.isArray(crmData?.patients) && crmData.patients.length > 0) {
+        localStorage.setItem('ag_crm_local_backup', JSON.stringify(crmData));
       }
     } catch (_) {}
 
-    return data.crm_data;
+    return crmData;
   } catch (error) {
     console.error('Erro getSupabaseCRMDatabase:', error);
     // Em caso de falha de rede/autenticação, tenta resgatar o backup local antes de retornar vazio

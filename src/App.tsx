@@ -40,7 +40,7 @@ import ClinicalAttendanceManager from './components/ClinicalAttendanceManager';
 import MobileWorkspace from './components/MobileWorkspace';
 import DentalCRMView from './components/DentalCRMView';
 import PatientAnamnesisForm from './components/PatientAnamnesisForm';
-import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings } from './types';
+import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings, CRMPatient } from './types';
 import { DEFAULT_PROCEDURES, DEMO_SVG_PLACEHOLDERS, DEFAULT_CLINIC_SETTINGS, INITIAL_PROPOSAL, INITIAL_SECTIONS } from './constants';
 import { initAuth, googleSignIn, logout } from './firebase';
 import FinancialView from './components/FinancialView';
