@@ -1557,21 +1557,27 @@ export default function DentalCRMView({
   };
 
   const uploadSupabaseFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!driveFolderId || !e.target.files || e.target.files.length === 0) return;
+    const targetFolder = driveFolderId || selectedPatient?.id || selectedPatient?.name;
+    if (!e.target.files || e.target.files.length === 0) return;
+    if (!targetFolder) {
+      alert("Por favor, selecione um paciente para enviar fotos para a pasta Cloud Drive.");
+      return;
+    }
     try {
       setIsSupabaseUploading(true);
       const files = Array.from(e.target.files);
       for (const file of files) {
-        const name = file.name;
-        await uploadPatientFileToSupabase(driveFolderId, file, name);
+        const uniqueName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+        await uploadPatientFileToSupabase(targetFolder, file, uniqueName);
       }
       // Refresh
-      const images = await listPatientFilesFromSupabase(driveFolderId, selectedPatient?.name);
+      const images = await listPatientFilesFromSupabase(targetFolder, selectedPatient?.name);
       setSupabaseImages(filterSupabaseImages(images));
     } catch (err: any) {
-      alert("Erro ao enviar imagem ao Supabase: " + err.message);
+      alert("Erro ao enviar imagem para a pasta Cloud Drive: " + (err?.message || err));
     } finally {
       setIsSupabaseUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -6280,16 +6286,30 @@ export default function DentalCRMView({
                             <h4 className="font-serif font-bold text-lg text-[#8B0000]">Raio-X, Tomografias e Fotos Clínicas</h4>
                           </div>
 
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-wrap">
                             {/* Standard file selector input */}
                             <label className="px-3.5 py-2 bg-white hover:bg-zinc-100 text-zinc-700 font-bold text-[10px] uppercase tracking-wider rounded-xl border border-zinc-300 transition-all flex items-center gap-1 cursor-pointer active:scale-95">
                               <Upload className="w-3.5 h-3.5 text-[#B48C4D]" />
-                              Upar Foto
+                              {isSupabaseUploading ? 'Enviando...' : 'Upar Foto'}
                               <input 
                                 type="file" 
                                 className="hidden" 
                                 accept="image/*" 
                                 multiple
+                                onChange={uploadSupabaseFile} 
+                                disabled={isSupabaseUploading} 
+                              />
+                            </label>
+
+                            {/* Mobile Camera input for mobile phones */}
+                            <label className="px-3.5 py-2 bg-[#8B0000] hover:bg-[#6c1b26] text-white font-bold text-[10px] uppercase tracking-wider rounded-xl border border-[#C09553] transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-sm">
+                              <Camera className="w-3.5 h-3.5 text-[#C09553]" />
+                              Câmera do Celular
+                              <input 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/*" 
+                                capture="environment"
                                 onChange={uploadSupabaseFile} 
                                 disabled={isSupabaseUploading} 
                               />
@@ -6301,7 +6321,7 @@ export default function DentalCRMView({
                               className={`px-3.5 py-2 text-[10px] uppercase font-bold tracking-wider rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 border ${isCameraActive ? 'bg-zinc-800 text-white border-zinc-700 hover:bg-zinc-700' : 'bg-white hover:bg-zinc-100 text-zinc-750 border-zinc-350'}`}
                             >
                               <Camera className="w-3.5 h-3.5 text-[#B48C4D]" />
-                              {isCameraActive ? 'Desativar Câmera' : 'Tirar Foto'}
+                              {isCameraActive ? 'Desativar Câmera' : 'Webcam'}
                             </button>
                           </div>
                         </div>

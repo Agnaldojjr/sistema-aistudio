@@ -434,14 +434,23 @@ export default function MobileWorkspace({
   const [syncsSuccess, setSyncsSuccess] = useState<Record<string, boolean>>({});
 
   const handleUploadToDrive = async (sectionId: string) => {
-    const pName = proposal.patientName;
+    let pName = proposal.patientName || (proposal.patientData as any)?.name;
     if (!pName || pName.trim() === '') {
-      alert('Você precisa definir um paciente ativo para enviar imagens ao Google Drive. Utilize o formulário de Cadastro Rápido.');
-      return;
+      const promptName = window.prompt('Informe o nome do paciente para enviar esta foto à pasta Cloud Drive:');
+      if (promptName && promptName.trim() !== '') {
+        pName = promptName.trim();
+        setProposal(prev => ({ ...prev, patientName: pName }));
+      } else {
+        alert('Você precisa definir um paciente ativo para enviar imagens à pasta do Drive.');
+        return;
+      }
     }
 
     const sec = sections.find(s => s.id === sectionId);
-    if (!sec || !sec.image) return;
+    if (!sec || !sec.image) {
+      alert('Nenhuma foto capturada neste slot para enviar.');
+      return;
+    }
 
     setSyncsLoading(prev => ({ ...prev, [sectionId]: true }));
     try {
@@ -456,10 +465,11 @@ export default function MobileWorkspace({
       }
       const blob = new Blob([u8arr], { type: mime });
 
-      // 2. Upload to Supabase
-      const d = format(new Date(), 'yyyy-MM-dd_HH-mm');
+      // 2. Upload to Supabase Storage / Cloud Drive
+      const d = format(new Date(), 'yyyy-MM-dd_HH-mm-ss');
       const filename = `${sectionId}_capture_${d}.jpeg`;
-      await uploadPatientFileToSupabase((proposal.patientData as any)?.id || pName, blob, filename);
+      const targetId = (proposal.patientData as any)?.id || pName;
+      await uploadPatientFileToSupabase(targetId, blob, filename);
 
       setSyncsSuccess(prev => ({ ...prev, [sectionId]: true }));
       setTimeout(() => {
@@ -467,7 +477,7 @@ export default function MobileWorkspace({
       }, 3000);
     } catch (err: any) {
       console.error(err);
-      alert('Erro ao enviar imagem ao Supabase: ' + err.message);
+      alert('Erro ao enviar imagem ao Supabase: ' + (err?.message || err));
     } finally {
       setSyncsLoading(prev => ({ ...prev, [sectionId]: false }));
     }
@@ -1032,17 +1042,29 @@ export default function MobileWorkspace({
                             </p>
                           </div>
 
-                          <div className="flex justify-center gap-2 pt-2">
-                            <button
-                              onClick={() => startLiveCamera()}
-                              className="bg-[#8B0000] hover:bg-[#6c1b26] border border-[#C09553] text-white font-bold py-2.5 px-5 text-xs rounded-xl flex items-center gap-2 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-md"
-                            >
+                          <div className="flex justify-center gap-2 pt-2 flex-wrap">
+                            <label className="bg-[#8B0000] hover:bg-[#6c1b26] border border-[#C09553] text-white font-bold py-2.5 px-4 text-xs rounded-xl flex items-center gap-2 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-md">
                               <Camera className="w-4 h-4 text-[#C09553]" />
-                              <span>Iniciar Câmera</span>
+                              <span>Câmera do Celular</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                onChange={handleFileChange}
+                                className="hidden"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => startLiveCamera()}
+                              className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 font-bold py-2.5 px-3.5 text-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer"
+                            >
+                              <Smartphone className="w-4 h-4 text-[#C09553]" />
+                              <span>Webcam Ao Vivo</span>
                             </button>
-                            <label className="bg-zinc-950 text-zinc-200 border border-zinc-700 font-bold py-2.5 px-4 text-xs rounded-xl flex items-center gap-2 cursor-pointer hover:bg-zinc-800 transition-colors">
-                              <Upload className="w-4 h-4" />
-                              <span>Arquivo</span>
+                            <label className="bg-zinc-950 text-zinc-200 border border-zinc-700 font-bold py-2.5 px-3.5 text-xs rounded-xl flex items-center gap-2 cursor-pointer hover:bg-zinc-800 transition-colors">
+                              <Upload className="w-4 h-4 text-zinc-400" />
+                              <span>Galeria</span>
                               <input
                                 type="file"
                                 accept="image/*"
