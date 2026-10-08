@@ -113,13 +113,36 @@ export async function uploadPatientFileToSupabase(patientIdentifier: string, fil
   const finalFilename = getSafeFilename(filename);
   const filePath = filename.includes('/') ? filename : `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
 
-  let r2Success = false;
+  // 1. Prioridade Máxima: Enviar via endpoint serverless (/api/storage-upload)
+  // Bypassa restrições de RLS do navegador e sincroniza a galeria automaticamente
+  if (typeof window !== 'undefined') {
+    try {
+      const formData = new FormData();
+      formData.append('file', file, finalFilename);
+      formData.append('filePath', filePath);
+      formData.append('patientId', targetFolder);
+      if (subfolder) formData.append('subfolder', subfolder);
+      formData.append('filename', finalFilename);
 
-  // 1. Tentar Cloudflare R2 primeiro apenas se estiver devidamente configurado
+      const relayRes = await fetch('/api/storage-upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (relayRes.ok) {
+        const json = await relayRes.json();
+        console.log(`[STORAGE] Upload salvo com sucesso via /api/storage-upload: ${json.path || filePath}`);
+        return { path: json.path || filePath, provider: 'supabase-relay', url: json.url };
+      }
+    } catch (relayErr: any) {
+      console.warn('[STORAGE] Falha no endpoint serverless /api/storage-upload, tentando métodos alternativos:', relayErr?.message || relayErr);
+    }
+  }
+
+  // 2. Se o endpoint falhar ou em ambiente offline, tentar Cloudflare R2 direto se estiver devidamente configurado
   if (isR2Configured()) {
     try {
       await uploadFile(file, filePath);
-      r2Success = true;
       console.log(`[STORAGE] Upload salvo no Cloudflare R2: ${filePath}`);
       return { path: filePath, provider: 'r2' };
     } catch (error: any) {
@@ -127,7 +150,7 @@ export async function uploadPatientFileToSupabase(patientIdentifier: string, fil
     }
   }
 
-  // 2. Se o Cloudflare R2 falhar ou não estiver configurado, salva no Supabase Storage
+  // 3. Fallback: salvar diretamente via cliente do Supabase Storage
   let supaResult = await supabase.storage
     .from(SUPABASE_BUCKET)
     .upload(filePath, file, {
@@ -152,32 +175,8 @@ export async function uploadPatientFileToSupabase(patientIdentifier: string, fil
     }
   }
 
-  // 3. Fallback de alta disponibilidade: Se o cliente do navegador móvel falhar (ex: RLS, política ou token expirado)
-  // Encaminha via relay de API serverless com chave administrativa (service_role)
   if (supaResult.error) {
-    console.warn('[STORAGE] Upload direto do navegador falhou, acionando relay serverless:', supaResult.error.message || supaResult.error);
-    try {
-      const formData = new FormData();
-      formData.append('file', file, finalFilename);
-      formData.append('filePath', filePath);
-      formData.append('patientId', patientIdentifier);
-      if (subfolder) formData.append('subfolder', subfolder);
-      formData.append('filename', finalFilename);
-
-      const relayRes = await fetch('/api/storage-upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (relayRes.ok) {
-        console.log(`[STORAGE] Upload salvo com sucesso via relay no Supabase Storage: ${filePath}`);
-        return { path: filePath, provider: 'supabase-relay' };
-      }
-    } catch (relayErr: any) {
-      console.warn('[STORAGE] Falha no relay de upload:', relayErr?.message || relayErr);
-    }
-
-    console.error('[STORAGE] Erro no fallback do Supabase Storage:', supaResult.error);
+    console.error('[STORAGE] Erro no fallback direto do Supabase Storage:', supaResult.error);
     throw supaResult.error;
   }
 
@@ -191,6 +190,73 @@ export async function uploadPatientFileToSupabase(patientIdentifier: string, fil
 export async function listPatientFilesFromSupabase(patientId: string, fallbackPatientName?: string, subfolder?: string) {
   const userId = await getStorageUserId();
   const idPath = getSafePatientPath(patientId);
+  const fallbackPath = fallbackPatientName ? getSafePatientPath(fallbackPatientName) : '';
+
+  // 1. Prioridade: Buscar via endpoint serverless (/api/storage-list) com privilégios administrativos
+  // Resolve RLS, unifica Cloudflare R2 e Supabase Storage com URLs públicas válidas
+  if (typeof window !== 'undefined') {
+    try {
+      const params = new URLSearchParams({
+        patientId: idPath,
+        ...(fallbackPath ? { patientName: fallbackPath } : {}),
+        ...(subfolder ? { subfolder } : {}),
+        ...(userId ? { userId } : {})
+      });
+
+      const res = await fetch(`/api/storage-list?${params.toString()}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.files)) {
+          // Processar e enriquecer JSONs de propostas se houver
+          const enriched = await Promise.all(json.files.map(async (file: any) => {
+            if (file.name?.toLowerCase().endsWith('.json') && file.thumbnailLink) {
+              try {
+                const r = await fetch(file.thumbnailLink);
+                if (r.ok) {
+                  const fileData = await r.json();
+                  let total = 0;
+                  if (fileData.simulations && fileData.selectedPlanIndex !== undefined && fileData.simulations[fileData.selectedPlanIndex]) {
+                    total = fileData.simulations[fileData.selectedPlanIndex].custoTotal;
+                  } else {
+                    const sections = fileData.sections || [];
+                    const procedures = fileData.procedures || [];
+                    sections.forEach((sec: any) => {
+                      sec.markers?.forEach((marker: any) => {
+                        if (marker.procedureInstances && marker.procedureInstances.length > 0) {
+                          marker.procedureInstances.forEach((inst: any) => {
+                            total += (inst.includeFinancial !== false ? (inst.price || 0) : 0);
+                          });
+                        } else if (marker.procedures) {
+                          marker.procedures.forEach((pid: any) => {
+                            const proc = procedures.find((p: any) => p.id === pid);
+                            total += (proc ? (proc.price || 0) : 0);
+                          });
+                        }
+                      });
+                    });
+                  }
+                  return {
+                    ...file,
+                    appProperties: {
+                      status: fileData.proposal?.status || 'Aberto',
+                      total: total
+                    },
+                    content: fileData
+                  };
+                }
+              } catch (_) {}
+            }
+            return file;
+          }));
+          return enriched;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[STORAGE] Erro ao consultar /api/storage-list, acionando fallback local:', apiErr);
+    }
+  }
+
+  // 2. Fallback de cliente (quando offline ou mock)
   const basePath = `${userId}/${idPath}`;
   const path = subfolder ? `${basePath}/${subfolder.replace(/^\/|\/$/g, '')}/` : `${basePath}/`;
 
@@ -388,7 +454,7 @@ export async function deletePatientFileFromSupabase(patientIdentifier: string, f
   const finalFilename = getSafeFilename(filename);
 
   let filePath: string;
-  if (filename.startsWith(`${userId}/`)) {
+  if (filename.startsWith(`${userId}/`) || filename.startsWith('clinic-master/')) {
     filePath = filename;
   } else if (filename.includes('/')) {
     filePath = `${userId}/${targetFolder}/${filename.replace(/^\/+/, '')}`;
@@ -396,7 +462,19 @@ export async function deletePatientFileFromSupabase(patientIdentifier: string, f
     filePath = `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
   }
 
-  // Deletar do Supabase Storage
+  // 1. Tentar endpoint serverless (/api/storage-delete) com permissão administrativa
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/storage-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: filePath, patientId: targetFolder, filename: finalFilename, subfolder })
+      });
+      if (res.ok) return;
+    } catch (_) {}
+  }
+
+  // 2. Deletar do Supabase Storage direto
   try {
     await supabase.storage.from(SUPABASE_BUCKET).remove([filePath]);
     if (!subfolder && !filename.includes('/')) {
@@ -405,7 +483,7 @@ export async function deletePatientFileFromSupabase(patientIdentifier: string, f
     }
   } catch (e) {}
 
-  // Deletar do Cloudflare R2
+  // 3. Deletar do Cloudflare R2
   try {
     await deleteFile(filePath);
   } catch (error) {

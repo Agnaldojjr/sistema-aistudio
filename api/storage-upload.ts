@@ -54,6 +54,8 @@ export default async function handler(req: Request) {
 
     const contentType = req.headers.get("content-type") || "";
     let filePath = "";
+    let filename = "foto.jpg";
+    let patientId = "paciente_anonimo";
     let fileBuffer: ArrayBuffer;
     let fileType = "application/octet-stream";
 
@@ -61,8 +63,8 @@ export default async function handler(req: Request) {
       const formData = await req.formData();
       const file = formData.get("file") as File | null;
       filePath = (formData.get("filePath") as string) || "";
-      const filename = (formData.get("filename") as string) || (file?.name || "foto.jpg");
-      const patientId = (formData.get("patientId") as string) || "paciente_anonimo";
+      filename = (formData.get("filename") as string) || (file?.name || "foto.jpg");
+      patientId = (formData.get("patientId") as string) || "paciente_anonimo";
       const subfolder = (formData.get("subfolder") as string) || "";
 
       if (!file) {
@@ -84,7 +86,9 @@ export default async function handler(req: Request) {
     } else {
       // Suporte a JSON com base64
       const body = await req.json();
-      filePath = body.filePath;
+      filePath = body.filePath || "";
+      filename = body.filename || "foto.jpg";
+      patientId = body.patientId || "paciente_anonimo";
       fileType = body.contentType || "image/jpeg";
       const base64Data = body.base64?.replace(/^data:.*?;base64,/, "");
 
@@ -120,14 +124,51 @@ export default async function handler(req: Request) {
       });
     }
 
-    // 3. Gerar URL pública ou assinada
+    // 3. Gerar URL pública
     const { data: publicData } = supabaseAdmin.storage.from(targetBucket).getPublicUrl(filePath);
+    const publicUrl = publicData?.publicUrl || null;
+
+    // 4. Sincronizar na galeria do paciente no CRM se for imagem
+    const isImage = fileType.startsWith("image/") || filename.match(/\.(jpe?g|png|webp|gif|bmp)$/i);
+    if (isImage && patientId && patientId !== "paciente_anonimo" && publicUrl) {
+      try {
+        const { data: clinicRecords } = await supabaseAdmin
+          .from('clinic_data')
+          .select('id, user_id, crm_data')
+          .limit(5);
+
+        if (Array.isArray(clinicRecords)) {
+          for (const clinicRow of clinicRecords) {
+            const crm = clinicRow.crm_data;
+            if (crm && Array.isArray(crm.patients)) {
+              if (!Array.isArray(crm.galeria)) crm.galeria = [];
+              const exists = crm.galeria.some((g: any) => g.url === publicUrl || g.id === filePath);
+              if (!exists) {
+                crm.galeria.push({
+                  id: `gal_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+                  patientId: patientId,
+                  url: publicUrl,
+                  description: filename,
+                  date: new Date().toISOString()
+                });
+                await supabaseAdmin
+                  .from('clinic_data')
+                  .update({ crm_data: crm, updated_at: new Date().toISOString() })
+                  .eq('id', clinicRow.id);
+              }
+            }
+          }
+        }
+      } catch (galErr) {
+        console.warn("Aviso ao vincular foto no CRM clinic_data:", galErr);
+      }
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
         path: filePath,
-        url: publicData?.publicUrl || null,
+        url: publicUrl,
       }),
       {
         status: 200,

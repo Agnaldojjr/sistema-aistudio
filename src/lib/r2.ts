@@ -5,7 +5,7 @@ const accountId = import.meta.env.VITE_CLOUDFLARE_R2_ACCOUNT_ID;
 const accessKeyId = import.meta.env.VITE_CLOUDFLARE_R2_ACCESS_KEY_ID;
 const secretAccessKey = import.meta.env.VITE_CLOUDFLARE_R2_SECRET_ACCESS_KEY;
 export const bucketName = import.meta.env.VITE_CLOUDFLARE_R2_BUCKET_NAME;
-const publicUrl = import.meta.env.VITE_CLOUDFLARE_R2_PUBLIC_URL;
+const publicUrl = import.meta.env.VITE_CLOUDFLARE_R2_PUBLIC_URL || 'https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev';
 
 if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) {
   console.warn('Cloudflare R2 credentials are not fully configured in environment variables.');
@@ -35,6 +35,7 @@ export function getS3Client(): S3Client | null {
         accessKeyId: accessKeyId || '',
         secretAccessKey: secretAccessKey || '',
       },
+      forcePathStyle: true,
     });
   }
   return _s3Client;
@@ -74,23 +75,10 @@ export async function uploadFile(file: File | Blob, path: string, contentType?: 
 /**
  * Gets a public or presigned URL for a file
  */
-export async function getFileUrl(path: string, expiresIn = 3600): Promise<string> {
-  // If a public custom domain is configured, use it
-  if (publicUrl) {
-    const baseUrl = publicUrl.endsWith('/') ? publicUrl : `${publicUrl}/`;
-    return `${baseUrl}${path}`;
-  }
-
-  const client = getS3Client();
-  if (!client) return '';
-
-  // Otherwise, generate a presigned URL
-  const command = new GetObjectCommand({
-    Bucket: bucketName,
-    Key: path,
-  });
-
-  return getSignedUrl(client, command, { expiresIn });
+export async function getFileUrl(path: string, _expiresIn = 3600): Promise<string> {
+  const effectiveBase = (publicUrl || 'https://pub-cabf0ef480a14522ac32d4c2a0451f18.r2.dev').replace(/\/+$/, '');
+  const cleanPath = path.replace(/^\/+/, '');
+  return `${effectiveBase}/${cleanPath}`;
 }
 
 /**

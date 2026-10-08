@@ -1582,16 +1582,15 @@ export default function DentalCRMView({
   };
 
   const deleteSupabaseFile = async (fileId: string) => {
-    if (!window.confirm("Deseja realmente excluir este arquivo do Supabase?")) return;
+    if (!window.confirm("Deseja realmente excluir este arquivo?")) return;
     try {
       setIsSupabaseUploading(true);
-      await deletePatientFileFromSupabase(driveFolderId || selectedPatient?.name || "Unknown", fileId);
-      if (driveFolderId) {
-        const images = await listPatientFilesFromSupabase(driveFolderId, selectedPatient?.name);
-        setSupabaseImages(filterSupabaseImages(images));
-      }
+      const targetFolder = driveFolderId || selectedPatient?.id || selectedPatient?.name || "Unknown";
+      await deletePatientFileFromSupabase(targetFolder, fileId);
+      const images = await listPatientFilesFromSupabase(targetFolder, selectedPatient?.name);
+      setSupabaseImages(filterSupabaseImages(images));
     } catch (err: any) {
-      alert("Erro ao excluir arquivo: " + err.message);
+      alert("Erro ao excluir arquivo: " + (err.message || err));
     } finally {
       setIsSupabaseUploading(false);
     }
