@@ -1,7 +1,72 @@
 import { supabase } from './supabase';
-import { uploadFile, getFileUrl, deleteFile, listFiles, moveFile, bucketName } from './r2';
+import { uploadFile, getFileUrl, deleteFile, listFiles, moveFile, bucketName, isR2Configured } from './r2';
 
 const SUPABASE_BUCKET = 'patient_files';
+
+let isBucketReady = false;
+let bucketInitPromise: Promise<boolean> | null = null;
+
+/**
+ * Garante que o bucket 'patient_files' exista no Supabase Storage,
+ * criando-o automaticamente via cliente ou via serverless endpoint com chave service_role se necessário.
+ */
+export async function ensureSupabaseBucket(): Promise<boolean> {
+  if (isBucketReady) return true;
+  if (bucketInitPromise) return bucketInitPromise;
+
+  bucketInitPromise = (async () => {
+    try {
+      // 1. Tentar verificar se o bucket já existe
+      const { data: bucket, error: getErr } = await supabase.storage.getBucket(SUPABASE_BUCKET);
+      if (!getErr && bucket) {
+        isBucketReady = true;
+        return true;
+      }
+
+      // 2. Tentar criar diretamente via cliente Supabase (caso permitido)
+      try {
+        const { error: createErr } = await supabase.storage.createBucket(SUPABASE_BUCKET, {
+          public: true,
+          fileSizeLimit: 52428800
+        });
+        if (!createErr || createErr.message?.includes('already exists')) {
+          isBucketReady = true;
+          return true;
+        }
+      } catch (_) {}
+
+      // 3. Fallback: solicitar criação via endpoint serverless (/api/storage-init)
+      if (typeof window !== 'undefined') {
+        try {
+          const apiRes = await fetch('/api/storage-init', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          if (apiRes.ok) {
+            isBucketReady = true;
+            return true;
+          }
+        } catch (_) {}
+      }
+
+      return false;
+    } catch (err) {
+      console.warn('[STORAGE] Erro ao assegurar existência do bucket:', err);
+      return false;
+    } finally {
+      bucketInitPromise = null;
+    }
+  })();
+
+  return bucketInitPromise;
+}
+
+// Inicializa a verificação do bucket em background na inicialização do app
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    ensureSupabaseBucket().catch(() => {});
+  }, 1000);
+}
 
 /**
  * Função utilitária para garantir um formato seguro de nome de pasta
@@ -36,32 +101,50 @@ export async function uploadPatientFileToSupabase(patientIdentifier: string, fil
 
   let r2Success = false;
 
-  // 1. Tentar Cloudflare R2 primeiro (para economizar a cota de 1GB do Supabase)
-  try {
-    await uploadFile(file, filePath);
-    r2Success = true;
-    console.log(`[STORAGE] Upload salvo no Cloudflare R2: ${filePath}`);
-  } catch (error: any) {
-    console.warn('[STORAGE] Cloudflare R2 indisponível ou bloqueado por CORS/TLS. Acionando fallback do Supabase Storage:', error?.message || error);
-  }
-
-  // 2. Se o Cloudflare R2 falhar, salva no Supabase Storage com garantia de redundância
-  if (!r2Success) {
-    const { data, error: supaErr } = await supabase.storage
-      .from(SUPABASE_BUCKET)
-      .upload(filePath, file, {
-        upsert: true
-      });
-
-    if (supaErr) {
-      console.error('[STORAGE] Erro no fallback do Supabase Storage:', supaErr);
-      throw supaErr;
+  // 1. Tentar Cloudflare R2 primeiro apenas se estiver devidamente configurado
+  if (isR2Configured()) {
+    try {
+      await uploadFile(file, filePath);
+      r2Success = true;
+      console.log(`[STORAGE] Upload salvo no Cloudflare R2: ${filePath}`);
+      return { path: filePath, provider: 'r2' };
+    } catch (error: any) {
+      console.warn('[STORAGE] Cloudflare R2 indisponível ou bloqueado por CORS/TLS. Acionando fallback do Supabase Storage:', error?.message || error);
     }
-    console.log(`[STORAGE] Upload salvo com sucesso no Supabase Storage: ${filePath}`);
-    return { path: filePath, provider: 'supabase' };
   }
 
-  return { path: filePath, provider: 'r2' };
+  // 2. Se o Cloudflare R2 falhar ou não estiver configurado, salva no Supabase Storage
+  let supaResult = await supabase.storage
+    .from(SUPABASE_BUCKET)
+    .upload(filePath, file, {
+      upsert: true
+    });
+
+  // Se o bucket não existir ("Bucket not found"), inicializa o bucket e repete o upload imediatamente!
+  if (supaResult.error && (
+    supaResult.error.message?.toLowerCase().includes('bucket not found') ||
+    (supaResult.error as any).statusCode === '400' ||
+    (supaResult.error as any).statusCode === 400 ||
+    (supaResult.error as any).status === 400
+  )) {
+    console.warn(`[STORAGE] Bucket "${SUPABASE_BUCKET}" ausente. Inicializando bucket e repetindo upload...`);
+    const initialized = await ensureSupabaseBucket();
+    if (initialized) {
+      supaResult = await supabase.storage
+        .from(SUPABASE_BUCKET)
+        .upload(filePath, file, {
+          upsert: true
+        });
+    }
+  }
+
+  if (supaResult.error) {
+    console.error('[STORAGE] Erro no fallback do Supabase Storage:', supaResult.error);
+    throw supaResult.error;
+  }
+
+  console.log(`[STORAGE] Upload salvo com sucesso no Supabase Storage: ${filePath}`);
+  return { path: filePath, provider: 'supabase' };
 }
 
 /**

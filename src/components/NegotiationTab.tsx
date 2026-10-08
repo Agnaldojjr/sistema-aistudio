@@ -1135,16 +1135,23 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       const safePatientName = patientName || 'Paciente_Anonimo';
       const cleanFileName = `Orcamento_${safePatientName.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
       
-      await uploadPatientFileToSupabase(selectedPatient?.id || safePatientName, pdfBlob, cleanFileName, 'Orcamentos');
-      log(`✅ Sucesso! PDF salvo na pasta de Documentos de "${safePatientName}".`);
+      let pdfLink = '';
+      try {
+        await uploadPatientFileToSupabase(selectedPatient?.id || safePatientName, pdfBlob, cleanFileName, 'Orcamentos');
+        log(`✅ Sucesso! PDF salvo na pasta de Documentos de "${safePatientName}".`);
 
-      log("🔗 3/5 - Configurando permissões de leitura seguras...");
-      let pdfLink = await getPatientFileUrlFromSupabase(selectedPatient?.id || safePatientName, cleanFileName, 315360000, 'Orcamentos');
+        log("🔗 3/5 - Configurando permissões de leitura seguras...");
+        pdfLink = await getPatientFileUrlFromSupabase(selectedPatient?.id || safePatientName, cleanFileName, 315360000, 'Orcamentos');
+      } catch (uploadErr: any) {
+        console.warn('[NegotiationTab] Falha no upload para nuvem do PDF:', uploadErr);
+        log(`⚠️ Armazenamento em nuvem indisponível (${uploadErr?.message || 'Bucket'}). Prosseguindo com PDF compilado localmente...`);
+      }
+
       if (!pdfLink) {
         pdfLink = localUrl;
       }
       setGeneratedPdfUrl(pdfLink);
-      log(`✅ Link público e seguro ativado!`);
+      log(`✅ Link do PDF ativado!`);
 
       log("🚀 4/5 - Iniciando conexão com a API de Integração do WhatsApp no domínio corporativo...");
       log(`Disparando POST para ${whatsappApiUrl}...`);
@@ -1217,13 +1224,35 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
     setIsSavingDrive(true);
     setSaveSuccessMsg('');
     try {
-      // Cria uma versão permanente e sincroniza imediatamente com o Supabase
-      const sealedVersion = await sealPermanentVersion();
+      // 1. Sempre salvar imediatamente os dados do orçamento no CRM / Banco de Dados Supabase (clinic_data)
+      let crmSaved = false;
+      try {
+        await saveContextToSupabase();
+        crmSaved = true;
+      } catch (crmErr: any) {
+        console.warn('[NegotiationTab] Aviso ao salvar contexto no CRM:', crmErr);
+      }
+
+      // 2. Tenta criar versão permanente na nuvem (Storage)
+      let sealedVersion: string | null = null;
+      try {
+        sealedVersion = await sealPermanentVersion();
+      } catch (storageErr: any) {
+        console.warn('[NegotiationTab] Aviso ao salvar versão no Storage:', storageErr);
+      }
+
+      if (!sealedVersion) {
+        try {
+          await forceCloudSync();
+        } catch (_) {}
+      }
+
       if (sealedVersion) {
-        setSaveSuccessMsg('Versão salva na nuvem!');
+        setSaveSuccessMsg('Orçamento e versão na nuvem salvos com sucesso!');
+      } else if (crmSaved) {
+        setSaveSuccessMsg('Orçamento salvo no CRM com sucesso!');
       } else {
-        await forceCloudSync();
-        setSaveSuccessMsg('Salvo no Supabase!');
+        setSaveSuccessMsg('Salvo localmente!');
       }
 
       // Integracao com o financeiro

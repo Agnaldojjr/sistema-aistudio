@@ -1,4 +1,4 @@
-import { uploadPatientFileToSupabase } from '../lib/storage';
+import { uploadPatientFileToSupabase, ensureSupabaseBucket } from '../lib/storage';
 
 export type BudgetSyncStatus = 
   | 'idle'
@@ -383,6 +383,7 @@ export async function uploadBudgetToCloud(
  * Processa e envia todos os orçamentos pendentes na fila offline
  */
 let isSyncingQueue = false;
+const lastFailedLogTime = new Map<string, number>();
 
 export async function syncAllPendingBudgets(): Promise<{ synced: number; failed: number }> {
   if (isSyncingQueue) return { synced: 0, failed: 0 };
@@ -398,6 +399,7 @@ export async function syncAllPendingBudgets(): Promise<{ synced: number; failed:
   let syncedCount = 0;
   let failedCount = 0;
   const remaining: OfflineBudgetItem[] = [];
+  const now = Date.now();
 
   for (const item of queue) {
     try {
@@ -411,6 +413,7 @@ export async function syncAllPendingBudgets(): Promise<{ synced: number; failed:
       await uploadPatientFileToSupabase(item.patientId || item.patientName, fileBlob, cleanFilename, 'Orcamentos');
       
       deleteFromIndexedDB(storageKey).catch(() => {});
+      lastFailedLogTime.delete(item.id);
       syncedCount++;
 
       if (typeof window !== 'undefined') {
@@ -418,8 +421,16 @@ export async function syncAllPendingBudgets(): Promise<{ synced: number; failed:
           detail: { patientId: item.patientId, filename: cleanFilename, timestamp: Date.now() }
         }));
       }
-    } catch (err) {
-      console.warn(`[budgetSyncService] ⏳ Mantendo ${item.id} na fila offline:`, err);
+    } catch (err: any) {
+      if (err?.message?.includes('Bucket not found') || (err as any)?.statusCode === '400') {
+        ensureSupabaseBucket().catch(() => {});
+      }
+
+      const lastLogged = lastFailedLogTime.get(item.id) || 0;
+      if (now - lastLogged > 30000) {
+        console.warn(`[budgetSyncService] ⏳ Mantendo ${item.id} na fila offline:`, err?.message || err);
+        lastFailedLogTime.set(item.id, now);
+      }
       failedCount++;
       remaining.push(item);
     }

@@ -11,19 +11,52 @@ if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) {
   console.warn('Cloudflare R2 credentials are not fully configured in environment variables.');
 }
 
-export const s3Client = new S3Client({
-  region: 'auto',
-  endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: accessKeyId || '',
-    secretAccessKey: secretAccessKey || '',
-  },
-});
+export function isR2Configured(): boolean {
+  return Boolean(
+    accountId &&
+    accessKeyId &&
+    secretAccessKey &&
+    bucketName &&
+    accountId !== 'undefined' &&
+    typeof accountId === 'string' &&
+    accountId.trim().length > 5 &&
+    !accountId.includes('placeholder')
+  );
+}
+
+let _s3Client: S3Client | null = null;
+export function getS3Client(): S3Client | null {
+  if (!isR2Configured()) return null;
+  if (!_s3Client) {
+    _s3Client = new S3Client({
+      region: 'auto',
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: accessKeyId || '',
+        secretAccessKey: secretAccessKey || '',
+      },
+    });
+  }
+  return _s3Client;
+}
+
+export const s3Client = {
+  send: (cmd: any) => {
+    const client = getS3Client();
+    if (!client) throw new Error('Cloudflare R2 não configurado');
+    return client.send(cmd);
+  }
+} as any;
 
 /**
  * Uploads a file to Cloudflare R2
  */
 export async function uploadFile(file: File | Blob, path: string, contentType?: string) {
+  const client = getS3Client();
+  if (!client) {
+    throw new Error('Cloudflare R2 não configurado');
+  }
+
   const arrayBuffer = await file.arrayBuffer();
   const buffer = new Uint8Array(arrayBuffer);
 
@@ -34,7 +67,7 @@ export async function uploadFile(file: File | Blob, path: string, contentType?: 
     ContentType: contentType || file.type || 'application/octet-stream',
   });
 
-  await s3Client.send(command);
+  await client.send(command);
   return { path };
 }
 
@@ -48,56 +81,68 @@ export async function getFileUrl(path: string, expiresIn = 3600): Promise<string
     return `${baseUrl}${path}`;
   }
 
+  const client = getS3Client();
+  if (!client) return '';
+
   // Otherwise, generate a presigned URL
   const command = new GetObjectCommand({
     Bucket: bucketName,
     Key: path,
   });
 
-  return getSignedUrl(s3Client, command, { expiresIn });
+  return getSignedUrl(client, command, { expiresIn });
 }
 
 /**
  * Deletes a file from Cloudflare R2
  */
 export async function deleteFile(path: string) {
+  const client = getS3Client();
+  if (!client) return;
+
   const command = new DeleteObjectCommand({
     Bucket: bucketName,
     Key: path,
   });
 
-  await s3Client.send(command);
+  await client.send(command);
 }
 
 /**
  * Renames/Moves a file by copying it and deleting the original
  */
 export async function moveFile(oldPath: string, newPath: string) {
+  const client = getS3Client();
+  if (!client) return;
+
   const copyCommand = new CopyObjectCommand({
     Bucket: bucketName,
     CopySource: encodeURI(`${bucketName}/${oldPath}`),
     Key: newPath,
   });
 
-  await s3Client.send(copyCommand);
+  await client.send(copyCommand);
 
   const deleteCommand = new DeleteObjectCommand({
     Bucket: bucketName,
     Key: oldPath,
   });
 
-  await s3Client.send(deleteCommand);
+  await client.send(deleteCommand);
 }
 
 /**
  * Lists files with a specific prefix
  */
 export async function listFiles(prefix: string) {
+  const client = getS3Client();
+  if (!client) return [];
+
   const command = new ListObjectsV2Command({
     Bucket: bucketName,
     Prefix: prefix,
   });
 
-  const response = await s3Client.send(command);
+  const response = await client.send(command);
   return response.Contents || [];
 }
