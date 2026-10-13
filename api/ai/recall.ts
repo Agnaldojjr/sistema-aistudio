@@ -1,5 +1,28 @@
 import { GoogleGenAI } from "@google/genai";
-import { generateContentWithFallback } from "../_gemini";
+
+const FALLBACK_MODELS = [
+  process.env.GEMINI_MODEL || "gemini-3.5-flash",
+  "gemini-3-flash-preview",
+  "gemini-flash-latest"
+];
+
+async function generateWithFallback(ai: GoogleGenAI, payload: any) {
+  let lastError: any = null;
+  for (const model of FALLBACK_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        ...payload,
+        model
+      });
+      return response;
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[Gemini Fallback] Modelo ${model} falhou:`, err?.message || err);
+      if (err?.status === 401 || err?.status === 403) throw err;
+    }
+  }
+  throw lastError;
+}
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -30,7 +53,7 @@ export default async function handler(req: any, res: any) {
     Mantenha a mensagem curta (máximo 3 frases), use emojis sutis, seja educada e não invente datas ou valores.
     `;
 
-    const { response } = await generateContentWithFallback(ai, {
+    const response = await generateWithFallback(ai, {
       contents: prompt,
       config: {
         temperature: 0.7,

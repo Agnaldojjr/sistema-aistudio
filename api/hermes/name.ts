@@ -1,6 +1,28 @@
 export const config = { runtime: 'edge' };
 import { GoogleGenAI } from "@google/genai";
-import { generateContentWithFallback } from "../_gemini";
+
+const FALLBACK_MODELS = [
+  process.env.GEMINI_MODEL || "gemini-3.5-flash",
+  "gemini-3-flash-preview",
+  "gemini-flash-latest"
+];
+
+async function generateWithFallback(ai: GoogleGenAI, payload: any) {
+  let lastError: any = null;
+  for (const model of FALLBACK_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        ...payload,
+        model
+      });
+      return response;
+    } catch (err: any) {
+      lastError = err;
+      if (err?.status === 401 || err?.status === 403) throw err;
+    }
+  }
+  throw lastError;
+}
 
 export default async (req: Request) => {
   // CORS Preflight
@@ -180,7 +202,7 @@ Responda APENAS com o nome extraído. Não adicione nenhuma introdução, explic
 Histórico de Conversa:
 ${chatHistory}`;
 
-    const { response: geminiResponse } = await generateContentWithFallback(ai, {
+    const geminiResponse = await generateWithFallback(ai, {
       contents: prompt,
       config: { temperature: 0.1 }
     });

@@ -326,7 +326,13 @@ export default function DentalCRMView({
       // 1. Tentar leitura nativa e determinística se for PDF (Zero IA, instantâneo, zero custo)
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         try {
-          const rawText = await file.text();
+          let rawText = '';
+          try {
+            const buffer = await file.arrayBuffer();
+            rawText = new TextDecoder('latin1').decode(buffer);
+          } catch {
+            rawText = await file.text();
+          }
           const parsedInternal = parseInternalBudgetPdf(rawText);
           if (parsedInternal && parsedInternal.items && parsedInternal.items.length > 0) {
             extractedItems = parsedInternal.items;

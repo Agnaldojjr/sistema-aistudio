@@ -1,5 +1,28 @@
 import { GoogleGenAI } from "@google/genai";
-import { generateContentWithFallback } from "../_gemini";
+
+const FALLBACK_MODELS = [
+  process.env.GEMINI_MODEL || "gemini-3.5-flash",
+  "gemini-3-flash-preview",
+  "gemini-flash-latest"
+];
+
+async function generateWithFallback(ai: GoogleGenAI, payload: any) {
+  let lastError: any = null;
+  for (const model of FALLBACK_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        ...payload,
+        model
+      });
+      return response;
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[Gemini Fallback] Modelo ${model} falhou:`, err?.message || err);
+      if (err?.status === 401 || err?.status === 403) throw err;
+    }
+  }
+  throw lastError;
+}
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -12,7 +35,7 @@ export default async function handler(req: any, res: any) {
     const prompt = `
     Aja como a secretária comercial premium do dentista ${doctorName}.
     Escreva um script curto de fechamento de venda via WhatsApp para enviar o orçamento em PDF para o paciente chamado ${patientName}.
-    O paciente fará os seguintes tratamentos: ${procedures.join(', ')}.
+    O paciente fará os seguintes tratamentos: ${(procedures || []).join(', ')}.
     
     A mensagem deve:
     1. Ser extremamente cordial, mas direta e com gatilho de autoridade.
@@ -25,7 +48,7 @@ export default async function handler(req: any, res: any) {
 
     if (process.env.GEMINI_API_KEY) {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const { response } = await generateContentWithFallback(ai, {
+      const response = await generateWithFallback(ai, {
         contents: prompt,
         config: { temperature: 0.7 }
       });

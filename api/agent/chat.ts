@@ -1,7 +1,12 @@
 export const config = { runtime: 'edge' };
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
-import { GEMINI_FALLBACK_MODELS } from "../_gemini";
+
+const GEMINI_FALLBACK_MODELS = [
+  process.env.GEMINI_MODEL || "gemini-3.5-flash",
+  "gemini-3-flash-preview",
+  "gemini-flash-latest"
+];
 
 export default async (req: Request) => {
   // CORS Preflight

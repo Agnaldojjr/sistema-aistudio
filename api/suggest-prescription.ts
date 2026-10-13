@@ -1,6 +1,29 @@
 export const config = { runtime: 'edge' };
 import { GoogleGenAI } from "@google/genai";
-import { generateContentWithFallback } from "./_gemini";
+
+const FALLBACK_MODELS = [
+  process.env.GEMINI_MODEL || "gemini-3.5-flash",
+  "gemini-3-flash-preview",
+  "gemini-flash-latest"
+];
+
+async function generateWithFallback(ai: GoogleGenAI, payload: any) {
+  let lastError: any = null;
+  for (const model of FALLBACK_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        ...payload,
+        model
+      });
+      return response;
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[Gemini Fallback] Modelo ${model} falhou:`, err?.message || err);
+      if (err?.status === 401 || err?.status === 403) throw err;
+    }
+  }
+  throw lastError;
+}
 
 export default async (req: Request) => {
   // CORS Preflight
@@ -39,7 +62,7 @@ export default async (req: Request) => {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "Chave GEMINI_API_KEY não configurada no servidor." }), {
+      return new Response(JSON.stringify({ error: "Chave da API Gemini não configurada no servidor." }), {
         status: 500,
         headers: {
           "Content-Type": "application/json",
@@ -65,7 +88,7 @@ Não use markdown complexo, pode usar números ou traços.
 
 Procedimento realizado: ${procedure}`;
 
-    const { response } = await generateContentWithFallback(ai, {
+    const response = await generateWithFallback(ai, {
       contents: prompt,
       config: {
         temperature: 0.2,
@@ -79,26 +102,11 @@ Procedimento realizado: ${procedure}`;
         "Access-Control-Allow-Origin": "*",
       },
     });
-  } catch (error: any) {
-    console.error("Gemini API Error:", error);
-    const errorStr = typeof error === 'object' ? JSON.stringify(error) : String(error);
-    const msg = error?.message || error?.toString?.() || "Failed to generate prescription";
 
-    let status = 500;
-    let errorMsg = "Erro ao conectar com a inteligência artificial. Tente novamente mais tarde.";
-
-    if (
-      msg.includes("prepayment credits are depleted") || 
-      msg.includes("RESOURCE_EXHAUSTED") ||
-      errorStr.includes("RESOURCE_EXHAUSTED") ||
-      error?.status === 429
-    ) {
-      status = 429;
-      errorMsg = "Créditos da API Google Gemini esgotados. Verifique seu projeto no AI Studio e o faturamento. O plano gratuito pode ter sido excedido.";
-    }
-
-    return new Response(JSON.stringify({ error: errorMsg }), {
-      status: status,
+  } catch (err: any) {
+    console.error("Erro na geração de receita via Gemini:", err);
+    return new Response(JSON.stringify({ error: "Falha na comunicação com o assistente de IA.", details: err?.message || String(err) }), {
+      status: 500,
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",

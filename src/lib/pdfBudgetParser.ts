@@ -1,7 +1,7 @@
 /**
- * Parser nativo e determinístico para orçamentos gerados pelo sistema.
+ * Parser nativo e determinístico para orçamentos em PDF gerados pelo sistema.
  * Permite reimportar PDFs emitidos pelo próprio sistema sem necessidade de IA externa,
- * garantindo velocidade instantânea, zero custo e zero falhas de rede.
+ * garantindo velocidade instantânea, zero custo e imunidade total a falhas de rede.
  */
 
 export interface ParsedBudgetItem {
@@ -19,17 +19,24 @@ export interface InternalBudgetParseResult {
   total?: number;
 }
 
+function normalizeForSearch(str: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
+
 export function parseInternalBudgetPdf(rawText: string): InternalBudgetParseResult | null {
   if (!rawText) return null;
 
+  const normalizedAll = normalizeForSearch(rawText);
+
   const isInternal =
-    rawText.includes('Planejador Odontológico Integrado') ||
-    rawText.includes('Planejador Odontologico Integrado') ||
-    rawText.includes('PLANO DE TRATAMENTO E ORÇAMENTO') ||
-    rawText.includes('PLANO DE TRATAMENTO E ORCAMENTO') ||
-    rawText.includes('CLÍNICA ODONTOLÓGICA DIGITAL') ||
-    rawText.includes('CLINICA ODONTOLOGICA DIGITAL') ||
-    rawText.includes('AG_ODONTO_BUDGET');
+    normalizedAll.includes('PLANEJADOR ODONTOLOGICO INTEGRADO') ||
+    normalizedAll.includes('PLANO DE TRATAMENTO E ORCAMENTO') ||
+    normalizedAll.includes('CLINICA ODONTOLOGICA DIGITAL') ||
+    normalizedAll.includes('AG_ODONTO_BUDGET');
 
   if (!isInternal) {
     return null;
@@ -60,14 +67,14 @@ export function parseInternalBudgetPdf(rawText: string): InternalBudgetParseResu
       }
     }
   } catch (e) {
-    console.warn('Falha ao processar metadados JSON do PDF, tentando leitura vetorial:', e);
+    console.warn('Falha ao processar metadados JSON do PDF, tentando leitura vetorial da tabela:', e);
   }
 
-  // 2. Extração determinística via operadores de texto Tj do jsPDF
+  // 2. Extração determinística de strings literais PDF (...)
   try {
-    const textMatches = [...rawText.matchAll(/\(([^)]+)\)\s*Tj/g)]
+    const textMatches = [...rawText.matchAll(/\(([^)]+)\)/g)]
       .map(m => m[1].trim())
-      .filter(Boolean);
+      .filter(t => t.length > 0 && !t.startsWith('/') && !t.startsWith('Font'));
 
     if (textMatches.length === 0) {
       return { isInternal: true, source: 'none', patientName: '', items: [] };
@@ -75,24 +82,27 @@ export function parseInternalBudgetPdf(rawText: string): InternalBudgetParseResu
 
     // Extrair Nome do Paciente
     let patientName = '';
-    const pacIdx = textMatches.findIndex(t => t.toUpperCase() === 'PACIENTE:');
+    const pacIdx = textMatches.findIndex(t => normalizeForSearch(t).includes('PACIENTE:'));
     if (pacIdx !== -1 && textMatches[pacIdx + 1]) {
       patientName = textMatches[pacIdx + 1];
     }
 
     // Delimitar a tabela de procedimentos
-    const startIdx = textMatches.findIndex(
-      t => t.toUpperCase().includes('VALOR UNIT') || t.toUpperCase().includes('DENTE/REGI')
-    );
+    const startIdx = textMatches.findIndex(t => {
+      const norm = normalizeForSearch(t);
+      return norm.includes('VALOR UNIT') || norm.includes('DENTE/REGI');
+    });
 
-    let endIdx = textMatches.findIndex(
-      (t, idx) =>
-        idx > startIdx &&
-        (t.toUpperCase().includes('PLANO FINANCEIRO') ||
-          t.toUpperCase().includes('INVESTIMENTO TOTAL') ||
-          t.toUpperCase().includes('ASSINATURA') ||
-          t.toUpperCase().includes('PLANEJADOR ODONTOL'))
-    );
+    let endIdx = textMatches.findIndex((t, idx) => {
+      if (idx <= startIdx) return false;
+      const norm = normalizeForSearch(t);
+      return (
+        norm.includes('PLANO FINANCEIRO') ||
+        norm.includes('INVESTIMENTO TOTAL') ||
+        norm.includes('ASSINATURA') ||
+        norm.includes('PLANEJADOR ODONTOL')
+      );
+    });
 
     if (startIdx === -1) {
       return { isInternal: true, source: 'none', patientName, items: [] };
@@ -108,7 +118,7 @@ export function parseInternalBudgetPdf(rawText: string): InternalBudgetParseResu
       const procCandidate = slice[i + 1];
       const priceCandidate = slice[i + 2];
 
-      // Formato padrão: [Dente, Procedimento, Valor]
+      // Formato padrão da tabela: [Dente, Procedimento, Valor Unitário]
       const isMoney3 =
         priceCandidate &&
         (priceCandidate.includes('R$') || /^\d+[.,]\d{2}$/.test(priceCandidate.replace('R$', '').trim()));
@@ -126,7 +136,7 @@ export function parseInternalBudgetPdf(rawText: string): InternalBudgetParseResu
         continue;
       }
 
-      // Formato sem dente especificado: [Procedimento, Valor]
+      // Formato sem dente especificado: [Procedimento, Valor Unitário]
       const isMoney2 =
         procCandidate &&
         (procCandidate.includes('R$') || /^\d+[.,]\d{2}$/.test(procCandidate.replace('R$', '').trim()));

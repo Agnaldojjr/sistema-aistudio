@@ -1,5 +1,28 @@
 import { GoogleGenAI } from "@google/genai";
-import { generateContentWithFallback } from "../_gemini";
+
+const FALLBACK_MODELS = [
+  process.env.GEMINI_MODEL || "gemini-3.5-flash",
+  "gemini-3-flash-preview",
+  "gemini-flash-latest"
+];
+
+async function generateWithFallback(ai: GoogleGenAI, payload: any) {
+  let lastError: any = null;
+  for (const model of FALLBACK_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        ...payload,
+        model
+      });
+      return response;
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[Gemini Fallback] Modelo ${model} falhou:`, err?.message || err);
+      if (err?.status === 401 || err?.status === 403) throw err;
+    }
+  }
+  throw lastError;
+}
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -28,21 +51,16 @@ export default async function handler(req: any, res: any) {
 
     const prompt = `
     Você é um assistente de inteligência artificial de alto nível integrado a um prontuário clínico odontológico.
-    Sua tarefa é analisar o relato de observações clínicas em texto livre abaixo e estruturar um plano de tratamento correspondente.
+    Sua função é transformar anotações clínicas rápidas, transcrições de voz ou observações do dentista em um plano de tratamento odontológico estruturado (ODONTOGRAMA).
     
-    Relato Clínico:
-    "${notes}"
-    
-    Regras Clínicas de Mapeamento:
-    1. Identifique os números dos dentes citados e os converta para o código internacional de 2 dígitos da FDI (ex: superior direito 11 a 18, superior esquerdo 21 a 28, inferior esquerdo 31 a 38, inferior direito 41 a 48).
-    2. Identifique as faces ou superfícies do dente afetadas. Mapeie para um ou mais dos seguintes:
-       - 'M' (Mesial), 'D' (Distal), 'O' (Oclusal - para molares/pré-molares), 'I' (Incisal - para incisivos/caninos), 'V' (Vestibular), 'L' (Lingual/Palatina), 'C' (Cervical).
-    3. Identifique a condição do dente. Mapeie estritamente para um destes termos em inglês:
-       - 'HEALTHY' (Saudável/Normal)
-       - 'CARIES' (Cárie)
-       - 'FRACTURE' (Fratura/Trinca)
-       - 'MISSING' (Ausente/Extraído)
-       - 'PULPITIS' (Canais inflamados, pulpite)
+    Regras Clínicas Estritas:
+    1. Identifique os dentes envolvidos utilizando o sistema de numeração FDI (Ex: 11 a 18, 21 a 28, 31 a 38, 41 a 48).
+    2. Identifique as faces quando mencionadas (M: Mesial, D: Distal, O: Oclusal, V: Vestibular, L: Lingual/Palatina).
+    3. Categorize o estado/condição do dente:
+       - 'CARIES' (Cárie ativa / restauração necessária)
+       - 'FRACTURE' (Dente quebrado/fraturado)
+       - 'PULPITIS' (Dor intensa, necessidade de canal/endodontia)
+       - 'MISSING' (Dente ausente)
        - 'IMPLANT' (Implante planejado/executado)
        - 'CROWN' (Coroa, faceta ou bloco planejado)
     4. Sugira procedimentos e preços médios adequados para cada dente:
@@ -53,7 +71,7 @@ export default async function handler(req: any, res: any) {
        - Fratura complexa -> "Coroa Provisória" (Preço: 400.00).
     `;
 
-    const { response } = await generateContentWithFallback(ai, {
+    const response = await generateWithFallback(ai, {
       contents: prompt,
       config: {
         responseMimeType: "application/json",
