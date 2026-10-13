@@ -1,5 +1,6 @@
 export const config = { runtime: 'edge' };
 import { GoogleGenAI } from "@google/genai";
+import { generateContentWithFallback } from "./_gemini";
 
 export default async (req: Request) => {
   // CORS Preflight
@@ -64,8 +65,7 @@ Não use markdown complexo, pode usar números ou traços.
 
 Procedimento realizado: ${procedure}`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+    const { response } = await generateContentWithFallback(ai, {
       contents: prompt,
       config: {
         temperature: 0.2,

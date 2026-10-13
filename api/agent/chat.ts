@@ -1,6 +1,7 @@
 export const config = { runtime: 'edge' };
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
+import { GEMINI_FALLBACK_MODELS } from "../_gemini";
 
 export default async (req: Request) => {
   // CORS Preflight
@@ -196,23 +197,25 @@ async function callLLM(prompt: string, jsonMode: boolean = false): Promise<strin
   }
 
   if (geminiKey) {
-    console.log("[LLM API] Chamando Gemini (gemini-2.5-flash)...");
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: jsonMode ? { responseMimeType: "application/json" } : undefined
-        })
-      });
-      if (response.ok) {
-        const data: any = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    for (const modelName of GEMINI_FALLBACK_MODELS) {
+      console.log(`[LLM API] Chamando Gemini (${modelName})...`);
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: jsonMode ? { responseMimeType: "application/json" } : undefined
+          })
+        });
+        if (response.ok) {
+          const data: any = await response.json();
+          return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        }
+        console.warn(`[LLM API] Erro Gemini (${modelName}): ${response.status} ${response.statusText}. Tentando próximo modelo...`);
+      } catch (err) {
+        console.warn(`[LLM API] Erro ao chamar Gemini (${modelName}):`, err);
       }
-      console.error(`[LLM API] Erro Gemini: ${response.status} ${response.statusText}`);
-    } catch (err) {
-      console.error("[LLM API] Erro ao chamar Gemini:", err);
     }
   }
 

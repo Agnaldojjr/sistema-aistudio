@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { generateContentWithFallback } from "../_gemini";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -24,8 +25,7 @@ export default async function handler(req: any, res: any) {
 
     if (process.env.GEMINI_API_KEY) {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+      const { response } = await generateContentWithFallback(ai, {
         contents: prompt,
         config: { temperature: 0.7 }
       });

@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { generateContentWithFallback } from "./_gemini";
 
 export const maxDuration = 60; // 60 seconds timeout for vision/PDF extraction
 
@@ -39,8 +40,7 @@ Caso o documento indique que toda a arcada ou múltiplos dentes compartilham o m
 Se não houver numeração de dente especificada, coloque o dente como null.
 Retorne APENAS um array JSON no formato solicitado.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+    const { response } = await generateContentWithFallback(ai, {
       contents: [
         {
           role: "user",

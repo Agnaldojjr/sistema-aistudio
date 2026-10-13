@@ -65,6 +65,7 @@ import { AIAssistedWhatsApp } from './AIAssistedWhatsApp';
 import { usePatientContext } from '../context/PatientContext';
 import { getDefaultToothCoordinates } from '../constants';
 import { syncAllPendingBudgets } from '../services/budgetSyncService';
+import { parseInternalBudgetPdf } from '../lib/pdfBudgetParser';
 
 // --- ZOD SCHEMAS FOR HISTORICAL IMPORT CONTENT VALIDATION ---
 const lenientString = z.preprocess((val) => (val !== undefined && val !== null) ? String(val) : val, z.string()).optional().nullable();
@@ -319,15 +320,40 @@ export default function DentalCRMView({
     
     setIsImportingBudget(true);
     try {
-      let dataUrl = '';
-      
-      if (file.type.startsWith('image/')) {
+      let extractedItems: any[] = [];
+      let isInternalBudget = false;
+
+      // 1. Tentar leitura nativa e determinística se for PDF (Zero IA, instantâneo, zero custo)
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         try {
-          // Compress the image before sending to avoid large payloads
-          dataUrl = await compressFileToDataUrl(file, 1200, 0.8);
-        } catch (compressError) {
-          console.warn("Compression failed, using original file", compressError);
-          // Fallback to reading file without compression if library fails
+          const rawText = await file.text();
+          const parsedInternal = parseInternalBudgetPdf(rawText);
+          if (parsedInternal && parsedInternal.items && parsedInternal.items.length > 0) {
+            extractedItems = parsedInternal.items;
+            isInternalBudget = true;
+          }
+        } catch (readErr) {
+          console.warn("Tentativa de leitura nativa de PDF falhou, prosseguindo com extração por IA:", readErr);
+        }
+      }
+
+      // 2. Se não for PDF interno do sistema, recorrer à API com IA (para fotos e documentos externos)
+      if (!isInternalBudget) {
+        let dataUrl = '';
+        
+        if (file.type.startsWith('image/')) {
+          try {
+            dataUrl = await compressFileToDataUrl(file, 1200, 0.8);
+          } catch (compressError) {
+            console.warn("Compression failed, using original file", compressError);
+            dataUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+          }
+        } else {
           dataUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
@@ -335,31 +361,43 @@ export default function DentalCRMView({
             reader.readAsDataURL(file);
           });
         }
-      } else {
-        // It's a PDF, we can't compress it as an image. Just read as Base64.
-        dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
+        
+        const response = await fetch('/api/extract-budget-vision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: dataUrl })
         });
+        
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.details || errData.error || 'Falha ao processar a imagem do orçamento.');
+        }
+        
+        const data = await response.json();
+        extractedItems = data.items || [];
+      }
+
+      if (!extractedItems || extractedItems.length === 0) {
+        throw new Error("Nenhum procedimento pôde ser identificado no documento.");
       }
       
-      const response = await fetch('/api/extract-budget-vision', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: dataUrl })
-      });
-      
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.details || errData.error || 'Falha ao processar a imagem do orçamento.');
+      // 3. Proteção e confirmação com o usuário antes de alterar procedimentos em tela
+      const existingMarkersCount = (activeSections || []).reduce((acc, s) => acc + (s.markers?.length || 0), 0);
+      let shouldReplace = false;
+
+      if (existingMarkersCount > 0) {
+        shouldReplace = window.confirm(
+          `Identificados ${extractedItems.length} procedimento(s) no orçamento.\n\n` +
+          `Deseja SUBSTITUIR os procedimentos atuais desta tela por este orçamento?\n\n` +
+          `• Clique em "OK" para SUBSTITUIR (manter apenas o orçamento importado).\n` +
+          `• Clique em "Cancelar" para SOMAR (manter os procedimentos atuais e adicionar os novos).`
+        );
       }
-      
-      const { items } = await response.json();
-      
+
       // Process items and map to activeSections
-      let newSections = [...(activeSections || [])];
+      let newSections = shouldReplace
+        ? (activeSections || []).map(s => ({ ...s, markers: [] }))
+        : [...(activeSections || [])];
       
       // Ensure upper and lower exist
       if (!newSections.find(s => s.id === 'upper')) {
@@ -369,16 +407,17 @@ export default function DentalCRMView({
         newSections.push({ id: 'lower', title: 'Arcada Inferior', subtitle: 'Dentes Posteriores e Anteriores Inferiores', image: null, markers: [] });
       }
       
-      items.forEach((item: any) => {
+      extractedItems.forEach((item: any) => {
         if (!item.procedureName) return;
         
         let proc = procedures?.find((p: any) => p.name.toLowerCase().includes(item.procedureName.toLowerCase()) || item.procedureName.toLowerCase().includes(p.name.toLowerCase()));
+        const effectivePrice = Number(item.price) || (proc?.price ? Number(proc.price) : 0);
         
         if (!proc) {
            proc = {
              id: 'imp-' + Date.now() + Math.random().toString(36).substr(2, 5),
-             name: item.procedureName + " (Importado)",
-             price: 0,
+             name: item.procedureName + (isInternalBudget ? '' : ' (Importado)'),
+             price: effectivePrice,
              color: '#8B0000'
            };
            if (setProcedures) {
@@ -421,7 +460,7 @@ export default function DentalCRMView({
                id: `inst-${marker.id}-${proc.id}-${Date.now()}-${Math.random()}`,
                procedureId: proc.id,
                name: proc.name,
-               price: proc.price,
+               price: effectivePrice > 0 ? effectivePrice : proc.price,
                includeFinancial: true,
                status: 'A realizar',
                date: '',
@@ -434,11 +473,11 @@ export default function DentalCRMView({
       });
       
       setActiveSections(newSections);
-      alert('Orçamento importado com sucesso!');
+      alert(isInternalBudget ? 'Orçamento do sistema importado com sucesso (100% dos dentes e valores restaurados)!' : 'Orçamento importado com sucesso via IA!');
       
     } catch (error: any) {
       console.error(error);
-      alert(`Erro ao importar orçamento: ${error?.message || 'Verifique se o formato da imagem é válido e se a API está online.'}`);
+      alert(`Erro ao importar orçamento: ${error?.message || 'Verifique se o formato do arquivo é válido e se a API está online.'}`);
     } finally {
       setIsImportingBudget(false);
       e.target.value = '';

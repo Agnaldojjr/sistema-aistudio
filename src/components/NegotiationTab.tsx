@@ -1123,6 +1123,33 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       doc.setTextColor(255, 255, 255);
       doc.text("Documento gerado eletronicamente - Planejador Odontológico Integrado Dr. Agnaldo Ferreira", 15, 292);
 
+      // Embutir metadados estruturados para reimportação instantânea e determinística sem IA
+      try {
+        const budgetMetadata = {
+          system: "Planejador Odontológico Integrado Dr. Agnaldo Ferreira",
+          type: "AG_ODONTO_BUDGET",
+          version: 1,
+          createdAt: new Date().toISOString(),
+          patientName: patientName || '',
+          patientId: selectedPatient?.id || null,
+          total: chosenSim?.custoTotal || 0,
+          items: flatList.map(item => ({
+            toothNumber: typeof item.tooth === 'number' ? item.tooth : (parseInt(String(item.tooth), 10) || null),
+            toothRaw: String(item.tooth),
+            procedureName: item.name,
+            price: Number(item.price) || 0
+          }))
+        };
+        doc.setProperties({
+          title: "Plano de Tratamento e Orçamento",
+          subject: "Planejador Odontológico Integrado",
+          author: clinicSettings.doctorName || 'Dr. Agnaldo Ferreira',
+          keywords: JSON.stringify(budgetMetadata)
+        });
+      } catch (metaErr) {
+        console.warn("Aviso ao embutir metadados no PDF:", metaErr);
+      }
+
       // Output as Blob
       const pdfBlob = doc.output('blob');
       log("✅ PDF estruturado com sucesso localmente!");
