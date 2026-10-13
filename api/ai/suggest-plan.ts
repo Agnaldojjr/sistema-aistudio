@@ -1,9 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 
 const FALLBACK_MODELS = [
-  process.env.GEMINI_MODEL || "gemini-3.5-flash",
-  "gemini-3-flash-preview",
-  "gemini-flash-latest"
+  process.env.GEMINI_MODEL || "gemini-3-flash-preview",
+  "gemini-flash-latest",
+  "gemini-3.5-flash"
 ];
 
 async function generateWithFallback(ai: GoogleGenAI, payload: any) {

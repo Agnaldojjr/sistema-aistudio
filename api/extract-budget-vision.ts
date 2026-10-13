@@ -3,9 +3,9 @@ import { GoogleGenAI } from "@google/genai";
 export const maxDuration = 60; // 60 seconds timeout for vision/PDF extraction
 
 const FALLBACK_MODELS = [
-  process.env.GEMINI_MODEL || "gemini-3.5-flash",
-  "gemini-3-flash-preview",
-  "gemini-flash-latest"
+  process.env.GEMINI_MODEL || "gemini-3-flash-preview",
+  "gemini-flash-latest",
+  "gemini-3.5-flash"
 ];
 
 async function generateWithFallback(ai: GoogleGenAI, payload: any) {
