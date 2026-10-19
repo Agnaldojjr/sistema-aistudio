@@ -4,6 +4,7 @@ import { createCalendarEvent, deleteCalendarEvent } from '../lib/calendar';
 import { addHours, addMinutes, format, parseISO } from 'date-fns';
 import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
 import { DEFAULT_PROCEDURES } from '../constants';
+import { extractPhoneFromCalendarEvent, parseEventSummaryAndService, phonesMatch } from './DashboardView';
 
 const TIME_SLOTS = Array.from({ length: 48 }, (_, i) => {
   const h = Math.floor(i / 2).toString().padStart(2, '0');
@@ -201,14 +202,15 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
     });
   };
   
-  // Try to parse phone/email from description if editing
+  // Parse phone/email from all fields of existingEvent if editing
   React.useEffect(() => {
-    if (existingEvent?.description) {
-      const pMatch = existingEvent.description.match(/WhatsApp:\s*([\d\+\-\(\)\s]+)/);
-      if (pMatch) setPatientPhone(pMatch[1].trim());
-      
-      const eMatch = existingEvent.description.match(/Email:\s*([^\s]+)/);
-      if (eMatch) setPatientEmail(eMatch[1].trim());
+    if (existingEvent) {
+      const extracted = extractPhoneFromCalendarEvent(existingEvent);
+      if (extracted) setPatientPhone(extracted);
+      if (existingEvent.description) {
+        const eMatch = existingEvent.description.match(/Email(?:\s+do\s+Paciente)?:\s*([^\s]+)/i);
+        if (eMatch) setPatientEmail(eMatch[1].trim());
+      }
     }
   }, [existingEvent]);
 
@@ -249,9 +251,10 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
         attendees.push({ email: patientEmail });
       }
 
+      const { cleanPatientName, extractedService } = parseEventSummaryAndService(title, '');
       const finalProcedureName = procedureSource === 'custom' 
-        ? customProcedureName 
-        : linkedProcedureName || 'Consulta Odontológica';
+        ? (customProcedureName || extractedService) 
+        : linkedProcedureName || extractedService || 'Consulta Odontológica';
 
       const description = `Consulta odontológica: ${finalProcedureName}.\nValor Estimado: R$ ${estimatedValue.toFixed(2)}\n\n${patientPhone ? `WhatsApp do Paciente: ${patientPhone}` : ''}\n${patientEmail ? `Email do Paciente: ${patientEmail}` : ''}`;
       
@@ -276,30 +279,28 @@ export default function EventModal({ onClose, onSaved, onDeleted, selectedDate, 
       if (!crmData.appointments) crmData.appointments = [];
 
       let patientId = selectedPatientObj?.id;
+      let resolvedPatientName = selectedPatientObj?.name || cleanPatientName.toUpperCase();
 
       if (!patientId) {
-        const matched = crmData.patients.find((p: any) => (p.name || '').toLowerCase().trim() === title.toLowerCase().trim());
+        const matched = crmData.patients.find((p: any) => {
+          const pName = (p.name || '').toLowerCase().trim();
+          const tClean = cleanPatientName.toLowerCase().trim();
+          if (patientPhone && phonesMatch(p.mobile || p.phone, patientPhone) && (pName === tClean || pName.startsWith(tClean + ' ') || tClean.startsWith(pName + ' '))) {
+            return true;
+          }
+          return pName === tClean;
+        });
         if (matched) {
           patientId = matched.id;
-        } else {
-          // Auto-create patient record
-          patientId = `pat_${Date.now()}`;
-          const newPat = {
-            id: patientId,
-            name: title.toUpperCase(),
-            phone: patientPhone,
-            mobile: patientPhone,
-            email: patientEmail,
-            createdAt: new Date().toISOString()
-          };
-          crmData.patients.push(newPat);
+          resolvedPatientName = matched.name;
         }
+        // Regra 1B: Não cria paciente automaticamente no CRM apenas ao salvar evento na agenda
       }
 
       const newApptRecord = {
         id: eventId,
         patientId,
-        patientName: title,
+        patientName: resolvedPatientName,
         date,
         time: startTime,
         status: 'Confirmado',

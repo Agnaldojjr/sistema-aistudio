@@ -70,6 +70,7 @@ interface Appointment {
   estimatedValue?: number;
   linkedProcedureId?: string;
   linkedProcedureName?: string;
+  suggestedPatients?: any[];
 }
 
 export const parseCurrency = (v: any): number => {
@@ -87,49 +88,209 @@ interface ReturnControl {
   phone: string;
 }
 
-function extractPhone(text: string): string {
+export function normalizePhoneDigits(phone: string): string {
+  if (!phone) return '';
+  let digits = String(phone).replace(/\D/g, '');
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith('55')) {
+    digits = digits.slice(2);
+  }
+  if ((digits.length === 11 || digits.length === 12) && digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+  return digits;
+}
+
+export function phonesMatch(phoneA?: string, phoneB?: string): boolean {
+  const a = normalizePhoneDigits(phoneA || '');
+  const b = normalizePhoneDigits(phoneB || '');
+  if (a.length < 8 || b.length < 8) return false;
+  if (a === b) return true;
+
+  // Se ambos possuem DDD (10 ou 11 dígitos), exige mesmo DDD + últimos 8 dígitos iguais (cobre nono dígito)
+  if (a.length >= 10 && b.length >= 10) {
+    const dddA = a.slice(0, 2);
+    const dddB = b.slice(0, 2);
+    return dddA === dddB && a.slice(-8) === b.slice(-8);
+  }
+
+  // Se um deles tem apenas o número sem DDD (8 ou 9 dígitos), compara os últimos 8 dígitos
+  return a.slice(-8) === b.slice(-8);
+}
+
+export function extractPhone(text: string): string {
   if (!text) return '';
-  const waRegex = /(?:whatsapp|whats|tel|telefone|celular|fone|contato)(?:\s+do\s+paciente)?\s*:\s*([\d\s\-()]+)/i;
+
+  // 1. Links diretos de WhatsApp (wa.me/55..., api.whatsapp.com/send?phone=...) ou tel:
+  const linkMatch = text.match(/(?:wa\.me\/|phone=|tel:)(\+?\d[\d\s\-().]{7,18}\d)/i);
+  if (linkMatch && linkMatch[1]) {
+    const digits = linkMatch[1].replace(/\D/g, '');
+    if (digits.length >= 8 && digits.length <= 15) return linkMatch[1].trim();
+  }
+
+  // 2. Campos rotulados (WhatsApp:, Tel:, Celular:, Contato:, Fone:, etc.)
+  const waRegex = /(?:whatsapp|whats|wpp|tel|telefone|celular|cel|fone|contato)(?:\s+do\s+paciente)?\s*[:=\-]?\s*(\+?\d[\d\s\-().]{7,20}\d)/i;
   const match = text.match(waRegex);
   if (match && match[1]) {
     const clean = match[1].replace(/\D/g, '');
-    if (clean.length >= 8) return match[1].trim();
+    if (clean.length >= 8 && clean.length <= 15) return match[1].trim();
   }
-  const phoneRegex = /(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?\d{4,5}\s*[-.]?\s*\d{4}/g;
-  const matches = text.match(phoneRegex);
+
+  // Remove datas (YYYY-MM-DD, DD/MM/YYYY) e horas (HH:MM) para evitar falsos positivos
+  const sanitizedText = text
+    .replace(/\b\d{4}[-/]\d{2}[-/]\d{2}\b/g, ' ')
+    .replace(/\b\d{2}[-/]\d{2}[-/]\d{2,4}\b/g, ' ')
+    .replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, ' ')
+    .replace(/R\$\s*[\d.,]+/gi, ' ');
+
+  // 3. Padrão de telefone com DDI/DDD opcional: (31) 99999-9999, 31 99999 9999, +55 31 99999-9999, 99999-9999
+  const phoneRegex = /(?:\+?55\s*[-.]?\s*)?(?:\(?\d{2}\)?\s*[-.]?\s*)?\b9?\d{4}\s*[-.\s]?\s*\d{4}\b/g;
+  const matches = sanitizedText.match(phoneRegex);
   if (matches && matches.length > 0) {
-    return matches[0].trim();
+    for (const candidate of matches) {
+      const digits = candidate.replace(/\D/g, '');
+      if (digits.length >= 8 && digits.length <= 13) {
+        return candidate.trim();
+      }
+    }
   }
+
   return '';
+}
+
+export function extractPhoneFromCalendarEvent(item: any): string {
+  if (!item) return '';
+  const candidateTexts: string[] = [];
+
+  if (item.description) candidateTexts.push(String(item.description));
+  if (item.summary) candidateTexts.push(String(item.summary));
+  if (item.location) candidateTexts.push(String(item.location));
+
+  if (Array.isArray(item.attendees)) {
+    for (const att of item.attendees) {
+      if (att.displayName) candidateTexts.push(String(att.displayName));
+      if (att.comment) candidateTexts.push(String(att.comment));
+      if (att.email) candidateTexts.push(String(att.email));
+    }
+  }
+
+  if (item.extendedProperties) {
+    const priv = item.extendedProperties.private || {};
+    const shared = item.extendedProperties.shared || {};
+    Object.values({ ...priv, ...shared }).forEach((val) => {
+      if (val) candidateTexts.push(String(val));
+    });
+  }
+
+  if (item.source?.title) candidateTexts.push(String(item.source.title));
+  if (item.source?.url) candidateTexts.push(String(item.source.url));
+
+  for (const text of candidateTexts) {
+    const found = extractPhone(text);
+    if (found) return found;
+  }
+
+  return '';
+}
+
+const GENERIC_DENTAL_TERMS = [
+  'consulta', 'de', 'da', 'do', 'limpeza', 'avaliacao', 'retorno', 'orcamento', 'emergencia',
+  'ortodontia', 'aparelho', 'revisao', 'procedimento', 'cirurgia', 'extracao',
+  'clareamento', 'restauracao', 'canal', 'endodontia', 'periodontia', 'profilaxia',
+  'implante', 'protese', 'botox', 'harmonizacao', 'facial', 'lente', 'resina',
+  'porcelana', 'lentes', 'facetas', 'dr', 'dra', 'paciente', 'atendimento',
+  'exame', 'raio-x', 'raiox', 'panoramica', 'periapical', 'tomografia', 'e', 'ou', 'com', 'urgencia', 'manutencao'
+];
+
+function isOnlyDentalTerms(text: string): boolean {
+  const norm = (text || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const words = norm.split(/[\s,.\-/|]+/).filter(w => w.length > 0);
+  if (words.length === 0) return false;
+  return words.every(w => GENERIC_DENTAL_TERMS.includes(w));
+}
+
+export function parseEventSummaryAndService(summary: string, cleanDesc: string): {
+  cleanPatientName: string;
+  extractedService: string;
+} {
+  let working = (summary || 'Consulta Sem Nome').trim();
+
+  // Remove marcadores de origem como 📍 [CELULAR]
+  working = working.replace(/^📍\s*\[CELULAR\]\s*/i, '').replace(/^\[CELULAR\]\s*/i, '').trim();
+
+  // Remove telefones embutidos no título para não sujar o nome do paciente
+  working = working
+    .replace(/(?:whatsapp|whats|wpp|tel|telefone|celular|cel|fone|contato)\s*[:=\-]?\s*(?:\+?55\s*[-.]?\s*)?(?:\(?\d{2}\)?\s*[-.]?\s*)?\b9?\d{4}\s*[-.\s]?\s*\d{4}\b/gi, ' ')
+    .replace(/(?:\+?55\s*[-.]?\s*)?(?:\(\d{2}\)|\b\d{2})\s*[-.]?\s*9?\d{4}\s*[-.\s]?\s*\d{4}\b/g, ' ')
+    .replace(/\b9\d{4}\s*[-.\s]?\s*\d{4}\b/g, ' ')
+    .replace(/\(\s*\)/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  let rawNamePart = working;
+  let extractedProc = '';
+
+  // Separa "Fulano - Avaliação e Limpeza" ou "Fulano | Limpeza" ou "Fulano / Avaliação"
+  const separatorMatch = working.match(/^(.+?)\s*(?:[-–—|/]|:\s+)\s*(.+)$/);
+  if (separatorMatch) {
+    const left = separatorMatch[1].trim();
+    const right = separatorMatch[2].trim();
+
+    // Caso o usuário tenha escrito "Avaliação - Fulano" (procedimento antes do nome)
+    if (isOnlyDentalTerms(left) && !isOnlyDentalTerms(right)) {
+      rawNamePart = right;
+      extractedProc = left;
+    } else {
+      rawNamePart = left;
+      extractedProc = right;
+    }
+  }
+
+  // Remove prefixos comuns antes do nome ("Consulta com Fulano" -> "Fulano")
+  const prefixes = [
+    /^consulta\s+com\s+/i,
+    /^consulta\s+de\s+/i,
+    /^consulta\s+/i,
+    /^paciente\s+/i,
+    /^atendimento\s+/i,
+  ];
+  for (const prefRx of prefixes) {
+    if (prefRx.test(rawNamePart)) {
+      const stripped = rawNamePart.replace(prefRx, '').trim();
+      if (stripped.length >= 2) {
+        rawNamePart = stripped;
+        break;
+      }
+    }
+  }
+
+  // Limpa pontuações residuais nas pontas
+  const cleanPatientName = rawNamePart.replace(/^[\s\-–—|/:,]+|[\s\-–—|/:,]+$/g, '').trim() || working;
+
+  const isGenericDesc = !cleanDesc || cleanDesc === 'Consulta Clínica' || cleanDesc === 'Agendamento via WhatsApp';
+  let extractedService = cleanDesc || 'Consulta Clínica';
+  if (extractedProc) {
+    extractedService = isGenericDesc ? extractedProc : `${extractedProc} • ${cleanDesc}`;
+  }
+
+  return {
+    cleanPatientName,
+    extractedService
+  };
 }
 
 function isPatientAppointment(summary: string, description: string): boolean {
   const lowerSummary = (summary || '').toLowerCase();
   const normalizedSummary = lowerSummary.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   
-  const blockedKeywords = ['reuniao', 'almoco', 'particular', 'bloqueio', 'compromisso', 'ferias', 'folga', 'curso', 'palestra', 'personal', 'maintenance', 'manutencao'];
+  const blockedKeywords = ['reuniao', 'almoco', 'particular', 'bloqueio', 'compromisso', 'ferias', 'folga', 'curso', 'palestra', 'personal', 'maintenance'];
   for (const kw of blockedKeywords) {
     if (normalizedSummary.includes(kw)) {
       return false;
     }
   }
 
-  // Check if it's purely a generic dental appointment title (no patient name included)
-  const genericTerms = [
-    'consulta', 'de', 'limpeza', 'avaliacao', 'retorno', 'orcamento', 'emergencia', 
-    'ortodontia', 'aparelho', 'revisao', 'procedimento', 'cirurgia', 'extracao', 
-    'clareamento', 'restauracao', 'canal', 'endodontia', 'periodontia', 'profilaxia', 
-    'implante', 'protese', 'botox', 'harmonizacao', 'facial', 'lente', 'resina', 
-    'porcelana', 'lentes', 'facetas', 'dr', 'dra', 'paciente', 'atendimento', 
-    'exame', 'raio-x', 'raiox', 'panoramica', 'periapical', 'tomografia', 'e', 'ou', 'com'
-  ];
-  
-  const words = normalizedSummary.split(/[\s,.-]+/).filter(w => w.length > 0);
-  if (words.length > 0) {
-    const hasOnlyGenericTerms = words.every(word => genericTerms.includes(word));
-    if (hasOnlyGenericTerms) {
-      return false;
-    }
+  if (isOnlyDentalTerms(normalizedSummary)) {
+    return false;
   }
 
   return true;
@@ -183,10 +344,14 @@ export default function DashboardView({
   // States for Event Modal (Create / Edit Appointment with Procedure link)
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
-  // States for changing patient association
+  // States for changing / confirming patient association in CRM
   const [isChangePatientOpen, setIsChangePatientOpen] = useState(false);
   const [appointmentToChange, setAppointmentToChange] = useState<Appointment | null>(null);
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
+  const [newPatientLinkName, setNewPatientLinkName] = useState('');
+  const [newPatientLinkPhone, setNewPatientLinkPhone] = useState('');
+  const [pendingActionAfterLink, setPendingActionAfterLink] = useState<'none' | 'planning' | 'open_patient'>('none');
+  const [isSavingPatientLink, setIsSavingPatientLink] = useState(false);
 
   // Search states
   const [searchQuery, setSearchQuery] = useState('');
@@ -313,62 +478,67 @@ export default function DashboardView({
           const eventId = item.id;
           const eventSummary = (item.summary || 'Consulta Sem Nome').trim();
 
+          // Extrai telefone lendo TODOS os campos do evento (summary, description, location, attendees, extendedProperties)
+          const extractedPhone = extractPhoneFromCalendarEvent(item);
+          // Separa o Nome do Paciente do Procedimento (ex: "Fulano 31999999999 - Avaliação e Limpeza")
+          const { cleanPatientName, extractedService } = parseEventSummaryAndService(eventSummary, cleanDesc);
+
           if (!isPatientAppointment(eventSummary, rawDesc)) {
             appts.push({
               id: eventId,
               patientName: eventSummary,
               originalSummary: eventSummary,
               time: timeStr,
-              service: cleanDesc,
+              service: extractedService,
               status: 'Confirmado',
-              phone: '',
+              phone: extractedPhone,
               estimatedValue: 0
             });
             continue;
           }
 
           let associatedAppt = crmData.appointments.find((a: any) => a.id === eventId);
-          let patient = null;
+          let patient: any = null;
 
-          if (associatedAppt) {
-            patient = crmData.patients.find((p: any) => p.id === associatedAppt.patientId);
+          if (associatedAppt && associatedAppt.patientId) {
+            patient = crmData.patients.find((p: any) => p.id === associatedAppt.patientId) || null;
           }
 
+          const normCleanName = cleanPatientName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+          const suggestedPatients: any[] = [];
+
           if (!patient) {
-            const extractedPhone = extractPhone(rawDesc);
-            const normalizedExtractedPhone = extractedPhone.replace(/\D/g, '');
+            // Busca candidatos por telefone e por nome no CRM
+            const phoneMatches = extractedPhone
+              ? crmData.patients.filter((p: any) => phonesMatch(p.mobile || p.phone || p.appProperties?.phone, extractedPhone))
+              : [];
 
-            if (normalizedExtractedPhone) {
-              patient = crmData.patients.find((p: any) => {
-                const pPhone = (p.mobile || p.phone || '').replace(/\D/g, '');
-                return pPhone && pPhone === normalizedExtractedPhone;
-              });
+            const nameMatches = crmData.patients.filter((p: any) => {
+              const pNameClean = (p.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+              if (!pNameClean || pNameClean.length < 2 || !normCleanName) return false;
+              if (pNameClean === normCleanName) return true;
+              if (pNameClean.startsWith(normCleanName + " ") || normCleanName.startsWith(pNameClean + " ")) return true;
+              return false;
+            });
+
+            // Se bater Nome + Telefone em um paciente já existente (ou se houver match único de telefone), vincula ao paciente existente sem duplicar
+            const exactPhoneAndNameMatch = phoneMatches.find((pm: any) => nameMatches.some((nm: any) => nm.id === pm.id));
+            if (exactPhoneAndNameMatch) {
+              patient = exactPhoneAndNameMatch;
+            } else if (phoneMatches.length === 1 && nameMatches.length === 0) {
+              patient = phoneMatches[0];
             }
 
-            if (!patient) {
-              const cleanEventSummary = eventSummary.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-              
-              let assumedName = cleanEventSummary;
-              const prefixes = ["consulta com ", "consulta de ", "consulta ", "retorno ", "avaliacao ", "manutencao ", "paciente ", "dr. ", "dra. ", "dr ", "dra "];
-              for (const pref of prefixes) {
-                if (assumedName.startsWith(pref)) {
-                  assumedName = assumedName.substring(pref.length).trim();
-                  break;
-                }
+            // Monta lista ordenada de sugestões para o modal de confirmação rápida (1B)
+            const seenIds = new Set<string>();
+            for (const p of [...phoneMatches, ...nameMatches]) {
+              if (p && p.id && !seenIds.has(p.id)) {
+                seenIds.add(p.id);
+                suggestedPatients.push(p);
               }
-
-              patient = crmData.patients.find((p: any) => {
-                const pNameClean = (p.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-                if (!pNameClean || pNameClean.length < 3) return false;
-
-                if (pNameClean === assumedName || pNameClean === cleanEventSummary) return true;
-                if (pNameClean.startsWith(assumedName + " ") || pNameClean.startsWith(cleanEventSummary + " ")) return true;
-                if (assumedName.startsWith(pNameClean + " ") || cleanEventSummary.startsWith(pNameClean + " ")) return true;
-
-                return false;
-              });
             }
 
+            // Se encontrou vínculo inequívoco com paciente já existente (Nome + Telefone), registra o vínculo do agendamento
             if (patient) {
               const newApptLink = {
                 id: eventId,
@@ -376,9 +546,9 @@ export default function DashboardView({
                 patientName: patient.name,
                 date: format(selectedAgendaDate, 'yyyy-MM-dd'),
                 time: timeStr,
-                status: 'Confirmado',
-                observations: cleanDesc,
-                createdAt: new Date().toISOString()
+                status: associatedAppt?.status || 'Confirmado',
+                observations: extractedService,
+                createdAt: associatedAppt?.createdAt || new Date().toISOString()
               };
 
               if (associatedAppt) {
@@ -388,53 +558,17 @@ export default function DashboardView({
                 crmData.appointments.push(newApptLink);
               }
               dbChanged = true;
-            } else {
-              const newPatId = `pat_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-              const extractedPhone = extractPhone(rawDesc);
-              const formattedPhone = extractedPhone || '';
-              let finalName = eventSummary.toUpperCase();
-
-              const newPatient = {
-                id: newPatId,
-                name: finalName,
-                codigo_paciente: `COD-${Math.floor(1000 + Math.random() * 9000)}`,
-                phone: formattedPhone,
-                mobile: formattedPhone,
-                healthInsurance: 'PARTICULAR',
-                medicalRecord: '',
-                observations: 'Cadastrado automaticamente via Google Calendar',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              };
-
-              crmData.patients.push(newPatient);
-
-              const newApptLink = {
-                id: eventId,
-                patientId: newPatId,
-                patientName: newPatient.name,
-                date: format(selectedAgendaDate, 'yyyy-MM-dd'),
-                time: timeStr,
-                status: 'Confirmado',
-                observations: cleanDesc,
-                createdAt: new Date().toISOString()
-              };
-
-              crmData.appointments.push(newApptLink);
-              patient = newPatient;
-              dbChanged = true;
             }
+            // IMPORTANTE (Regra 1B): NÃO cria pacientes automaticamente em crmData.patients!
           }
 
           // Calculate or extract estimated procedure value
           let estVal = associatedAppt?.estimatedValue;
           if (estVal === undefined || estVal === null) {
-            // Try to extract value from description or patient plan
             const valMatch = rawDesc.match(/R\$\s*([\d.,]+)/i) || eventSummary.match(/R\$\s*([\d.,]+)/i);
             if (valMatch && valMatch[1]) {
               estVal = parseFloat(valMatch[1].replace('.', '').replace(',', '.'));
             } else {
-              // Default estimate per consulta if patient has plan
               estVal = 200;
             }
           }
@@ -442,15 +576,16 @@ export default function DashboardView({
           appts.push({
             id: eventId,
             patientId: patient?.id,
-            patientName: patient?.name || eventSummary,
+            patientName: patient?.name || cleanPatientName.toUpperCase(),
             originalSummary: eventSummary,
             time: timeStr,
-            service: associatedAppt?.linkedProcedureName || cleanDesc,
+            service: associatedAppt?.linkedProcedureName || extractedService,
             status: associatedAppt?.status || 'Confirmado',
-            phone: patient?.mobile || patient?.phone || extractPhone(rawDesc),
+            phone: patient?.mobile || patient?.phone || extractedPhone,
             estimatedValue: Number(estVal) || 0,
             linkedProcedureId: associatedAppt?.linkedProcedureId,
-            linkedProcedureName: associatedAppt?.linkedProcedureName
+            linkedProcedureName: associatedAppt?.linkedProcedureName,
+            suggestedPatients
           });
         }
 
@@ -860,32 +995,42 @@ export default function DashboardView({
     }
   };
 
-  const handleOpenChangePatient = (appt: Appointment) => {
+  const handleOpenChangePatient = (appt: Appointment, nextAction: 'none' | 'planning' | 'open_patient' = 'none') => {
     setAppointmentToChange(appt);
+    setNewPatientLinkName(appt.patientName || '');
+    setNewPatientLinkPhone(appt.phone || '');
+    setPendingActionAfterLink(nextAction);
     setPatientSearchQuery('');
     setIsChangePatientOpen(true);
   };
 
-  const handleAssociatePatient = async (selectedPatient: any) => {
-    if (!appointmentToChange) return;
-    try {
-      const crmData = await getSupabaseCRMDatabase();
-      if (!crmData.patients) crmData.patients = [];
-      if (!crmData.appointments) crmData.appointments = [];
+  const linkAppointmentsToPatientInDb = (crmData: any, targetAppt: Appointment, patientObj: any) => {
+    const normTargetName = (targetAppt.patientName || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const targetPhone = targetAppt.phone || newPatientLinkPhone;
 
-      const apptId = appointmentToChange.id;
-      const oldPatientId = appointmentToChange.patientId;
+    // Identifica todos os agendamentos do dia que pertencem a este mesmo paciente (mesmo ID, mesmo nome limpo ou mesmo telefone)
+    const matchingAppts = appointments.filter(a => {
+      if (a.id === targetAppt.id) return true;
+      if (a.patientId) return false; // já vinculado
+      const aNormName = (a.patientName || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      if (normTargetName && aNormName === normTargetName) return true;
+      if (targetPhone && a.phone && phonesMatch(a.phone, targetPhone)) return true;
+      return false;
+    });
 
-      const existingApptIdx = crmData.appointments.findIndex((a: any) => a.id === apptId);
+    const linkedIds = new Set<string>();
+    for (const apptItem of matchingAppts) {
+      linkedIds.add(apptItem.id);
+      const existingApptIdx = crmData.appointments.findIndex((a: any) => a.id === apptItem.id);
       const apptData = {
-        id: apptId,
-        patientId: selectedPatient.id,
-        patientName: selectedPatient.name,
+        id: apptItem.id,
+        patientId: patientObj.id,
+        patientName: patientObj.name,
         date: format(selectedAgendaDate, 'yyyy-MM-dd'),
-        time: appointmentToChange.time,
-        status: appointmentToChange.status,
-        observations: appointmentToChange.service,
-        estimatedValue: appointmentToChange.estimatedValue || 200,
+        time: apptItem.time,
+        status: apptItem.status,
+        observations: apptItem.service,
+        estimatedValue: apptItem.estimatedValue || 200,
         createdAt: new Date().toISOString()
       };
 
@@ -894,6 +1039,34 @@ export default function DashboardView({
       } else {
         crmData.appointments.push(apptData);
       }
+    }
+
+    return linkedIds;
+  };
+
+  const handleAssociatePatient = async (selectedPatient: any) => {
+    if (!appointmentToChange || isSavingPatientLink) return;
+    setIsSavingPatientLink(true);
+    try {
+      const crmData = await getSupabaseCRMDatabase();
+      if (!crmData.patients) crmData.patients = [];
+      if (!crmData.appointments) crmData.appointments = [];
+
+      // Se o paciente no CRM ainda não tinha telefone e o agendamento possui telefone extraído, atualiza o cadastro
+      const candidatePhone = (newPatientLinkPhone || appointmentToChange.phone || '').trim();
+      const patIdx = crmData.patients.findIndex((p: any) => p.id === selectedPatient.id);
+      let updatedPatientObj = selectedPatient;
+      if (patIdx >= 0 && candidatePhone && !crmData.patients[patIdx].mobile && !crmData.patients[patIdx].phone) {
+        crmData.patients[patIdx] = {
+          ...crmData.patients[patIdx],
+          phone: candidatePhone,
+          mobile: candidatePhone,
+          updatedAt: new Date().toISOString()
+        };
+        updatedPatientObj = crmData.patients[patIdx];
+      }
+
+      const linkedIds = linkAppointmentsToPatientInDb(crmData, appointmentToChange, updatedPatientObj);
 
       await saveSupabaseCRMDatabase(crmData);
       setCrmFullDb(crmData);
@@ -902,26 +1075,118 @@ export default function DashboardView({
       setRealPatients(enriched);
       
       setAppointments(prev => prev.map(a => {
-        if (a.id === apptId) {
+        if (linkedIds.has(a.id)) {
           return {
             ...a,
-            patientId: selectedPatient.id,
-            patientName: selectedPatient.name,
-            phone: selectedPatient.mobile || selectedPatient.phone || ''
+            patientId: updatedPatientObj.id,
+            patientName: updatedPatientObj.name,
+            phone: updatedPatientObj.mobile || updatedPatientObj.phone || candidatePhone,
+            suggestedPatients: []
           };
         }
         return a;
       }));
 
+      const actionToRun = pendingActionAfterLink;
       setIsChangePatientOpen(false);
       setAppointmentToChange(null);
+      setPendingActionAfterLink('none');
       window.dispatchEvent(new Event('appointments-updated'));
+
+      if (actionToRun === 'planning') {
+        onNavigateToPlanning(updatedPatientObj.name);
+      } else if (actionToRun === 'open_patient') {
+        onOpenPatient(updatedPatientObj.name);
+      }
     } catch (err: any) {
       alert('Erro ao associar paciente: ' + err.message);
+    } finally {
+      setIsSavingPatientLink(false);
     }
   };
 
+  const handleCreateAndAssociatePatient = async () => {
+    if (!appointmentToChange || isSavingPatientLink) return;
+    const cleanName = (newPatientLinkName || appointmentToChange.patientName || '').trim().toUpperCase();
+    if (!cleanName) {
+      alert('Informe o nome do paciente.');
+      return;
+    }
 
+    setIsSavingPatientLink(true);
+    try {
+      const crmData = await getSupabaseCRMDatabase();
+      if (!crmData.patients) crmData.patients = [];
+      if (!crmData.appointments) crmData.appointments = [];
+
+      const cleanPhone = (newPatientLinkPhone || appointmentToChange.phone || '').trim();
+
+      // Verifica se já existe exatamente esse paciente (por telefone + nome ou nome exato) para evitar duplicidade
+      let targetPatient = crmData.patients.find((p: any) => {
+        const pName = (p.name || '').trim().toUpperCase();
+        if (cleanPhone && phonesMatch(p.mobile || p.phone, cleanPhone) && pName === cleanName) return true;
+        return pName === cleanName && (!cleanPhone || !p.mobile || phonesMatch(p.mobile || p.phone, cleanPhone));
+      });
+
+      if (!targetPatient) {
+        const newPatId = `pat_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        targetPatient = {
+          id: newPatId,
+          name: cleanName,
+          codigo_paciente: `COD-${Math.floor(1000 + Math.random() * 9000)}`,
+          phone: cleanPhone,
+          mobile: cleanPhone,
+          healthInsurance: 'PARTICULAR',
+          medicalRecord: '',
+          observations: `Cadastrado via Agenda (${appointmentToChange.service || 'Consulta'})`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        crmData.patients.push(targetPatient);
+      } else if (cleanPhone && !targetPatient.mobile && !targetPatient.phone) {
+        targetPatient.phone = cleanPhone;
+        targetPatient.mobile = cleanPhone;
+        targetPatient.updatedAt = new Date().toISOString();
+      }
+
+      const linkedIds = linkAppointmentsToPatientInDb(crmData, appointmentToChange, targetPatient);
+
+      await saveSupabaseCRMDatabase(crmData);
+      setCrmFullDb(crmData);
+
+      const enriched = await enrichPatients(crmData.patients);
+      setRealPatients(enriched);
+
+      setAppointments(prev => prev.map(a => {
+        if (linkedIds.has(a.id)) {
+          return {
+            ...a,
+            patientId: targetPatient.id,
+            patientName: targetPatient.name,
+            phone: targetPatient.mobile || targetPatient.phone || cleanPhone,
+            suggestedPatients: []
+          };
+        }
+        return a;
+      }));
+
+      const actionToRun = pendingActionAfterLink;
+      setIsChangePatientOpen(false);
+      setAppointmentToChange(null);
+      setPendingActionAfterLink('none');
+      window.dispatchEvent(new Event('appointments-updated'));
+
+      if (actionToRun === 'planning') {
+        onNavigateToPlanning(targetPatient.name);
+      } else if (actionToRun === 'open_patient') {
+        onOpenPatient(targetPatient.name);
+      }
+    } catch (err: any) {
+      alert('Erro ao criar e vincular paciente: ' + err.message);
+    } finally {
+      setIsSavingPatientLink(false);
+    }
+  };
 
   const filteredPatientsForChange = useMemo(() => {
     if (!patientSearchQuery.trim()) return realPatients;
@@ -1208,33 +1473,50 @@ export default function DashboardView({
                         
                         {/* Patient detail & Prontuário Button */}
                         <td className="py-3.5">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span 
                               className="font-bold text-zinc-800 uppercase cursor-pointer hover:text-[#8B0000] hover:underline"
-                              onClick={() => onOpenPatient(appt.patientName)}
+                              onClick={() => appt.patientId ? onOpenPatient(appt.patientName) : handleOpenChangePatient(appt, 'open_patient')}
                             >
                               {appt.patientName}
                             </span>
                             <button
-                              onClick={() => handleOpenDrawer(appt)}
+                              onClick={() => appt.patientId ? handleOpenDrawer(appt) : handleOpenChangePatient(appt)}
                               className="p-1 text-zinc-400 hover:text-[#8B0000] hover:bg-[#8B0000]/10 rounded-md transition-colors cursor-pointer"
                               title="Abrir Prontuário & Evolução Clínica"
                             >
                               <FileText className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          {appt.originalSummary && appt.originalSummary.toUpperCase() !== appt.patientName.toUpperCase() && (
-                            <div className="text-[9px] text-[#C09553] font-medium mt-0.5 truncate max-w-[160px]" title={`Agenda: ${appt.originalSummary}`}>
-                              Agenda: {appt.originalSummary}
+                          {!appt.patientId && (
+                            <div className="mt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenChangePatient(appt)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-bold bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition-colors cursor-pointer"
+                                title="Confirmar vínculo com paciente existente ou criar novo cadastro limpo no CRM"
+                              >
+                                <UserPlus className="w-3 h-3 text-amber-700" />
+                                {(appt.suggestedPatients?.length || 0) > 0
+                                  ? `Vincular ao CRM (${appt.suggestedPatients!.length} sugestão)`
+                                  : 'Confirmar / Cadastrar no CRM'}
+                              </button>
                             </div>
                           )}
-                          <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{appt.phone || 'Sem celular'}</div>
+                          {appt.originalSummary && appt.originalSummary.toUpperCase() !== appt.patientName.toUpperCase() && (
+                            <div className="text-[9px] text-[#C09553] font-medium mt-0.5 truncate max-w-[180px]" title={`Evento original: ${appt.originalSummary}`}>
+                              Evento: {appt.originalSummary}
+                            </div>
+                          )}
+                          <div className="text-[10px] text-zinc-500 font-mono mt-0.5">
+                            {appt.phone ? `📱 ${appt.phone}` : 'Sem celular identificado'}
+                          </div>
                         </td>
 
                         {/* Active Treatment Status Badge */}
                         <td className="py-3.5">
                           <button
-                            onClick={() => handleOpenDrawer(appt)}
+                            onClick={() => appt.patientId ? handleOpenDrawer(appt) : handleOpenChangePatient(appt)}
                             className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9.5px] font-bold border transition-colors cursor-pointer ${treatmentInfo.stageColor}`}
                             title="Clique para ver o prontuário completo"
                           >
@@ -1303,7 +1585,7 @@ export default function DashboardView({
                             </button>
 
                             <button
-                              onClick={() => onNavigateToPlanning(appt.patientName)}
+                              onClick={() => appt.patientId ? onNavigateToPlanning(appt.patientName) : handleOpenChangePatient(appt, 'planning')}
                               className="px-2.5 py-1 bg-[#8B0000] text-white hover:bg-[#6c1b26] transition-colors font-bold text-[10px] rounded cursor-pointer"
                               title="Abrir Planejamento Odontológico"
                             >
@@ -1312,8 +1594,12 @@ export default function DashboardView({
 
                             <button
                               onClick={() => handleOpenChangePatient(appt)}
-                              className="p-1 px-1.5 bg-zinc-50 text-zinc-600 hover:bg-zinc-100 rounded-lg border border-zinc-200 hover:border-zinc-300 transition-colors flex items-center justify-center cursor-pointer"
-                              title="Alterar / Associar Paciente"
+                              className={`p-1 px-1.5 rounded-lg border transition-colors flex items-center justify-center cursor-pointer ${
+                                appt.patientId
+                                  ? 'bg-zinc-50 text-zinc-600 hover:bg-zinc-100 border-zinc-200 hover:border-zinc-300'
+                                  : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border-amber-300'
+                              }`}
+                              title="Vincular a paciente existente ou cadastrar no CRM"
                             >
                               <UserPlus className="w-3.5 h-3.5" />
                             </button>
@@ -1557,69 +1843,167 @@ export default function DashboardView({
         />
       )}
 
-      {/* Change Patient Association Modal */}
-      {isChangePatientOpen && (
+      {/* Confirm / Link Patient Association Modal */}
+      {isChangePatientOpen && appointmentToChange && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl border border-zinc-200 flex flex-col max-h-[85vh]">
+          <div className="w-full max-w-lg bg-white rounded-2xl overflow-hidden shadow-2xl border border-zinc-200 flex flex-col max-h-[90vh]">
             <div className="p-5 border-b border-zinc-100 flex items-center justify-between bg-gradient-to-r from-[#8B0000] to-[#5C0000] text-white">
               <div>
-                <h3 className="font-serif font-bold text-lg">Associar / Alterar Paciente</h3>
-                <p className="text-xs text-white/80 mt-1">
-                  Agendamento: <span className="font-semibold">{appointmentToChange?.originalSummary}</span>
+                <h3 className="font-serif font-bold text-lg">Confirmar Paciente no CRM</h3>
+                <p className="text-xs text-white/80 mt-0.5">
+                  Evento Google Agenda: <span className="font-semibold">{appointmentToChange.originalSummary}</span> ({appointmentToChange.time})
                 </p>
               </div>
               <button 
-                onClick={() => { setIsChangePatientOpen(false); setAppointmentToChange(null); }}
-                className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white"
+                onClick={() => { setIsChangePatientOpen(false); setAppointmentToChange(null); setPendingActionAfterLink('none'); }}
+                className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
-            <div className="p-4 border-b border-zinc-100 bg-zinc-50">
-              <div className="relative flex items-center">
-                <Search className="w-4 h-4 absolute left-3 text-zinc-400" />
-                <input 
-                  type="text"
-                  placeholder="Pesquisar por nome ou WhatsApp..."
-                  value={patientSearchQuery}
-                  onChange={(e) => setPatientSearchQuery(e.target.value)}
-                  className="w-full bg-white border border-zinc-200 text-zinc-800 placeholder-zinc-400 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C09553] focus:border-transparent transition-all"
-                />
+
+            <div className="flex-1 overflow-y-auto divide-y divide-zinc-100">
+              {/* BLOCO 1: SUGESTÕES ENCONTRADAS NO CRM (1 CLIQUE) */}
+              {appointmentToChange.suggestedPatients && appointmentToChange.suggestedPatients.length > 0 && (
+                <div className="p-4 bg-amber-50/60 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-900">
+                      🔗 Paciente(s) Já Encontrado(s) no CRM (Vincular com 1 Clique)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-800">
+                    Encontramos {appointmentToChange.suggestedPatients.length} cadastro(s) compatível(is) por nome ou telefone. Clique para vincular sem duplicar:
+                  </p>
+                  <div className="space-y-1.5 pt-1">
+                    {appointmentToChange.suggestedPatients.map((p: any) => {
+                      const isPhoneMatched = newPatientLinkPhone && phonesMatch(p.mobile || p.phone, newPatientLinkPhone);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          disabled={isSavingPatientLink}
+                          onClick={() => handleAssociatePatient(p)}
+                          className="w-full text-left p-3 bg-white hover:bg-emerald-50/70 rounded-xl flex items-center gap-3 transition-all border border-amber-200 hover:border-emerald-400 shadow-2xs cursor-pointer"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-[#8B0000]/10 flex items-center justify-center text-[#8B0000] font-bold shrink-0">
+                            {p.name ? p.name.charAt(0).toUpperCase() : '?'}
+                          </div>
+                          <div className="truncate flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-bold text-zinc-800 truncate">{p.name}</p>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${isPhoneMatched ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                {isPhoneMatched ? 'Mesmo Telefone' : 'Mesmo Nome'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-zinc-500 font-mono truncate">
+                              {p.mobile || p.phone || 'Sem telefone salvo (será atualizado)'}
+                            </p>
+                          </div>
+                          <span className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold shrink-0">
+                            Vincular
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* BLOCO 2: CRIAR NOVO PACIENTE LIMPO NO CRM */}
+              <div className="p-4 bg-[#FAF8F5] space-y-3">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#8B0000] block">
+                  ➕ Ou Cadastrar Como Novo Paciente no CRM
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-600 uppercase block mb-1">Nome Limpo (Sem Procedimento)</label>
+                    <input
+                      type="text"
+                      value={newPatientLinkName}
+                      onChange={(e) => setNewPatientLinkName(e.target.value)}
+                      placeholder="Ex: FULANO DA SILVA"
+                      className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-xs font-bold text-zinc-800 uppercase focus:outline-none focus:ring-2 focus:ring-[#C09553]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-600 uppercase block mb-1">WhatsApp / Telefone Identificado</label>
+                    <input
+                      type="text"
+                      value={newPatientLinkPhone}
+                      onChange={(e) => setNewPatientLinkPhone(e.target.value)}
+                      placeholder="Ex: 31999999999"
+                      className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-xs font-mono text-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#C09553]"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <span className="text-[10px] text-zinc-500">
+                    Procedimento separado: <strong className="text-zinc-700">{appointmentToChange.service}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={isSavingPatientLink || !newPatientLinkName.trim()}
+                    onClick={handleCreateAndAssociatePatient}
+                    className="px-4 py-2 bg-[#8B0000] hover:bg-[#5C0000] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Criar no CRM & Vincular</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* BLOCO 3: BUSCAR QUALQUER OUTRO PACIENTE DO CRM */}
+              <div className="p-4 space-y-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-400 block">
+                  Buscar Outro Paciente no CRM
+                </span>
+                <div className="relative flex items-center">
+                  <Search className="w-4 h-4 absolute left-3 text-zinc-400" />
+                  <input 
+                    type="text"
+                    placeholder="Pesquisar todos os pacientes por nome ou WhatsApp..."
+                    value={patientSearchQuery}
+                    onChange={(e) => setPatientSearchQuery(e.target.value)}
+                    className="w-full bg-zinc-50 border border-zinc-200 text-zinc-800 placeholder-zinc-400 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#C09553] focus:border-transparent transition-all"
+                  />
+                </div>
+
+                <div className="max-h-48 overflow-y-auto space-y-1 pt-1">
+                  {filteredPatientsForChange.length > 0 ? (
+                    filteredPatientsForChange.map((p: any) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={isSavingPatientLink}
+                        onClick={() => handleAssociatePatient(p)}
+                        className="w-full text-left p-2.5 hover:bg-zinc-50 rounded-xl flex items-center gap-3 transition-colors border border-transparent hover:border-zinc-200 cursor-pointer"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-[#8B0000]/10 flex items-center justify-center text-[#8B0000] font-bold text-xs shrink-0">
+                          {p.name ? p.name.charAt(0).toUpperCase() : '?'}
+                        </div>
+                        <div className="truncate flex-1">
+                          <p className="text-xs font-bold text-zinc-800 truncate">{p.name}</p>
+                          <p className="text-[11px] text-zinc-500 font-mono truncate">{p.mobile || p.phone || 'Sem telefone'}</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-zinc-400" />
+                      </button>
+                    ))
+                  ) : (
+                    <div className="py-6 text-center text-xs text-zinc-500 font-medium">
+                      Nenhum paciente encontrado na busca
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {filteredPatientsForChange.length > 0 ? (
-                filteredPatientsForChange.map((p: any) => (
-                  <button
-                    key={p.id}
-                    onClick={() => handleAssociatePatient(p)}
-                    className="w-full text-left p-3 hover:bg-zinc-50 rounded-xl flex items-center gap-3 transition-colors border border-transparent hover:border-zinc-100"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-[#8B0000]/10 flex items-center justify-center text-[#8B0000] font-bold shrink-0">
-                      {p.name ? p.name.charAt(0).toUpperCase() : '?'}
-                    </div>
-                    <div className="truncate flex-1">
-                      <p className="text-sm font-bold text-zinc-800 truncate">{p.name}</p>
-                      <p className="text-xs text-zinc-500 truncate">{p.mobile || p.phone || 'Sem telefone'}</p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-zinc-400" />
-                  </button>
-                ))
-              ) : (
-                <div className="py-8 text-center text-sm text-zinc-500 font-medium">
-                  Nenhum paciente encontrado
-                </div>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-zinc-100 bg-zinc-50 flex justify-end">
+            <div className="p-3.5 border-t border-zinc-100 bg-zinc-50 flex justify-end">
               <button
-                onClick={() => { setIsChangePatientOpen(false); setAppointmentToChange(null); }}
-                className="px-4 py-2 border border-zinc-200 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-100 transition-colors"
+                type="button"
+                onClick={() => { setIsChangePatientOpen(false); setAppointmentToChange(null); setPendingActionAfterLink('none'); }}
+                className="px-4 py-2 border border-zinc-200 text-zinc-600 rounded-xl text-xs font-bold hover:bg-zinc-100 transition-colors cursor-pointer"
               >
-                Cancelar
+                Fechar
               </button>
             </div>
           </div>
