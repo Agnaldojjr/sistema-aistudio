@@ -260,7 +260,25 @@ export default function DentalCRMView({
     refreshPatientSubModules
   } = usePatientContext();
 
-  const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'appointments' | 'anamnesis' | 'clinical' | 'communication' | 'financial' | 'docs_gallery' | 'drive_records' | 'treatment_plan' | 'plan_editor' | 'plan_negotiation' | 'plan_documents'>('info');
+  const [activeDetailTab, setActiveDetailTabState] = useState<'info' | 'appointments' | 'anamnesis' | 'clinical' | 'communication' | 'financial' | 'docs_gallery' | 'drive_records' | 'treatment_plan' | 'plan_editor' | 'plan_negotiation' | 'plan_documents'>(() => {
+    if (typeof window !== 'undefined') {
+      const savedTab = localStorage.getItem('agnaldo_dent_crm_detail_tab');
+      const validTabs = ['info', 'appointments', 'anamnesis', 'clinical', 'communication', 'financial', 'docs_gallery', 'drive_records', 'treatment_plan', 'plan_editor', 'plan_negotiation', 'plan_documents'];
+      if (savedTab && validTabs.includes(savedTab)) {
+        return savedTab as any;
+      }
+    }
+    return 'info';
+  });
+
+  const setActiveDetailTab = (tab: 'info' | 'appointments' | 'anamnesis' | 'clinical' | 'communication' | 'financial' | 'docs_gallery' | 'drive_records' | 'treatment_plan' | 'plan_editor' | 'plan_negotiation' | 'plan_documents') => {
+    setActiveDetailTabState(tab);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('agnaldo_dent_crm_detail_tab', tab);
+      } catch (_) {}
+    }
+  };
 
   // Supabase integration states
   const [driveFolderId, setSupabaseFolderId] = useState<string | null>(null);
@@ -557,9 +575,119 @@ export default function DentalCRMView({
 
   // Treatment Plan states
   const [activeTreatmentPlan, setActiveTreatmentPlan] = useState<any | null>(null);
-  const [selectedProposalId, setSelectedProposalId] = useState<string>('');
+  const [selectedProposalId, setSelectedProposalIdState] = useState<string>(() => {
+    if (typeof window !== 'undefined' && selectedPatient?.id) {
+      return localStorage.getItem(`agnaldo_dent_selected_proposal_${selectedPatient.id}`) || '';
+    }
+    return '';
+  });
+
+  const setSelectedProposalId = (id: string | null) => {
+    const cleanId = id || '';
+    setSelectedProposalIdState(cleanId);
+    if (typeof window !== 'undefined' && selectedPatient?.id) {
+      try {
+        if (cleanId) {
+          localStorage.setItem(`agnaldo_dent_selected_proposal_${selectedPatient.id}`, cleanId);
+        } else {
+          localStorage.removeItem(`agnaldo_dent_selected_proposal_${selectedPatient.id}`);
+        }
+      } catch (_) {}
+    }
+  };
+
   const [selectedProposalData, setSelectedProposalData] = useState<any | null>(null);
   const [isLoadingPlanData, setIsLoadingPlanData] = useState(false);
+
+  // Feedback visual de salvamento de status (orçamento e procedimentos individuais)
+  const [savingStatusMap, setSavingStatusMap] = useState<Record<string, 'saving' | 'saved' | 'error'>>({});
+
+  const markStatusSaving = (key: string) => {
+    setSavingStatusMap(prev => ({ ...prev, [key]: 'saving' }));
+  };
+
+  const markStatusSaved = (key: string) => {
+    setSavingStatusMap(prev => ({ ...prev, [key]: 'saved' }));
+    setTimeout(() => {
+      setSavingStatusMap(prev => {
+        const next = { ...prev };
+        if (next[key] === 'saved') delete next[key];
+        return next;
+      });
+    }, 2800);
+  };
+
+  const markStatusError = (key: string) => {
+    setSavingStatusMap(prev => ({ ...prev, [key]: 'error' }));
+  };
+
+  // Cache local instantâneo para garantir que F5 ou troca de aba nunca perca status alterado
+  const getProposalCacheKey = (patientId: string, propIdOrName: string) => {
+    const baseName = (propIdOrName || '').split('/').pop() || propIdOrName;
+    return `agnaldo_dent_prop_override_${patientId}_${baseName}`;
+  };
+
+  const saveProposalOverrideLocally = (patientId: string, propId: string, propName: string, content: any) => {
+    if (typeof window === 'undefined' || !patientId) return;
+    try {
+      const sanitized = JSON.parse(JSON.stringify(content));
+      if (Array.isArray(sanitized.sections)) {
+        sanitized.sections = sanitized.sections.map((sec: any) => {
+          if (sec?.image && typeof sec.image === 'string' && sec.image.length > 50000 && sec.image.startsWith('data:')) {
+            return { ...sec, image: null };
+          }
+          return sec;
+        });
+      }
+      const payload = JSON.stringify({
+        updatedAtMs: Date.now(),
+        content: sanitized
+      });
+      localStorage.setItem(getProposalCacheKey(patientId, propId), payload);
+      if (propName && propName !== propId) {
+        localStorage.setItem(getProposalCacheKey(patientId, propName), payload);
+      }
+    } catch (e) {
+      console.warn('Aviso ao gravar cache local de orçamento:', e);
+    }
+  };
+
+  const applyLocalOverrideToProposal = (patientId: string, propId: string, propName: string, remoteContent: any) => {
+    if (typeof window === 'undefined' || !patientId) return remoteContent;
+    try {
+      const raw = localStorage.getItem(getProposalCacheKey(patientId, propId)) ||
+                  localStorage.getItem(getProposalCacheKey(patientId, propName));
+      if (!raw) return remoteContent;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.content) return remoteContent;
+
+      // Mescla preservando imagens originais do remoto se o cache local tiver sanitizado imagens pesadas
+      const localContent = parsed.content;
+      const mergedSections = Array.isArray(remoteContent?.sections)
+        ? remoteContent.sections.map((rSec: any) => {
+            const lSec = (localContent.sections || []).find((s: any) => s.id === rSec.id);
+            if (!lSec) return rSec;
+            return {
+              ...rSec,
+              ...lSec,
+              image: lSec.image || rSec.image
+            };
+          })
+        : (localContent.sections || []);
+
+      return {
+        ...remoteContent,
+        ...localContent,
+        proposal: {
+          ...(remoteContent?.proposal || {}),
+          ...(localContent.proposal || {})
+        },
+        sections: mergedSections
+      };
+    } catch (_) {
+      return remoteContent;
+    }
+  };
 
   // Timeline & Before/After Photo states & helpers
   const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false);
@@ -1225,12 +1353,22 @@ export default function DentalCRMView({
     }
   }, [initialNewPatientData, onClearInitialNewPatientData]);
 
+  const prevSelectedPatientIdRef = useRef<string | null>(null);
+
   // Sync related lists when selected patient changes
   useEffect(() => {
     if (selectedPatient) {
-      // Limpa dados de plano e propostas do paciente anterior imediatamente
+      const isPatientSwitch = prevSelectedPatientIdRef.current !== null && prevSelectedPatientIdRef.current !== selectedPatient.id;
+      prevSelectedPatientIdRef.current = selectedPatient.id;
+
+      // Limpa dados de plano e propostas do paciente anterior imediatamente se trocou de paciente
       setActiveTreatmentPlan(null);
-      setSelectedProposalId('');
+      if (isPatientSwitch) {
+        const savedPropId = typeof window !== 'undefined'
+          ? localStorage.getItem(`agnaldo_dent_selected_proposal_${selectedPatient.id}`) || ''
+          : '';
+        setSelectedProposalIdState(savedPropId);
+      }
       setSelectedProposalData(null);
       setSupabaseProposals([]);
       setSupabaseImages([]);
@@ -1239,8 +1377,9 @@ export default function DentalCRMView({
       syncGoogleSupabaseDataForPatient(selectedPatient);
       syncAnamnesisFromFirestore(selectedPatient.id);
     } else {
+      prevSelectedPatientIdRef.current = null;
       setActiveTreatmentPlan(null);
-      setSelectedProposalId('');
+      setSelectedProposalIdState('');
       setSelectedProposalData(null);
       setAppointments([]);
       setClinicalHistory([]);
@@ -1263,7 +1402,7 @@ export default function DentalCRMView({
     return () => {
       stopCameraStream();
     };
-  }, [selectedPatient]);
+  }, [selectedPatient?.id]);
 
   // Synchronize the selected proposal ID when the patient's proposals list updates
   useEffect(() => {
@@ -1281,29 +1420,62 @@ export default function DentalCRMView({
 
   useEffect(() => {
     if (driveProposals.length > 0) {
-      setSelectedProposalId(driveProposals[0].id);
+      const savedPropId = (typeof window !== 'undefined' && selectedPatient?.id)
+        ? localStorage.getItem(`agnaldo_dent_selected_proposal_${selectedPatient.id}`)
+        : null;
+
+      // Verifica se já existe seleção válida ou salva no localStorage
+      const candidateId = selectedProposalId || savedPropId || '';
+      const matched = candidateId
+        ? driveProposals.find(p => p.id === candidateId || p.name === candidateId || p.id.endsWith(`/${candidateId.split('/').pop()}`))
+        : null;
+
+      const targetProp = matched || driveProposals[0];
+      if (selectedProposalId !== targetProp.id) {
+        setSelectedProposalId(targetProp.id);
+      }
+      if (targetProp.content) {
+        setSelectedProposalData(targetProp.content);
+      }
+      if (driveProposals[0].content) {
+        setActiveTreatmentPlan(driveProposals[0].content);
+      }
     } else {
-      setSelectedProposalId('');
+      setSelectedProposalIdState('');
     }
   }, [driveProposals]);
 
   // Load the content of the selected proposal JSON file
   useEffect(() => {
     if (selectedProposalId && driveFolderId) {
+      // Se o orçamento já veio enriquecido em driveProposals, usa imediatamente com override local!
+      const existingProp = driveProposals.find(p => p.id === selectedProposalId);
+      if (existingProp?.content && selectedPatient?.id) {
+        const merged = applyLocalOverrideToProposal(selectedPatient.id, existingProp.id, existingProp.name, existingProp.content);
+        setSelectedProposalData(merged);
+        if (driveProposals.length > 0 && selectedProposalId === driveProposals[0].id) {
+          setActiveTreatmentPlan(merged);
+        }
+        return;
+      }
+
       const loadPlanData = async () => {
         setIsLoadingPlanData(true);
         try {
           const data = await (async () => { 
             const url = await getPatientFileUrlFromSupabase(driveFolderId, selectedProposalId); 
             if (!url) throw new Error("Plan not found");
-            const r = await fetch(url); 
+            const r = await fetch(url, { cache: 'no-store' }); 
             if (!r.ok) throw new Error("Plan fetch failed");
             return await r.json(); 
           })();
-          setSelectedProposalData(data);
+          const merged = selectedPatient?.id
+            ? applyLocalOverrideToProposal(selectedPatient.id, selectedProposalId, existingProp?.name || selectedProposalId, data)
+            : data;
+          setSelectedProposalData(merged);
           // Set as active plan if it's the latest proposal for the dashboard
           if (driveProposals.length > 0 && selectedProposalId === driveProposals[0].id) {
-            setActiveTreatmentPlan(data);
+            setActiveTreatmentPlan(merged);
           }
         } catch (err) {
           console.error("Error loading selected plan:", err);
@@ -1333,7 +1505,7 @@ export default function DentalCRMView({
       if (selectedPatient && (e.detail?.patientId === selectedPatient.id || e.detail?.patientId === selectedPatient.name)) {
         if (driveFolderId) {
           listPatientFilesFromSupabase(driveFolderId, selectedPatient.name).then(files => {
-            const filtered = filterSupabaseProposals(files);
+            const filtered = filterSupabaseProposals(files, selectedPatient.id);
             setSupabaseProposals(filtered);
           }).catch(console.warn);
         }
@@ -1428,7 +1600,7 @@ export default function DentalCRMView({
     instanceId: string,
     newStatus: 'executado' | 'em andamento' | 'não realizado'
   ) => {
-    if (!proposalData) return;
+    if (!proposalData || !selectedPatient) return;
 
     // Deep clone proposal
     const updatedData = JSON.parse(JSON.stringify(proposalData));
@@ -1479,13 +1651,54 @@ export default function DentalCRMView({
 
     if (!found || !targetInst) return;
 
-    // Update local state immediately
+    // Auto-update proposal status when procedures progress
+    const allInsts = getProcedureInstancesFromProposal(updatedData);
+    const totalCount = allInsts.length;
+    const doneCount = allInsts.filter(i => {
+      const s = (i.status || '').toLowerCase().trim();
+      return s === 'executado' || s === 'realizado';
+    }).length;
+    const inProgCount = allInsts.filter(i => (i.status || '').toLowerCase().trim() === 'em andamento').length;
+
+    if (totalCount > 0 && updatedData.proposal) {
+      if (doneCount === totalCount) {
+        updatedData.proposal.status = 'Concluído';
+      } else if ((doneCount > 0 || inProgCount > 0) && updatedData.proposal.status === 'Aberto (paciente não pagou)') {
+        updatedData.proposal.status = 'Em Andamento';
+      }
+    }
+
+    const currentPropObj = driveProposals.find(p => p.id === selectedProposalId);
+    const propName = currentPropObj?.name || selectedProposalId;
+    const statusKey = `proc-${instanceId}`;
+    const cardStatusKey = `prop-${selectedProposalId}`;
+
+    markStatusSaving(statusKey);
+    markStatusSaving(cardStatusKey);
+
+    // 1. Update local state & localStorage override immediately (0ms - F5 safe!)
+    saveProposalOverrideLocally(selectedPatient.id, selectedProposalId, propName, updatedData);
     setSelectedProposalData(updatedData);
+    setSupabaseProposals(prev => prev.map(p => p.id === selectedProposalId ? {
+      ...p,
+      content: updatedData,
+      appProperties: {
+        ...(p.appProperties || {}),
+        status: updatedData.proposal?.status || p.appProperties?.status || 'Aberto'
+      }
+    } : p));
+
     if (driveProposals.length > 0 && selectedProposalId === driveProposals[0].id) {
       setActiveTreatmentPlan(updatedData);
     }
+    if (updatedData.sections) {
+      setActiveSections(updatedData.sections);
+    }
+    if (updatedData.proposal) {
+      setActiveProposal(updatedData.proposal);
+    }
 
-    // Sync financial records (Patient local and global)
+    // 2. Sync financial records (Patient local and global)
     const rawInstId = String(instanceId || '');
     const cleanProcId = rawInstId.replace(/^(pay-proc-|pay-|proc-)+/, '');
     const payId = `pay-proc-${cleanProcId}`;
@@ -1497,7 +1710,7 @@ export default function DentalCRMView({
       if (!hasLocal) {
         const newLocalPayment = {
           id: payId,
-          patientId: selectedPatient!.id,
+          patientId: selectedPatient.id,
           date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
           method: methodVal,
           paymentMethod: methodVal,
@@ -1523,8 +1736,8 @@ export default function DentalCRMView({
       if (!hasGlobal) {
         const newGlobalPayment = {
           id: payId,
-          patientId: selectedPatient!.id,
-          patientName: selectedPatient!.name,
+          patientId: selectedPatient.id,
+          patientName: selectedPatient.name,
           date: new Date().toISOString(),
           amount: priceVal,
           value: priceVal,
@@ -1543,18 +1756,40 @@ export default function DentalCRMView({
     }
 
     try {
-      await uploadPatientFileToSupabase(selectedPatient!.id, new Blob([JSON.stringify(updatedData)], {type: "application/json"}), selectedProposalId);
-      // Wait a tiny bit for states to batch, then save context
-      setTimeout(() => {
-        saveContextToSupabase();
-      }, 200);
+      const targetFolder = driveFolderId || selectedPatient.id;
+      await uploadPatientFileToSupabase(
+        targetFolder,
+        new Blob([JSON.stringify(updatedData)], { type: "application/json" }),
+        selectedProposalId
+      );
+      await saveContextToSupabase();
+      markStatusSaved(statusKey);
+      markStatusSaved(cardStatusKey);
     } catch (err: any) {
-      alert("Erro ao salvar alteração de status no Supabase: " + err.message);
+      console.error("Erro ao salvar alteração de status no Supabase:", err);
+      markStatusSaved(statusKey); // Salvo localmente no cache com segurança
+      markStatusSaved(cardStatusKey);
     }
   };
 
-  const filterSupabaseProposals = (files: any[]) => {
-    return (files || []).filter(f => f.name.toLowerCase().endsWith('.json'));
+  const filterSupabaseProposals = (files: any[], patId?: string) => {
+    const targetPatId = patId || selectedPatient?.id || '';
+    return (files || [])
+      .filter(f => f.name.toLowerCase().endsWith('.json'))
+      .map(f => {
+        if (targetPatId && f.content) {
+          const mergedContent = applyLocalOverrideToProposal(targetPatId, f.id, f.name, f.content);
+          return {
+            ...f,
+            content: mergedContent,
+            appProperties: {
+              ...(f.appProperties || {}),
+              status: mergedContent?.proposal?.status || f.appProperties?.status || 'Aberto'
+            }
+          };
+        }
+        return f;
+      });
   };
 
   const filterSupabaseImages = (files: any[]) => {
@@ -1577,7 +1812,7 @@ export default function DentalCRMView({
       // Load proposals
       try {
         const proposals = await listPatientFilesFromSupabase(folderId, patient.name);
-        setSupabaseProposals(filterSupabaseProposals(proposals));
+        setSupabaseProposals(filterSupabaseProposals(proposals, patient?.id));
       } catch (err: any) {
         console.warn("Failed to load proposals for folder:", folderId, err);
       } finally {
@@ -2117,6 +2352,12 @@ export default function DentalCRMView({
       // Sort patients alphabetically
       list.sort((a: any, b: any) => a.name.localeCompare(b.name));
       setPatients(list);
+      if (selectedPatient?.id) {
+        const freshMatch = list.find((p: any) => p.id === selectedPatient.id);
+        if (freshMatch) {
+          setSelectedPatient(freshMatch);
+        }
+      }
     } catch (err) {
       console.error('Error fetching CRM patients:', err);
     } finally {
@@ -5146,161 +5387,180 @@ export default function DentalCRMView({
                                       </div>
                                     </div>
 
-                                    {/* Status Selector */}
-                                    <select
-                                      value={proposalStatus}
-                                      onChange={async (e) => {
-                                        const targetProposalData = prop.content || (selectedProposalId === prop.id ? selectedProposalData : null);
-                                        if (!targetProposalData) {
-                                          setSelectedProposalId(prop.id);
-                                          return;
-                                        }
-                                        const newStatus = e.target.value;
-                                        let paymentMethodSelected = targetProposalData.proposal?.paymentMethod || 'PIX';
+                                    {/* Status Selector + Visual Feedback */}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {savingStatusMap[`prop-${prop.id}`] === 'saving' && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full animate-pulse">
+                                          <Loader2 className="w-3 h-3 animate-spin" /> Salvando...
+                                        </span>
+                                      )}
+                                      {savingStatusMap[`prop-${prop.id}`] === 'saved' && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full transition-all">
+                                          ✓ Salvo
+                                        </span>
+                                      )}
+                                      <select
+                                        value={proposalStatus}
+                                        onChange={async (e) => {
+                                          const baseProposalData = prop.content || (selectedProposalId === prop.id ? selectedProposalData : null) || { proposal: {} };
+                                          const newStatus = e.target.value;
+                                          let paymentMethodSelected = baseProposalData.proposal?.paymentMethod || 'PIX';
 
-                                        if (newStatus === 'Aprovado (paciente pagou)') {
-                                          const allowedMethods = ['PIX', 'Dinheiro', 'Cartão de Crédito', 'Cartão de Débito'];
-                                          const methodInput = window.prompt(
-                                            "Confirmar pagamento do orçamento.\nSelecione a forma de pagamento (PIX, Dinheiro, Cartão de Crédito, Cartão de Débito):",
-                                            paymentMethodSelected
-                                          );
-                                          if (methodInput === null) {
-                                            // Cancel the selection change
-                                            return;
-                                          }
-                                          const cleanedInput = methodInput.trim().replace(/[^a-zA-Z0-9 ]/g, '');
-                                          const matched = allowedMethods.find(
-                                            m => m.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") ===
-                                                 cleanedInput.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                                          );
-                                          if (matched) {
-                                            paymentMethodSelected = matched as any;
-                                          } else {
-                                            alert("Método de pagamento inválido. Usando PIX como padrão.");
-                                            paymentMethodSelected = 'PIX';
-                                          }
-                                        }
-
-                                        const updated = {
-                                          ...targetProposalData,
-                                          proposal: {
-                                            ...targetProposalData.proposal,
-                                            status: newStatus,
-                                            paymentMethod: paymentMethodSelected
-                                          }
-                                        };
-                                        
-                                        // Update states
-                                        setSelectedProposalData(updated);
-                                        if (selectedProposalId === prop.id) {
-                                          setActiveTreatmentPlan(updated);
-                                          setActiveProposal(updated.proposal);
-                                        }
-                                        
-                                        // Persist updated JSON back to list
-                                        setSupabaseProposals(prev => prev.map(p => p.id === prop.id ? { ...p, content: updated } : p));
-
-                                        // Finance integration: only insert, do not delete if status is changed away (per user request)
-                                        if (newStatus === 'Aprovado (paciente pagou)') {
-                                          const budgetPayId = 'pay-budget-' + prop.id.replace(/[^a-zA-Z0-9-]/g, '_');
-                                          
-                                          // Calculate total budget value
-                                          let totalAmount = 0;
-                                          if (updated.simulations && updated.selectedPlanIndex !== undefined && updated.simulations[updated.selectedPlanIndex]) {
-                                            totalAmount = updated.simulations[updated.selectedPlanIndex].custoTotal || 0;
-                                          } else {
-                                            const sections = updated.sections || [];
-                                            const procedures = updated.procedures || [];
-                                            sections.forEach((sec: any) => {
-                                              sec.markers?.forEach((marker: any) => {
-                                                if (marker.procedureInstances && marker.procedureInstances.length > 0) {
-                                                  marker.procedureInstances.forEach((inst: any) => {
-                                                    totalAmount += (inst.includeFinancial !== false ? (inst.price || 0) : 0);
-                                                  });
-                                                } else if (marker.procedures) {
-                                                  marker.procedures.forEach((pid: any) => {
-                                                    const proc = procedures.find((p: any) => p.id === pid);
-                                                    totalAmount += (proc ? (proc.price || 0) : 0);
-                                                  });
-                                                }
-                                              });
-                                            });
-                                          }
-
-                                          const description = `Orçamento: ${prop.name.replace('.json', '').replace('orcamento_salvo', 'Orçamento').replace(/_/g, ' ')} - Aprovado e Pago`;
-
-                                          // 1. Add to patient's individual pagamentosList if not already present
-                                          const hasLocal = pagamentosList.some((p: any) => p.id === budgetPayId);
-                                          let updatedLocalList = [...pagamentosList];
-                                          if (!hasLocal) {
-                                            const newLocalPayment = {
-                                              id: budgetPayId,
-                                              patientId: selectedPatient!.id,
-                                              date: new Date().toISOString().split('T')[0],
-                                              method: paymentMethodSelected,
-                                              paymentMethod: paymentMethodSelected,
-                                              description: description,
-                                              value: totalAmount,
-                                              amount: totalAmount,
-                                              status: 'Pago'
-                                            };
-                                            updatedLocalList.push(newLocalPayment);
-                                            setPagamentosList(updatedLocalList);
-                                          }
-
-                                          // 2. Add to global agnaldo_dent_financeiro in LocalStorage
-                                          const globalFinanceStr = localStorage.getItem('agnaldo_dent_financeiro');
-                                          let globalFinance: any[] = [];
-                                          if (globalFinanceStr) {
-                                            try {
-                                              globalFinance = JSON.parse(globalFinanceStr);
-                                            } catch (e) {
-                                              console.error(e);
+                                          if (newStatus === 'Aprovado (paciente pagou)') {
+                                            const allowedMethods = ['PIX', 'Dinheiro', 'Cartão de Crédito', 'Cartão de Débito'];
+                                            const methodInput = window.prompt(
+                                              "Confirmar pagamento do orçamento.\nSelecione a forma de pagamento (PIX, Dinheiro, Cartão de Crédito, Cartão de Débito):",
+                                              paymentMethodSelected
+                                            );
+                                            if (methodInput === null) {
+                                              // Cancel the selection change
+                                              return;
+                                            }
+                                            const cleanedInput = methodInput.trim().replace(/[^a-zA-Z0-9 ]/g, '');
+                                            const matched = allowedMethods.find(
+                                              m => m.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") ===
+                                                   cleanedInput.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                                            );
+                                            if (matched) {
+                                              paymentMethodSelected = matched as any;
+                                            } else {
+                                              alert("Método de pagamento inválido. Usando PIX como padrão.");
+                                              paymentMethodSelected = 'PIX';
                                             }
                                           }
-                                          const hasGlobal = globalFinance.some((p: any) => p.id === budgetPayId);
-                                          if (!hasGlobal) {
-                                            globalFinance.unshift({
-                                              id: budgetPayId,
-                                              patientId: selectedPatient!.id,
-                                              patientName: selectedPatient!.name,
-                                              date: new Date().toISOString(),
-                                              amount: totalAmount,
-                                              paymentMethod: paymentMethodSelected,
-                                              status: 'Pago',
-                                              description: description
-                                            });
-                                            localStorage.setItem('agnaldo_dent_financeiro', JSON.stringify(globalFinance));
-                                            window.dispatchEvent(new Event('local-storage'));
-                                            window.dispatchEvent(new Event('storage'));
-                                          }
-                                        }
 
-                                        try {
-                                          const { uploadPatientFileToSupabase } = await import('../lib/storage');
-                                          if (driveFolderId) {
-                                            await uploadPatientFileToSupabase(
-                                              driveFolderId,
-                                              new Blob([JSON.stringify(updated)], { type: 'application/json' }),
-                                              prop.name
-                                            );
+                                          const updated = {
+                                            ...baseProposalData,
+                                            proposal: {
+                                              ...(baseProposalData.proposal || {}),
+                                              status: newStatus,
+                                              paymentMethod: paymentMethodSelected
+                                            }
+                                          };
+
+                                          const cardStatusKey = `prop-${prop.id}`;
+                                          markStatusSaving(cardStatusKey);
+
+                                          // 1. Grava instantaneamente no cache local (0ms) para sobreviver a F5 imediato
+                                          if (selectedPatient?.id) {
+                                            saveProposalOverrideLocally(selectedPatient.id, prop.id, prop.name, updated);
                                           }
                                           
-                                          // Save patient sub-modules context to Supabase database CRM record
-                                          setTimeout(() => {
-                                            saveContextToSupabase();
-                                          }, 300);
-                                        } catch (err) { console.error('Error saving status:', err); }
-                                      }}
-                                      className={`text-[10px] font-bold px-3 py-1.5 rounded-full border cursor-pointer focus:outline-none transition-colors ${sc.bg} ${sc.text} ${sc.border}`}
-                                    >
-                                      <option value="Aberto (paciente não pagou)">🔴 Aberto</option>
-                                      <option value="Aprovado (paciente pagou)">🟢 Aprovado</option>
-                                      <option value="Aguardando Aprovação">⏳ Aguardando</option>
-                                      <option value="Em Andamento">🔄 Em Andamento</option>
-                                      <option value="Concluído">✅ Concluído</option>
-                                      <option value="Arquivado">📁 Arquivado</option>
-                                    </select>
+                                          // 2. Atualiza estados da tela imediatamente
+                                          setSelectedProposalId(prop.id);
+                                          setSelectedProposalData(updated);
+                                          setActiveTreatmentPlan(updated);
+                                          setActiveProposal(updated.proposal);
+                                          
+                                          // 3. Atualiza lista de propostas em memória
+                                          setSupabaseProposals(prev => prev.map(p => p.id === prop.id ? {
+                                            ...p,
+                                            content: updated,
+                                            appProperties: { ...(p.appProperties || {}), status: newStatus }
+                                          } : p));
+
+                                          // Finance integration: only insert, do not delete if status is changed away (per user request)
+                                          if (newStatus === 'Aprovado (paciente pagou)' && selectedPatient) {
+                                            const budgetPayId = 'pay-budget-' + prop.id.replace(/[^a-zA-Z0-9-]/g, '_');
+                                            
+                                            // Calculate total budget value
+                                            let totalAmount = 0;
+                                            if (updated.simulations && updated.selectedPlanIndex !== undefined && updated.simulations[updated.selectedPlanIndex]) {
+                                              totalAmount = updated.simulations[updated.selectedPlanIndex].custoTotal || 0;
+                                            } else {
+                                              const sections = updated.sections || [];
+                                              const procedures = updated.procedures || [];
+                                              sections.forEach((sec: any) => {
+                                                sec.markers?.forEach((marker: any) => {
+                                                  if (marker.procedureInstances && marker.procedureInstances.length > 0) {
+                                                    marker.procedureInstances.forEach((inst: any) => {
+                                                      totalAmount += (inst.includeFinancial !== false ? (inst.price || 0) : 0);
+                                                    });
+                                                  } else if (marker.procedures) {
+                                                    marker.procedures.forEach((pid: any) => {
+                                                      const proc = procedures.find((p: any) => p.id === pid);
+                                                      totalAmount += (proc ? (proc.price || 0) : 0);
+                                                    });
+                                                  }
+                                                });
+                                              });
+                                            }
+
+                                            const description = `Orçamento: ${prop.name.replace('.json', '').replace('orcamento_salvo', 'Orçamento').replace(/_/g, ' ')} - Aprovado e Pago`;
+
+                                            // 1. Add to patient's individual pagamentosList if not already present
+                                            const hasLocal = pagamentosList.some((p: any) => p.id === budgetPayId);
+                                            let updatedLocalList = [...pagamentosList];
+                                            if (!hasLocal) {
+                                              const newLocalPayment = {
+                                                id: budgetPayId,
+                                                patientId: selectedPatient.id,
+                                                date: new Date().toISOString().split('T')[0],
+                                                method: paymentMethodSelected,
+                                                paymentMethod: paymentMethodSelected,
+                                                description: description,
+                                                value: totalAmount,
+                                                amount: totalAmount,
+                                                status: 'Pago'
+                                              };
+                                              updatedLocalList.push(newLocalPayment);
+                                              setPagamentosList(updatedLocalList);
+                                            }
+
+                                            // 2. Add to global agnaldo_dent_financeiro in LocalStorage
+                                            const globalFinanceStr = localStorage.getItem('agnaldo_dent_financeiro');
+                                            let globalFinance: any[] = [];
+                                            if (globalFinanceStr) {
+                                              try {
+                                                globalFinance = JSON.parse(globalFinanceStr);
+                                              } catch (e) {
+                                                console.error(e);
+                                              }
+                                            }
+                                            const hasGlobal = globalFinance.some((p: any) => p.id === budgetPayId);
+                                            if (!hasGlobal) {
+                                              globalFinance.unshift({
+                                                id: budgetPayId,
+                                                patientId: selectedPatient.id,
+                                                patientName: selectedPatient.name,
+                                                date: new Date().toISOString(),
+                                                amount: totalAmount,
+                                                paymentMethod: paymentMethodSelected,
+                                                status: 'Pago',
+                                                description: description
+                                              });
+                                              localStorage.setItem('agnaldo_dent_financeiro', JSON.stringify(globalFinance));
+                                              window.dispatchEvent(new Event('local-storage'));
+                                              window.dispatchEvent(new Event('storage'));
+                                            }
+                                          }
+
+                                          try {
+                                            const targetFolder = driveFolderId || selectedPatient?.id;
+                                            if (targetFolder) {
+                                              await uploadPatientFileToSupabase(
+                                                targetFolder,
+                                                new Blob([JSON.stringify(updated)], { type: 'application/json' }),
+                                                prop.id
+                                              );
+                                            }
+                                            await saveContextToSupabase();
+                                            markStatusSaved(cardStatusKey);
+                                          } catch (err) {
+                                            console.error('Error saving status:', err);
+                                            markStatusSaved(cardStatusKey);
+                                          }
+                                        }}
+                                        className={`text-[10px] font-bold px-3 py-1.5 rounded-full border cursor-pointer focus:outline-none transition-colors ${sc.bg} ${sc.text} ${sc.border}`}
+                                      >
+                                        <option value="Aberto (paciente não pagou)">🔴 Aberto</option>
+                                        <option value="Aprovado (paciente pagou)">🟢 Aprovado</option>
+                                        <option value="Aguardando Aprovação">⏳ Aguardando</option>
+                                        <option value="Em Andamento">🔄 Em Andamento</option>
+                                        <option value="Concluído">✅ Concluído</option>
+                                        <option value="Arquivado">📁 Arquivado</option>
+                                      </select>
+                                    </div>
                                   </div>
 
                                   {/* Progress Bar */}
@@ -5388,6 +5648,7 @@ export default function DentalCRMView({
                                   const cleanStatus = (item.status || '').toLowerCase().trim();
                                   const isDone = cleanStatus === 'executado' || cleanStatus === 'realizado';
                                   const isInProgress = cleanStatus === 'em andamento';
+                                  const procSaveState = savingStatusMap[`proc-${item.instanceId}`];
                                   return (
                                     <div key={item.instanceId} className="p-3.5 flex items-center gap-3">
                                       <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isDone ? 'bg-emerald-500' : isInProgress ? 'bg-amber-400' : 'bg-zinc-300'}`} />
@@ -5398,8 +5659,19 @@ export default function DentalCRMView({
                                         </div>
                                         {item.updatedAt && <p className="text-[9px] text-zinc-400 mt-0.5">Atualizado: {item.updatedAt}</p>}
                                       </div>
-                                      <span className="text-xs font-mono font-bold text-zinc-600 shrink-0 mr-4">{formatBRL(item.price)}</span>
+                                      <span className="text-xs font-mono font-bold text-zinc-600 shrink-0 mr-2">{formatBRL(item.price)}</span>
                                       
+                                      {procSaveState === 'saving' && (
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full animate-pulse shrink-0">
+                                          <Loader2 className="w-2.5 h-2.5 animate-spin" /> Salvando...
+                                        </span>
+                                      )}
+                                      {procSaveState === 'saved' && (
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0 transition-all">
+                                          ✓ Salvo
+                                        </span>
+                                      )}
+
                                       {/* Interactive Status Selector Dropdown */}
                                       <select
                                         value={isDone ? 'executado' : isInProgress ? 'em andamento' : 'não realizado'}

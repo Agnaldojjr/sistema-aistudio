@@ -76,7 +76,33 @@ const INITIAL_PROPOSAL: TreatmentProposal = {
 const isPresentation = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'presentation';
 
 export function PatientProvider({ children }: { children: ReactNode }) {
-  const [selectedPatient, setSelectedPatient] = useState<CRMPatient | null>(null);
+  const [selectedPatient, setSelectedPatientState] = useState<CRMPatient | null>(() => {
+    if (typeof window === 'undefined' || isPresentation) return null;
+    try {
+      const saved = localStorage.getItem('agnaldo_dent_selected_patient');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id && parsed.name) {
+          return parsed;
+        }
+      }
+    } catch (_) {}
+    return null;
+  });
+
+  const setSelectedPatient = useCallback((patient: CRMPatient | null) => {
+    setSelectedPatientState(patient);
+    if (typeof window !== 'undefined' && !isPresentation) {
+      try {
+        if (patient && patient.id) {
+          localStorage.setItem('agnaldo_dent_selected_patient', JSON.stringify(patient));
+        } else {
+          localStorage.removeItem('agnaldo_dent_selected_patient');
+        }
+      } catch (_) {}
+    }
+  }, []);
+
   const [appointments, setAppointments] = useState<CRMAppointment[]>([]);
   const [clinicalHistory, setClinicalHistory] = useState<CRMClinicalHistory[]>([]);
   const [communications, setCommunications] = useState<CRMCommunication[]>([]);

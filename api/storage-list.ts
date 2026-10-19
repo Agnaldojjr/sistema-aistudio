@@ -81,7 +81,10 @@ export default async function handler(req: Request) {
             if (item.name && !item.name.endsWith(".emptyFolderPlaceholder") && item.id !== null) {
               const fullStoragePath = `${folder}/${item.name}`;
               if (!foundFilesMap.has(item.name)) {
-                const publicUrl = `${supabaseUrl}/storage/v1/object/public/${targetBucket}/${fullStoragePath}`;
+                const basePublicUrl = `${supabaseUrl}/storage/v1/object/public/${targetBucket}/${fullStoragePath}`;
+                const publicUrl = item.name.endsWith(".json")
+                  ? `${basePublicUrl}?_t=${Date.now()}`
+                  : basePublicUrl;
                 const isOrcamento = folder.endsWith("Orcamentos");
                 const displayName = isOrcamento ? `Orcamentos/${item.name}` : item.name;
 
@@ -179,7 +182,11 @@ export default async function handler(req: Request) {
       }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+        },
       }
     );
   } catch (err: any) {

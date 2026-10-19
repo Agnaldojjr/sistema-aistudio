@@ -110,8 +110,26 @@ export async function uploadPatientFileToSupabase(patientIdentifier: string, fil
   const targetFolder = getSafePatientPath(patientIdentifier);
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
   
-  const finalFilename = getSafeFilename(filename);
-  const filePath = filename.includes('/') ? filename : `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
+  let filePath: string;
+  let finalFilename: string;
+
+  if (filename.startsWith('clinic-master/') || filename.startsWith(`${userId}/`)) {
+    filePath = filename;
+    finalFilename = filename.split('/').pop() || 'orcamento.json';
+  } else if (filename.includes('/')) {
+    const parts = filename.split('/').filter(Boolean);
+    finalFilename = getSafeFilename(parts[parts.length - 1] || 'orcamento.json');
+    if (parts[0] === 'Orcamentos' || parts.includes('Orcamentos')) {
+      filePath = `${userId}/${targetFolder}/Orcamentos/${finalFilename}`;
+    } else if (parts[0] === targetFolder) {
+      filePath = `${userId}/${filename.replace(/^\/+/, '')}`;
+    } else {
+      filePath = `${userId}/${targetFolder}/${filename.replace(/^\/+/, '')}`;
+    }
+  } else {
+    finalFilename = getSafeFilename(filename);
+    filePath = `${userId}/${targetFolder}/${subfolderPath}${finalFilename}`;
+  }
 
   // 1. Prioridade Máxima: Enviar via endpoint serverless (/api/storage-upload)
   // Bypassa restrições de RLS do navegador e sincroniza a galeria automaticamente
@@ -200,10 +218,11 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
         patientId: idPath,
         ...(fallbackPath ? { patientName: fallbackPath } : {}),
         ...(subfolder ? { subfolder } : {}),
-        ...(userId ? { userId } : {})
+        ...(userId ? { userId } : {}),
+        _t: String(Date.now())
       });
 
-      const res = await fetch(`/api/storage-list?${params.toString()}`);
+      const res = await fetch(`/api/storage-list?${params.toString()}`, { cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.files)) {
@@ -211,7 +230,9 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
           const enriched = await Promise.all(json.files.map(async (file: any) => {
             if (file.name?.toLowerCase().endsWith('.json') && file.thumbnailLink) {
               try {
-                const r = await fetch(file.thumbnailLink);
+                const separator = file.thumbnailLink.includes('?') ? '&' : '?';
+                const freshUrl = `${file.thumbnailLink}${separator}_t=${Date.now()}`;
+                const r = await fetch(freshUrl, { cache: 'no-store' });
                 if (r.ok) {
                   const fileData = await r.json();
                   let total = 0;
@@ -397,7 +418,8 @@ export async function listPatientFilesFromSupabase(patientId: string, fallbackPa
     const enrichedFiles = await Promise.all(fileObjects.map(async (file) => {
       if (file.name.toLowerCase().endsWith('.json') && file.thumbnailLink) {
         try {
-          const r = await fetch(file.thumbnailLink);
+          const separator = file.thumbnailLink.includes('?') ? '&' : '?';
+          const r = await fetch(`${file.thumbnailLink}${separator}_t=${Date.now()}`, { cache: 'no-store' });
           if (r.ok) {
             const fileData = await r.json();
             let total = 0;
@@ -542,7 +564,7 @@ export async function getPatientFileUrlFromSupabase(patientIdentifier: string, f
   const subfolderPath = subfolder ? `${subfolder.replace(/^\/|\/$/g, '')}/` : '';
   const finalFilename = getSafeFilename(filename);
   
-  const filePath = filename.startsWith(`${userId}/`)
+  const filePath = (filename.startsWith(`${userId}/`) || filename.startsWith('clinic-master/'))
     ? filename
     : (filename.includes('/')
       ? `${userId}/${targetFolder}/${filename.replace(/^\/+/, '')}`
@@ -555,7 +577,8 @@ export async function getPatientFileUrlFromSupabase(patientIdentifier: string, f
       .createSignedUrl(filePath, expiresIn);
 
     if (!supaErr && supaUrl?.signedUrl) {
-      return supaUrl.signedUrl;
+      const sep = supaUrl.signedUrl.includes('?') ? '&' : '?';
+      return `${supaUrl.signedUrl}${sep}_t=${Date.now()}`;
     }
 
     // Fallback: tentar URL pública direta do bucket
@@ -564,7 +587,8 @@ export async function getPatientFileUrlFromSupabase(patientIdentifier: string, f
       .getPublicUrl(filePath);
 
     if (publicData?.publicUrl) {
-      return publicData.publicUrl;
+      const sep = publicData.publicUrl.includes('?') ? '&' : '?';
+      return `${publicData.publicUrl}${sep}_t=${Date.now()}`;
     }
   } catch (e) {}
 
