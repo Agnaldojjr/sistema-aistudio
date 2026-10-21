@@ -41,6 +41,16 @@ import { uploadPatientFileToSupabase, getPatientFileUrlFromSupabase } from '../l
 import { compressFileToDataUrl, compressImage } from '../lib/imageUtils';
 import { useAutoSaveBudget } from '../hooks/useAutoSaveBudget';
 import { jsPDF } from 'jspdf';
+import { DEFAULT_CLINICAL_STAGES, getDefaultStageForProcedure } from '../constants';
+import {
+  AcquirerId,
+  AcquirerRateTable,
+  loadAcquirerRates,
+  syncAcquirerRatesWithAI,
+} from '../lib/cardMachineRates';
+import BudgetStagesAutonomyPanel, {
+  ResolvedBudgetProcedureItem,
+} from './BudgetStagesAutonomyPanel';
 
 interface NegotiationTabProps {
   sections: PhotoSection[];
@@ -220,7 +230,121 @@ export default function NegotiationTab({
     return (cached as 'visa_master' | 'elo_amex') || 'visa_master';
   });
 
-  // Calculate procedure list total sum for default liquid amount
+  // Etapas clínicas do orçamento (Urgência, Reabilitação, Estética)
+  const activeStages = useMemo(() => {
+    if (Array.isArray(proposal?.stages) && proposal.stages.length > 0) {
+      return proposal.stages;
+    }
+    return DEFAULT_CLINICAL_STAGES;
+  }, [proposal?.stages]);
+
+  const handleUpdateStages = useCallback(
+    (nextStages: typeof DEFAULT_CLINICAL_STAGES) => {
+      setProposal((prev) => ({
+        ...prev,
+        stages: nextStages,
+      }));
+    },
+    [setProposal]
+  );
+
+  // Maquininha ativa (Ton vs InfiniteTap) e tabela de taxas validada
+  const [acquirerRates, setAcquirerRates] = useState<Record<AcquirerId, AcquirerRateTable>>(() =>
+    loadAcquirerRates()
+  );
+  const selectedAcquirer: AcquirerId = proposal?.selectedAcquirer || 'ton';
+  const handleSelectAcquirer = useCallback(
+    (acq: AcquirerId) => {
+      setProposal((prev) => ({
+        ...prev,
+        selectedAcquirer: acq,
+      }));
+    },
+    [setProposal]
+  );
+
+  const [isSyncingRates, setIsSyncingRates] = useState(false);
+  const [syncRatesMessage, setSyncRatesMessage] = useState('');
+
+  const handleSyncRatesWithAI = useCallback(async () => {
+    setIsSyncingRates(true);
+    setSyncRatesMessage('');
+    try {
+      const result = await syncAcquirerRatesWithAI(selectedAcquirer, acquirerRates);
+      setAcquirerRates(result.updatedRates);
+      setSyncRatesMessage(
+        `Taxas de ${result.updatedRates[selectedAcquirer].name} sincronizadas e validadas (${result.source}).`
+      );
+      setTimeout(() => setSyncRatesMessage(''), 6000);
+    } finally {
+      setIsSyncingRates(false);
+    }
+  }, [selectedAcquirer, acquirerRates]);
+
+  // Lista unificada de todos os procedimentos mapeados com status de Etapa e Inclusão Individual
+  const resolvedBudgetItems = useMemo<ResolvedBudgetProcedureItem[]>(() => {
+    const items: ResolvedBudgetProcedureItem[] = [];
+    const stageEnabledMap = new Map<string, boolean>();
+    activeStages.forEach((st) => stageEnabledMap.set(st.id, st.enabled !== false));
+
+    (sections || []).forEach((sec) => {
+      (sec.markers || []).forEach((marker) => {
+        const excludedSet = new Set(marker.excludedProcedures || []);
+        (marker.procedures || []).forEach((pid) => {
+          const proc = procedures.find((p) => p.id === pid);
+          if (!proc) return;
+          const inst = marker.procedureInstances?.find((i) => i.procedureId === pid);
+          const price =
+            marker.customPrices?.[pid] !== undefined
+              ? marker.customPrices[pid]
+              : inst?.price !== undefined
+              ? inst.price
+              : proc.price;
+          const stageId =
+            marker.procedureStages?.[pid] ||
+            inst?.stageId ||
+            proc.defaultStageId ||
+            getDefaultStageForProcedure(proc.name, proc.id);
+          const stageEnabled = stageEnabledMap.get(stageId) ?? true;
+          const itemIncluded =
+            !excludedSet.has(pid) && (inst ? inst.includeFinancial !== false : true);
+
+          items.push({
+            sectionId: sec.id,
+            markerId: marker.id,
+            toothNumber: marker.toothNumber || 0,
+            procedureId: pid,
+            procedureName: proc.name,
+            price,
+            stageId,
+            stageEnabled,
+            itemIncluded,
+            effectiveIncluded: stageEnabled && itemIncluded,
+          });
+        });
+      });
+    });
+
+    return items;
+  }, [sections, procedures, activeStages]);
+
+  const activeStageGrossTotal = useMemo(
+    () =>
+      resolvedBudgetItems
+        .filter((i) => i.effectiveIncluded)
+        .reduce((acc, i) => acc + i.price, 0),
+    [resolvedBudgetItems]
+  );
+
+  const deferredStagesTotal = useMemo(
+    () =>
+      resolvedBudgetItems
+        .filter((i) => !i.effectiveIncluded)
+        .reduce((acc, i) => acc + i.price, 0),
+    [resolvedBudgetItems]
+  );
+
+  // Calculate procedure list total sum for default liquid amount (legacy below kept for safety, overridden by activeStageGrossTotal)
   const calculatedGrossTotal = useMemo(() => {
     return sections.reduce((secSum, sec) => {
       return secSum + sec.markers.reduce((markSum, marker) => {
@@ -235,7 +359,7 @@ export default function NegotiationTab({
         }, 0);
       }, 0);
     }, 0);
-  }, [sections, procedures]);
+  }, [sections, procedures, resolvedBudgetItems, activeStages]);
 
   // If user wants to manually adjust the base Valor Líquido Desejado, fallback to calculated total
   const customNetKey = selectedPatient?.id ? `ag_neg_custom_net_${selectedPatient.id}` : 'ag_neg_custom_net';
@@ -252,7 +376,7 @@ export default function NegotiationTab({
     }
   }, [selectedPatient?.id]);
 
-  const desiredNet = customNetDesired !== null ? customNetDesired : calculatedGrossTotal;
+  const desiredNet = customNetDesired !== null ? customNetDesired : activeStageGrossTotal;
 
   const [boxEntradas, setBoxEntradas] = useState<number[]>(() => {
     const cached = localStorage.getItem('ag_neg_box_entradas');
@@ -352,7 +476,7 @@ export default function NegotiationTab({
     
     // O consultório nunca deve absorver taxas maiores que 14%
     // Find the maximum installment where the rate is <= 14%
-    const activeRates = TON_RATES[salesVolume][cardBrand];
+    const activeRates = acquirerRates[selectedAcquirer]?.tiers?.[salesVolume]?.credit?.[cardBrand] || TON_RATES[salesVolume][cardBrand];
     let maxInstallmentsByRate = 12;
     for (let i = 0; i < 12; i++) {
       if (activeRates[i] > 14) {
@@ -362,7 +486,7 @@ export default function NegotiationTab({
     }
 
     return Math.min(baseMax, maxInstallmentsByRate);
-  }, [desiredNet, salesVolume, cardBrand]);
+  }, [desiredNet, salesVolume, cardBrand, acquirerRates, selectedAcquirer]);
 
   // Compile calculations for each of the 4 columns
   const simulations = useMemo(() => {
@@ -381,13 +505,14 @@ export default function NegotiationTab({
         optionFeeDecimal = 0;
         instCount = 1;
       } else if (bMethod === 'debito') {
-        optionFeeDecimal = (DEBIT_RATES[salesVolume]?.[cardBrand] || 0) / 100;
+        optionFeeDecimal = ((acquirerRates[selectedAcquirer]?.tiers?.[salesVolume]?.debit?.[cardBrand] ?? DEBIT_RATES[salesVolume]?.[cardBrand]) || 0) / 100;
         instCount = 1;
       } else if (bMethod === 'credito_vista') {
-        optionFeeDecimal = (TON_RATES[salesVolume]?.[cardBrand]?.[0] || 0) / 100;
+        optionFeeDecimal = ((acquirerRates[selectedAcquirer]?.tiers?.[salesVolume]?.credit?.[cardBrand]?.[0] ?? TON_RATES[salesVolume]?.[cardBrand]?.[0]) || 0) / 100;
         instCount = 1;
       } else if (bMethod === 'credito_parcelado') {
-        const machineFeePercent = TON_RATES[salesVolume][cardBrand][Math.min(11, Math.max(0, bInst - 1))];
+        const activeCreditTable = acquirerRates[selectedAcquirer]?.tiers?.[salesVolume]?.credit?.[cardBrand] || TON_RATES[salesVolume][cardBrand];
+        const machineFeePercent = activeCreditTable[Math.min(11, Math.max(0, bInst - 1))];
         optionFeeDecimal = machineFeePercent / 100;
         instCount = bInst;
       }
@@ -434,7 +559,7 @@ export default function NegotiationTab({
         installments: instCount
       };
     });
-  }, [desiredNet, boxEntradas, boxMethods, boxInstallments, maxInstallmentsRule, salesVolume, cardBrand]);
+  }, [desiredNet, boxEntradas, boxMethods, boxInstallments, maxInstallmentsRule, salesVolume, cardBrand, acquirerRates, selectedAcquirer]);
 
   const chosenSim = simulations[selectedPlanIndices[0]] || simulations[0];
   
@@ -469,8 +594,38 @@ export default function NegotiationTab({
   const scriptInstallmentValue = formatCurrency(chosenSim.valorParcela);
   const scriptTotal = formatCurrency(chosenSim.custoTotal);
 
+  const deferredProceduresList = useMemo(() => {
+    return resolvedBudgetItems
+      .filter((item) => !item.effectiveIncluded)
+      .map((item) => {
+        const st = activeStages.find((s) => s.id === item.stageId);
+        return {
+          id: `${item.sectionId}-${item.markerId}-${item.procedureId}`,
+          toothNumber: item.toothNumber,
+          procedureName: item.procedureName,
+          price: item.price,
+          stageLabel: st?.label || 'Etapa Futura',
+          stageColor: st?.color || '#d97706',
+        };
+      });
+  }, [resolvedBudgetItems, activeStages]);
+
   // Flat list of all procedures currently configured
   const proceduresListOnMapeamento = useMemo(() => {
+    if (resolvedBudgetItems) {
+      return resolvedBudgetItems
+        .filter((item) => item.effectiveIncluded)
+        .map((item) => {
+          const st = activeStages.find((s) => s.id === item.stageId);
+          return {
+            id: `${item.sectionId}-${item.markerId}-${item.procedureId}`,
+            toothNumber: item.toothNumber,
+            procedureName: item.procedureName,
+            price: item.price,
+            quadrantTitle: st?.label || 'Etapa Ativa',
+          };
+        });
+    }
     const list: Array<{
       id: string;
       toothNumber: number;
@@ -497,7 +652,7 @@ export default function NegotiationTab({
     });
 
     return list;
-  }, [sections, procedures]);
+  }, [sections, procedures, resolvedBudgetItems, activeStages]);
 
   // ponytail: tracking procedures for payment-per-procedure mode when status is "Em Andamento"
   const proceduresTrackingList = useMemo(() => {
@@ -1528,6 +1683,27 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
         </div>
       </div>
 
+      <BudgetStagesAutonomyPanel
+        sections={sections}
+        onUpdateSections={handleUpdateAllSections}
+        procedures={procedures}
+        stages={activeStages}
+        onUpdateStages={handleUpdateStages}
+        resolvedItems={resolvedBudgetItems}
+        activeTotal={activeStageGrossTotal}
+        deferredTotal={deferredStagesTotal}
+        onResetCustomNet={() => setCustomNetDesired(null)}
+        selectedAcquirer={selectedAcquirer}
+        onSelectAcquirer={handleSelectAcquirer}
+        acquirerRates={acquirerRates}
+        onUpdateAcquirerRates={setAcquirerRates}
+        salesVolume={salesVolume}
+        cardBrand={cardBrand}
+        onSyncRatesWithAI={handleSyncRatesWithAI}
+        isSyncingRates={isSyncingRates}
+        syncRatesMessage={syncRatesMessage}
+      />
+
       {/* ================= CONTROLS SCREEN PANEL (Hides on Print) ================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start print:hidden">
         
@@ -1603,7 +1779,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                     onClick={() => setCustomNetDesired(null)}
                     className="text-[10px] text-[#8B0000] hover:underline flex items-center gap-1"
                   >
-                    <Undo2 className="w-3 h-3" /> Restaurar Mapeado ({formatCurrency(calculatedGrossTotal)})
+                    <Undo2 className="w-3 h-3" /> Restaurar Etapas Ativas ({formatCurrency(activeStageGrossTotal)})
                   </button>
                 )}
               </div>
@@ -1613,7 +1789,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                   type="number"
                   min="0"
                   step="0.01"
-                  value={customNetDesired !== null ? customNetDesired : calculatedGrossTotal}
+                  value={customNetDesired !== null ? customNetDesired : activeStageGrossTotal}
                   onChange={(e) => setCustomNetDesired(parseFloat(e.target.value) || 0)}
                   className="w-full bg-[#FAF8F5] border border-[#D5CBB3] pl-9 pr-3 py-2 text-sm text-zinc-800 font-bold rounded-lg focus:outline-none focus:border-[#8B0000]"
                 />
@@ -1662,7 +1838,7 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
               </span>
               <span className="font-bold text-[#8B0000] flex items-center gap-1 font-mono">
                 <Calendar className="w-3.5 h-3.5 text-[#B48C4D]" />
-                1 Dia Útil (Conta Ton)
+                {acquirerRates[selectedAcquirer]?.settlementLabel || '1 Dia Útil (Conta Ton)'}
               </span>
             </div>
 
@@ -2205,10 +2381,15 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
                   {proceduresListOnMapeamento.map((item, idx) => (
                     <tr key={idx} className="hover:bg-zinc-50">
                       <td className="py-1 px-2.5 font-mono text-xs text-zinc-900 font-bold">
-                        Dente {item.toothNumber}
+                        {item.toothNumber === 0 ? 'Geral' : `Dente ${item.toothNumber}`}
                       </td>
                       <td className="py-1 px-2.5 text-zinc-700 font-medium truncate max-w-[280px]">
-                        {item.procedureName}
+                        <span>{item.procedureName}</span>
+                        {item.quadrantTitle && (
+                          <span className="ml-2 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-[#FAF8F5] border border-[#E6DEC9] text-[#8B0000]">
+                            {item.quadrantTitle}
+                          </span>
+                        )}
                       </td>
                       <td className="py-1 px-2.5 text-right font-mono text-zinc-800 font-extrabold text-[11px]">
                         {formatCurrency(item.price)}
@@ -2221,9 +2402,65 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           )}
         </div>
 
+        {/* Etapas Futuras Planejadas (2º Momento — Não Incluso no Valor Atual) */}
+        {deferredProceduresList.length > 0 && (
+          <div className="mt-4 bg-amber-50/40 border border-dashed border-[#D5CBB3] rounded-xl p-3 space-y-2 no-print-break">
+            <div className="flex items-center justify-between">
+              <span className="text-[9.5px] font-bold uppercase tracking-wider text-amber-900">
+                Planejamento de Etapas Futuras (Para Execução Posterior — Não Incluso no Valor Atual)
+              </span>
+              <span className="text-[10px] font-mono font-bold text-amber-900">
+                Subtotal Futuro: {formatCurrency(deferredStagesTotal)}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px]">
+              {deferredProceduresList.map((df, idx) => (
+                <div
+                  key={`${df.id}-${idx}`}
+                  className="flex items-center justify-between bg-white/80 border border-amber-200/60 rounded px-2 py-1 text-zinc-600"
+                >
+                  <span className="truncate">
+                    <strong className="font-mono text-zinc-800">
+                      {df.toothNumber === 0 ? 'Geral' : `D${df.toothNumber}`}
+                    </strong>{' '}
+                    — {df.procedureName}{' '}
+                    <span className="text-[9px] text-amber-800 font-bold">({df.stageLabel})</span>
+                  </span>
+                  <span className="font-mono font-semibold text-zinc-500 ml-2 shrink-0">
+                    {formatCurrency(df.price)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Registros de Fotos Mapeadas (Fotos do Planejamento) */}
         {(() => {
-          const displayedSections = (sections || []).filter((s) => !!s.image || (s.markers && s.markers.length > 0) || s.id === 'upper' || s.id === 'lower');
+          const displayedSections = (sections || []).filter((s) => !!s.image);
+          if (displayedSections.length === 0) {
+            return (
+              <div className="mt-3 flex items-center justify-between bg-[#FAF8F5] border border-dashed border-[#E6DEC9] rounded-xl px-3 py-2 print:hidden">
+                <span className="text-[11px] text-zinc-500 flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-[#C09553]" />
+                  <span>Deseja ilustrar este orçamento com alguma foto ou radiografia opcional?</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvulsaTitle('');
+                    setAvulsaDescription('');
+                    setAvulsaDataUrl(null);
+                    setShowAddAvulsaModal(true);
+                  }}
+                  className="px-2.5 py-1 bg-white text-[#8B0000] text-[10px] font-bold rounded-lg border border-[#C09553]/50 hover:bg-[#8B0000] hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>+ Anexar Foto Opcional</span>
+                </button>
+              </div>
+            );
+          }
           if (displayedSections.length === 0) return null;
           return (
             <div className="mt-4 no-print-break space-y-2">

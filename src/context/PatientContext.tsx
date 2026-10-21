@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
 import { CRMPatient, CRMAppointment, CRMClinicalHistory, CRMCommunication, PhotoSection, TreatmentProposal } from '../types';
+import { DEFAULT_CLINICAL_STAGES } from '../constants';
 
 interface PatientContextData {
   selectedPatient: CRMPatient | null;
@@ -71,6 +72,8 @@ const INITIAL_PROPOSAL: TreatmentProposal = {
   customDiscountAmount: 0,
   showTotalBySection: true,
   markerSize: 26,
+  stages: DEFAULT_CLINICAL_STAGES,
+  selectedAcquirer: 'ton',
 };
 
 const isPresentation = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'presentation';
@@ -176,10 +179,17 @@ export function PatientProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedPatient, activeSections, activeProposal]);
 
+  const patientLoadSequence = useRef(0);
+  const saveInFlightRef = useRef(false);
+
   const refreshPatientSubModules = useCallback(async (patientId: string) => {
     if (!patientId) return;
+    const currentSeq = ++patientLoadSequence.current;
     try {
       const crmData = await getSupabaseCRMDatabase();
+      if (currentSeq !== patientLoadSequence.current) {
+        return; // Ignora resposta obsoleta se o usuário trocou rapidamente de paciente
+      }
       
       setAppointments((crmData.appointments || []).filter((a: any) => a.patientId === patientId));
       setClinicalHistory((crmData.clinical_history || []).filter((h: any) => h.patientId === patientId));
@@ -315,19 +325,25 @@ export function PatientProvider({ children }: { children: ReactNode }) {
     };
 
     try {
-      // Serialize activeSections safely to prevent main thread blocking or localStorage quota errors
-      const sanitizedSections = activeSections.map(sec => {
-        if (sec.image && sec.image.length > 500000 && sec.image.startsWith('data:image')) {
-          // If base64 data URL is too large, preserve markers while keeping image reference light
-          return { ...sec, image: sec.image };
-        }
-        return sec;
-      });
-      const serialized = JSON.stringify(sanitizedSections);
+      const serialized = JSON.stringify(activeSections);
       localStorage.setItem(`agnaldo_dent_sections_${selectedPatient.id}`, serialized);
       localStorage.setItem('agnaldo_dent_sections', serialized);
     } catch (e) {
-      console.warn('Não foi possível salvar activeSections no localStorage (limite excedido?)', e);
+      // Fallback seguro se a cota do localStorage estourar por imagens Base64:
+      // preserva 100% dos dentes/marcadores e mantém imagens leves, sem perder os dados em memória/Supabase
+      try {
+        const lightSections = activeSections.map(sec => {
+          if (sec.image && sec.image.length > 350000 && sec.image.startsWith('data:image')) {
+            return { ...sec, image: null };
+          }
+          return sec;
+        });
+        const fallbackSerialized = JSON.stringify(lightSections);
+        localStorage.setItem(`agnaldo_dent_sections_${selectedPatient.id}`, fallbackSerialized);
+        localStorage.setItem('agnaldo_dent_sections', fallbackSerialized);
+      } catch (innerErr) {
+        console.warn('Não foi possível salvar activeSections no localStorage (limite excedido)', innerErr);
+      }
     }
 
     return () => {
@@ -393,7 +409,8 @@ export function PatientProvider({ children }: { children: ReactNode }) {
   }, [activeProposal, selectedPatient, isPresentation]);
 
   const saveContextToSupabase = async () => {
-    if (!selectedPatient) return;
+    if (!selectedPatient || saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setIsSavingToSupabase(true);
     try {
       const crmData = await getSupabaseCRMDatabase();
@@ -460,6 +477,7 @@ export function PatientProvider({ children }: { children: ReactNode }) {
       console.error("Erro ao salvar no Drive:", err);
       throw err; // Permite que a UI exiba o erro
     } finally {
+      saveInFlightRef.current = false;
       setIsSavingToSupabase(false);
     }
   };

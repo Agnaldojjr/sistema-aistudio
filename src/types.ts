@@ -5,11 +5,22 @@
 
 import { ToothCondition, ToothSurface } from './TreatmentPlanning3D/types';
 
+export type ClinicalStageId = 'stage_1' | 'stage_2' | 'stage_3' | string;
+
+export interface ClinicalStage {
+  id: ClinicalStageId;
+  label: string;
+  subtitle: string;
+  color: string;
+  enabled: boolean;
+}
+
 export interface Procedure {
   id: string;
   name: string;
   price: number;
   color: string; // Hex color code
+  defaultStageId?: ClinicalStageId;
 }
 
 export interface ToothMarker {
@@ -19,12 +30,19 @@ export interface ToothMarker {
   y: number; // Vertical position in percentage (0 to 100)
   procedures: string[]; // List of Procedure IDs applied to this tooth
   notes?: string; // Optional specific clinical observations/notes for this tooth
+  /** Mapa opcional de procedureId -> stageId para classificar procedimentos por etapa sem exigir procedureInstances */
+  procedureStages?: Record<string, ClinicalStageId>;
+  /** Lista opcional de procedureIds temporariamente desmarcados do cálculo financeiro atual */
+  excludedProcedures?: string[];
+  /** Preços customizados por procedureId neste dente */
+  customPrices?: Record<string, number>;
   procedureInstances?: {
     id: string;
     procedureId: string;
     name: string;
     price: number;
     includeFinancial: boolean;
+    stageId?: ClinicalStageId;
     status: 'A realizar' | 'Realizado' | 'Em andamento' | 'Cancelado';
     date: string;
     dentist: string;
@@ -179,6 +197,10 @@ export interface TreatmentProposal {
   showTotalBySection: boolean; // if we want to show totals for Upper/Lower/Smile separately
   markerSize?: number; // customizable circle marker size in pixels
   paymentMethod?: 'Dinheiro' | 'PIX' | 'Cartão de Crédito' | 'Cartão de Débito';
+  /** Etapas clínicas do orçamento (Urgência, Reabilitação, Estética) */
+  stages?: ClinicalStage[];
+  /** Maquininha ativa no simulador financeiro */
+  selectedAcquirer?: 'ton' | 'infinitetap';
 }
 
 export interface PaymentRecord {

@@ -957,6 +957,33 @@ ${doctorName}`;
     }
   });
 
+  app.post("/api/ai/card-rates-sync", async (req, res) => {
+    try {
+      const acquirer = req.body?.acquirer === "infinitetap" ? "infinitetap" : "ton";
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({ error: "GEMINI_API_KEY não configurada." });
+      }
+      const ai = new GoogleGenAI({ apiKey });
+      const acquirerLabel =
+        acquirer === "infinitetap"
+          ? "InfinitePay / InfiniteTap (Brasil - recebimento em 1 dia útil)"
+          : "Ton (Stone - Planos Ton Brother / PromoTon no Brasil - recebimento em 1 dia útil)";
+      const prompt = `Consulte as taxas oficiais vigentes no Brasil para a maquininha ${acquirerLabel}. Retorne APENAS um objeto JSON válido com "source" e "tiers" ("under_3" e "between_3_6", cada um com "debit": {"visa_master", "elo_amex"} e "credit": {"visa_master": [12 taxas de 1x a 12x], "elo_amex": [12 taxas de 1x a 12x]}).`;
+      const response = await ai.models.generateContent({
+        model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+        contents: prompt,
+        config: { temperature: 0.1, tools: [{ googleSearch: {} }] },
+      });
+      const rawText = (response.text || "").trim();
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("Resposta sem JSON válido.");
+      res.json(JSON.parse(jsonMatch[0]));
+    } catch (err: any) {
+      res.status(500).json({ error: "Falha ao sincronizar taxas via IA", details: err?.message });
+    }
+  });
+
   app.post("/api/extract-budget-vision", async (req, res) => {
     try {
       const { imageBase64 } = req.body;

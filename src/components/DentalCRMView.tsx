@@ -41,6 +41,8 @@ import {
 } from 'lucide-react';
 import { getSupabaseCRMDatabase, saveSupabaseCRMDatabase } from '../lib/supabaseCrm';
 import PhotoEditor from './PhotoEditor';
+import ArchOdontogram2D from './ArchOdontogram2D';
+import { DEFAULT_CLINICAL_STAGES } from '../constants';
 import PatientDocumentsTab from './PatientDocumentsTab';
 import NegotiationTab from './NegotiationTab';
 import ProcedureManager from './ProcedureManager';
@@ -308,6 +310,7 @@ export default function DentalCRMView({
   const [avulsoPhotoDesc, setAvulsoPhotoDesc] = useState('');
   const [avulsoPhotoDataUrl, setAvulsoPhotoDataUrl] = useState<string | null>(null);
   const [isProcessingAvulsoPhoto, setIsProcessingAvulsoPhoto] = useState(false);
+  const [mappingViewMode, setMappingViewMode] = useState<'arch_2d' | 'classic_photos'>('arch_2d');
 
   const handleOpenBatchPhotos = async () => {
     setShowBatchPhotoModal(true);
@@ -6077,7 +6080,181 @@ export default function DentalCRMView({
                             </div>
                           )}
 
-                          {activeSections.map((section, idx) => (
+                          {/* Seletor de Modo de Mapeamento: Arcada 2D Rápida vs. Fotos com Bolinhas */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#FAF8F5] border border-[#E6DEC9] rounded-xl p-3">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setMappingViewMode('arch_2d')}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                                  mappingViewMode === 'arch_2d'
+                                    ? 'bg-[#8B0000] text-white shadow-sm'
+                                    : 'bg-white text-zinc-600 border border-zinc-200 hover:border-[#C09553]'
+                                }`}
+                              >
+                                <span>🦷 Arcada 2D Rápida (Por Etapas)</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setMappingViewMode('classic_photos')}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                                  mappingViewMode === 'classic_photos'
+                                    ? 'bg-[#8B0000] text-white shadow-sm'
+                                    : 'bg-white text-zinc-600 border border-zinc-200 hover:border-[#C09553]'
+                                }`}
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                                <span>Modo Fotos & Bolinhas ({activeSections.filter(s => s.image).length})</span>
+                              </button>
+                            </div>
+                            <span className="text-[11px] text-zinc-500">
+                              {mappingViewMode === 'arch_2d'
+                                ? 'Clique nos dentes da arcada para lançar procedimentos rapidamente sem precisar de foto.'
+                                : 'Modo clássico de marcação sobre fotografias intraorais e radiografias.'}
+                            </span>
+                          </div>
+
+                          {mappingViewMode === 'arch_2d' ? (
+                            <div className="space-y-6">
+                              <ArchOdontogram2D
+                                sections={activeSections}
+                                onUpdateSections={setActiveSections}
+                                procedures={procedures || []}
+                                stages={activeProposal?.stages || DEFAULT_CLINICAL_STAGES}
+                                onUpdateStages={(nextStages) =>
+                                  setActiveProposal((prev: any) => ({
+                                    ...(prev || {}),
+                                    stages: nextStages,
+                                  }))
+                                }
+                                onAddProcedure={
+                                  setProcedures
+                                    ? (newProc) => setProcedures((prev: any) => [...prev, newProc])
+                                    : undefined
+                                }
+                                onEditProcedure={
+                                  setProcedures
+                                    ? (updatedProc) =>
+                                        setProcedures((prev: any[]) =>
+                                          prev.map((p) => (p.id === updatedProc.id ? updatedProc : p))
+                                        )
+                                    : undefined
+                                }
+                                onDeleteProcedure={
+                                  setProcedures
+                                    ? (procId) => {
+                                        setProcedures((prev: any[]) => prev.filter((p) => p.id !== procId));
+                                        setActiveSections((prevSections) =>
+                                          prevSections.map((sec) => ({
+                                            ...sec,
+                                            markers: sec.markers.map((m) => ({
+                                              ...m,
+                                              procedures: m.procedures.filter((id) => id !== procId),
+                                            })),
+                                          }))
+                                        );
+                                      }
+                                    : undefined
+                                }
+                                onGoToNegotiation={() => setActiveDetailTab('plan_negotiation')}
+                              />
+
+                              {/* Galeria Opcional de Fotos Anexadas ao Orçamento */}
+                              <div className="bg-white border border-[#E6DEC9] rounded-2xl p-5 shadow-xs space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div>
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#8B0000] flex items-center gap-1.5">
+                                      <Camera className="w-4 h-4 text-[#C09553]" />
+                                      Fotos & Radiografias Anexadas ao Orçamento (Opcional)
+                                    </h4>
+                                    <p className="text-[11px] text-zinc-500">
+                                      Anexe fotos ou radiografias apenas se desejar ilustrar o caso no PDF do paciente.
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowAddAvulsoPhotoModal(true);
+                                        setAvulsoPhotoTitle('');
+                                        setAvulsoPhotoDesc('');
+                                        setAvulsoPhotoDataUrl(null);
+                                      }}
+                                      className="px-3 py-1.5 bg-[#FAF8F5] hover:bg-[#8B0000] text-[#8B0000] hover:text-white border border-[#C09553]/40 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                      <span>Anexar Foto / Raio-X</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {activeSections.filter((s) => s.image).length === 0 ? (
+                                  <div className="text-xs text-zinc-400 italic py-3 px-4 bg-[#FAF8F5] rounded-xl border border-dashed border-[#E6DEC9]">
+                                    Nenhuma foto anexada neste orçamento (o orçamento será gerado de forma limpa usando a tabela clínica por etapas).
+                                  </div>
+                                ) : (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
+                                    {activeSections
+                                      .filter((s) => s.image)
+                                      .map((sec) => (
+                                        <div
+                                          key={sec.id}
+                                          className="border border-[#E6DEC9] rounded-xl p-2.5 bg-[#FAF8F5] space-y-2 relative group"
+                                        >
+                                          <div className="flex items-center justify-between gap-1">
+                                            <span className="text-[11px] font-bold text-[#8B0000] truncate">
+                                              {sec.title}
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                if (
+                                                  window.confirm(
+                                                    `Remover a imagem de "${sec.title}" deste orçamento?`
+                                                  )
+                                                ) {
+                                                  setActiveSections((prev) =>
+                                                    prev
+                                                      .map((s) =>
+                                                        s.id === sec.id ? { ...s, image: null } : s
+                                                      )
+                                                      .filter(
+                                                        (s) =>
+                                                          !(
+                                                            (s.isExtra || s.id.startsWith('extra-')) &&
+                                                            !s.image
+                                                          )
+                                                      )
+                                                  );
+                                                }
+                                              }}
+                                              className="text-zinc-400 hover:text-red-600 p-1 rounded cursor-pointer"
+                                              title="Remover foto"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                          <div className="aspect-video rounded-lg overflow-hidden bg-zinc-900 border border-[#E6DEC9]">
+                                            <img
+                                              src={sec.image!}
+                                              alt={sec.title}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          </div>
+                                          {sec.description && (
+                                            <p className="text-[10.5px] text-zinc-600 line-clamp-2">
+                                              {sec.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {mappingViewMode === 'classic_photos' && activeSections.map((section, idx) => (
                             <PhotoEditor
                               key={section.id}
                               section={section}

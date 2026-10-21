@@ -66,7 +66,7 @@ export default function AIInspectorView({ onNavigateView }: AIInspectorViewProps
 
   useEffect(() => {
     if (!isAiSandboxMode()) {
-      enableAiSandboxMode();
+      // Não força modo sandbox automaticamente ao abrir a aba para preservar a sessão clínica real do cirurgião-dentista
     }
     const unsub = subscribeAiRuntimeLogs(() => {
       setLogs(getAiRuntimeLogs());

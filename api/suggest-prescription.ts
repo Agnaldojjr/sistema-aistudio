@@ -50,7 +50,7 @@ export default async (req: Request) => {
 
   try {
     const { procedure } = await req.json();
-    if (!procedure) {
+    if (!procedure || typeof procedure !== 'string' || !procedure.trim() || procedure.length > 1000) {
       return new Response(JSON.stringify({ error: "Procedimento não informado." }), {
         status: 400,
         headers: {

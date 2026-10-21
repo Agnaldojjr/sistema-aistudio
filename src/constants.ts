@@ -3,7 +3,81 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Procedure, ClinicSettings, PhotoSection, TreatmentProposal } from './types';
+import { Procedure, ClinicSettings, PhotoSection, TreatmentProposal, ClinicalStage, ClinicalStageId } from './types';
+
+export const DEFAULT_CLINICAL_STAGES: ClinicalStage[] = [
+  {
+    id: 'stage_1',
+    label: 'Fase 1: Urgência & Saúde Bucal',
+    subtitle: 'Alívio de dor, canais, extrações, limpeza e adequação do meio',
+    color: '#dc2626',
+    enabled: true,
+  },
+  {
+    id: 'stage_2',
+    label: 'Fase 2: Reabilitação & Função',
+    subtitle: 'Restaurações definitivas, pinos, coroas, implantes e próteses',
+    color: '#d97706',
+    enabled: true,
+  },
+  {
+    id: 'stage_3',
+    label: 'Fase 3: Estética & Sorriso',
+    subtitle: 'Facetas, clareamento dental, harmonização e acabamento estético',
+    color: '#059669',
+    enabled: true,
+  },
+];
+
+/**
+ * Classifica automaticamente um procedimento na etapa clínica mais adequada
+ * caso o cirurgião-dentista ainda não tenha movido manualmente.
+ */
+export function getDefaultStageForProcedure(procName: string = '', procId: string = ''): ClinicalStageId {
+  const n = procName.toLowerCase();
+  // Fase 3: Estética
+  if (
+    n.includes('faceta') ||
+    n.includes('clareamento') ||
+    n.includes('botox') ||
+    n.includes('lente') ||
+    n.includes('estétic') ||
+    n.includes('estetic') ||
+    procId === 'p_11' ||
+    procId === 'p_16' ||
+    procId === 'p_17' ||
+    procId === 'p_18'
+  ) {
+    return 'stage_3';
+  }
+  // Fase 2: Reabilitação & Função
+  if (
+    n.includes('coroa') ||
+    n.includes('implante') ||
+    n.includes('prótese') ||
+    n.includes('protese') ||
+    n.includes('roach') ||
+    n.includes('pino') ||
+    n.includes('reconstrução') ||
+    n.includes('reconstrucao') ||
+    n.includes('resina') ||
+    procId === 'p_3' ||
+    procId === 'p_4' ||
+    procId === 'p_5' ||
+    procId === 'p_8' ||
+    procId === 'p_9' ||
+    procId === 'p_20' ||
+    procId === 'p_21' ||
+    procId === 'p_22' ||
+    procId === 'p_23' ||
+    procId === 'p_24' ||
+    procId === 'p_25'
+  ) {
+    return 'stage_2';
+  }
+  // Fase 1: Urgência & Saúde Bucal (Profilaxia, Canal, Exodontia, Siso, Provisório, etc.)
+  return 'stage_1';
+}
 
 export const DEFAULT_CLINIC_SETTINGS: ClinicSettings = {
   doctorName: "Dr. Agnaldo Ferreira",
