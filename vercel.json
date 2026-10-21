@@ -5,7 +5,16 @@
       "schedule": "0 12 * * *"
     }
   ],
+  "headers": [
+    {
+      "source": "/(llms\\.txt|llms-full\\.txt|ai-context\\.json)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "public, max-age=60" }
+      ]
+    }
+  ],
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|llms\\.txt|llms-full\\.txt|ai-context\\.json|assets/|models/|favicon\\.svg).*)", "destination": "/index.html" }
   ]
 }

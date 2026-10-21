@@ -44,6 +44,8 @@ import { PhotoSection, Procedure, TreatmentProposal, ClinicSettings, CRMPatient 
 import { DEFAULT_PROCEDURES, DEMO_SVG_PLACEHOLDERS, DEFAULT_CLINIC_SETTINGS, INITIAL_PROPOSAL, INITIAL_SECTIONS } from './constants';
 import { initAuth, googleSignIn, logout } from './firebase';
 import FinancialView from './components/FinancialView';
+import AIInspectorView from './components/AIInspectorView';
+import { initAiRuntimeTelemetry, isAiSandboxMode, enableAiSandboxMode, disableAiSandboxMode } from './lib/aiSandbox';
 
 import type { User } from '@supabase/supabase-js';
 import { usePatientContext, PatientProvider } from './context/PatientContext';
@@ -69,14 +71,15 @@ const AFLogoSVG = ({ className = '', light = false }: { className?: string; ligh
 // ─── Initial State ─────────────────────────────────────────────────────────
 
 // ─── Navigation Config ──────────────────────────────────────────────────────
-type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings' | 'financeiro';
+type AppView = 'dashboard' | 'calendar' | 'crm' | 'settings' | 'financeiro' | 'ai-inspector';
 
 const NAV_ITEMS = [
-  { id: 'dashboard' as AppView, label: 'Painel', icon: LayoutDashboard, section: 'principal' },
-  { id: 'financeiro' as AppView, label: 'Financeiro', icon: Coins, section: 'principal' },
-  { id: 'crm'       as AppView, label: 'Pacientes', icon: Users,           section: 'principal' },
-  { id: 'calendar'  as AppView, label: 'Agenda',    icon: Calendar,        section: 'principal' },
-  { id: 'settings'  as AppView, label: 'Ajustes',   icon: Settings,        section: 'principal' },
+  { id: 'dashboard'    as AppView, label: 'Painel',      icon: LayoutDashboard, section: 'principal' },
+  { id: 'financeiro'   as AppView, label: 'Financeiro',  icon: Coins,           section: 'principal' },
+  { id: 'crm'          as AppView, label: 'Pacientes',   icon: Users,           section: 'principal' },
+  { id: 'calendar'     as AppView, label: 'Agenda',      icon: Calendar,        section: 'principal' },
+  { id: 'settings'     as AppView, label: 'Ajustes',     icon: Settings,        section: 'principal' },
+  { id: 'ai-inspector' as AppView, label: 'Inspeção IA', icon: Bot,             section: 'principal' },
 ];
 
 // ─── Sidebar ────────────────────────────────────────────────────────────────
@@ -210,6 +213,7 @@ function TopBar({ currentView, proposal, selectedPatient, sections, currentFileI
     crm: 'Gestão de Pacientes',
     calendar: 'Agenda',
     settings: 'Configurações',
+    'ai-inspector': 'Central de Inspeção & Código para IA',
   };
 
   const isSamePatient = Boolean(
@@ -266,6 +270,17 @@ function TopBar({ currentView, proposal, selectedPatient, sections, currentFileI
 
       {/* Right actions */}
       <div className="flex items-center gap-2 flex-shrink-0">
+        {isAiSandboxMode() && (
+          <button
+            onClick={() => onChangeView('ai-inspector')}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-[#8B0000]/10 border border-[#8B0000]/30 text-[#8B0000] hover:bg-[#8B0000]/20 transition-colors cursor-pointer"
+            title="Abrir Central de Inspeção e Código para IA"
+          >
+            <Bot className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Sandbox IA (Dados Fictícios)</span>
+            <span className="md:hidden">IA</span>
+          </button>
+        )}
         <button
           onClick={() => setIsMobileOptimized(!isMobileOptimized)}
           className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 transition-colors"
@@ -282,7 +297,15 @@ function TopBar({ currentView, proposal, selectedPatient, sections, currentFileI
 
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
-function LoginScreen({ onLogin, isLoggingIn }: { onLogin: () => void; isLoggingIn: boolean }) {
+function LoginScreen({
+  onLogin,
+  isLoggingIn,
+  onEnterAiSandbox,
+}: {
+  onLogin: () => void;
+  isLoggingIn: boolean;
+  onEnterAiSandbox: () => void;
+}) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4"
       style={{ background: 'linear-gradient(135deg, #5C0000 0%, #8B0000 50%, #3D0000 100%)' }}>
@@ -310,7 +333,7 @@ function LoginScreen({ onLogin, isLoggingIn }: { onLogin: () => void; isLoggingI
             </p>
           </div>
 
-          <div className="px-8 py-8 space-y-6">
+          <div className="px-8 py-8 space-y-5">
             <div className="text-center">
               <h2 className="text-zinc-800 font-bold text-base">Portal Clínico</h2>
               <p className="text-zinc-500 text-sm mt-1">Faça login com sua conta Google para acessar o sistema.</p>
@@ -319,7 +342,7 @@ function LoginScreen({ onLogin, isLoggingIn }: { onLogin: () => void; isLoggingI
             <button
               onClick={onLogin}
               disabled={isLoggingIn}
-              className="w-full flex items-center justify-center gap-3 bg-white border-2 border-zinc-200 rounded-xl px-4 py-3.5 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-3 bg-white border-2 border-zinc-200 rounded-xl px-4 py-3.5 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-5 h-5">
                 <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -333,8 +356,34 @@ function LoginScreen({ onLogin, isLoggingIn }: { onLogin: () => void; isLoggingI
               </span>
             </button>
 
+            {/* Acesso Aberto para IA / Modo Sandbox */}
+            <div className="pt-3 border-t border-zinc-100 space-y-2.5">
+              <button
+                type="button"
+                onClick={onEnterAiSandbox}
+                data-testid="enter-ai-sandbox-btn"
+                className="w-full flex items-center justify-center gap-2 bg-[#FAF8F5] hover:bg-[#F3EFE6] border border-[#C09553]/50 text-[#8B0000] rounded-xl px-4 py-3 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              >
+                <Bot className="w-4 h-4" />
+                <span>Acesso para IA • Modo Sandbox & Código</span>
+              </button>
+              <div className="flex items-center justify-center gap-3 text-[10px] font-mono text-zinc-500">
+                <a href="/llms.txt" target="_blank" rel="noopener noreferrer" className="hover:text-[#8B0000] underline">
+                  /llms.txt
+                </a>
+                <span>•</span>
+                <a href="/llms-full.txt" target="_blank" rel="noopener noreferrer" className="hover:text-[#8B0000] underline">
+                  /llms-full.txt
+                </a>
+                <span>•</span>
+                <a href="/ai-context.json" target="_blank" rel="noopener noreferrer" className="hover:text-[#8B0000] underline">
+                  /ai-context.json
+                </a>
+              </div>
+            </div>
+
             <p className="text-center text-[10px] text-zinc-400">
-              Seus dados são salvos no Supabase de forma privada e segura.
+              Seus dados reais são salvos no Supabase de forma privada e segura.
             </p>
           </div>
         </div>
@@ -372,7 +421,7 @@ export default function App() {
     const pathname = window.location.pathname;
     const segments = pathname.split('/').filter(Boolean);
     const primaryView = segments[0] as AppView;
-    const validViews: AppView[] = ['dashboard', 'calendar', 'crm', 'settings', 'financeiro'];
+    const validViews: AppView[] = ['dashboard', 'calendar', 'crm', 'settings', 'financeiro', 'ai-inspector'];
     
     if (validViews.includes(primaryView)) {
       let tab = 'registration';
@@ -436,6 +485,7 @@ export default function App() {
 
   // --- EFFECTS ---
   useEffect(() => {
+    initAiRuntimeTelemetry();
     const unsubscribe = initAuth(
       (usr) => { setUser(usr); setNeedsAuth(false); },
       () => setNeedsAuth(true)
@@ -635,11 +685,21 @@ export default function App() {
 
   // --- RENDER: Login Screen ---
   if (needsAuth) {
-    return <LoginScreen onLogin={handleLogin} isLoggingIn={isLoggingIn} />;
+    return (
+      <LoginScreen
+        onLogin={handleLogin}
+        isLoggingIn={isLoggingIn}
+        onEnterAiSandbox={() => {
+          enableAiSandboxMode();
+          setNeedsAuth(false);
+          setCurrentAppView('ai-inspector');
+        }}
+      />
+    );
   }
 
   // --- RENDER: Mobile-optimized workspace ---
-  if (isMobileOptimized) {
+  if (isMobileOptimized && currentAppView !== 'ai-inspector') {
     return (
       <div className="app-shell">
         <Sidebar
@@ -806,6 +866,20 @@ export default function App() {
               currentTheme={currentTheme}
               onChangeTheme={setCurrentTheme}
               clinicSettings={clinicSettings}
+            />
+          </main>
+        )}
+
+        {/* ── AI Inspector & Sandbox Hub ───────────────────────── */}
+        {currentAppView === 'ai-inspector' && (
+          <main className="flex-1 px-5 py-6 lg:px-8 lg:py-8 max-w-7xl w-full mx-auto animate-fade-in-up">
+            <AIInspectorView
+              onNavigateView={(view, crmTab) => {
+                setCurrentAppView(view);
+                if (crmTab) {
+                  setActiveTab(crmTab);
+                }
+              }}
             />
           </main>
         )}

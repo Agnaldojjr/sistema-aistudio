@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { isAiSandboxMode, getAiSandboxCRMDatabase, saveAiSandboxCRMDatabase } from './aiSandbox';
 
 // Helper: Pega a sessão atual
 async function getUserId() {
@@ -8,6 +9,9 @@ async function getUserId() {
 }
 
 export async function getSupabaseCRMDatabase() {
+  if (isAiSandboxMode()) {
+    return getAiSandboxCRMDatabase();
+  }
   try {
     const userId = await getUserId();
     const { data, error } = await supabase
@@ -80,6 +84,10 @@ export async function getSupabaseCRMDatabase() {
 }
 
 export async function saveSupabaseCRMDatabase(dataToSave: any) {
+  if (isAiSandboxMode()) {
+    saveAiSandboxCRMDatabase(dataToSave);
+    return;
+  }
   const userId = await getUserId();
   
   // SAFEGUARD: Prevenir sobrescrita ou perda acidental de dados de pacientes

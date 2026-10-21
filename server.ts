@@ -305,6 +305,53 @@ async function startServer() {
     legacyHeaders: false,
   });
 
+  // Endpoint aberto de inspeção para IA (antes do rate limiter geral)
+  app.get("/api/ai-context", (req, res) => {
+    try {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      const formatParam = req.query.format as string | undefined;
+      const fileParam = req.query.file as string | undefined;
+
+      if (formatParam === "txt" || formatParam === "llms") {
+        const p = path.join(process.cwd(), "public", "llms.txt");
+        if (fs.existsSync(p)) {
+          res.setHeader("Content-Type", "text/plain; charset=utf-8");
+          return res.send(fs.readFileSync(p, "utf-8"));
+        }
+      }
+
+      if (formatParam === "full") {
+        const p = path.join(process.cwd(), "public", "llms-full.txt");
+        if (fs.existsSync(p)) {
+          res.setHeader("Content-Type", "text/plain; charset=utf-8");
+          return res.send(fs.readFileSync(p, "utf-8"));
+        }
+      }
+
+      const jsonPath = path.join(process.cwd(), "public", "ai-context.json");
+      if (!fs.existsSync(jsonPath)) {
+        return res.status(404).json({ error: "ai-context.json ainda não gerado. Execute npm run build ou tsx scripts/generate_ai_context.ts." });
+      }
+
+      const manifest = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
+      if (fileParam && Array.isArray(manifest.files)) {
+        const matched = manifest.files.find((f: any) => f.path === fileParam || f.path.endsWith(fileParam));
+        if (!matched) {
+          return res.status(404).json({ error: `Arquivo '${fileParam}' não encontrado.` });
+        }
+        if (req.query.raw === "true" || formatParam === "raw") {
+          res.setHeader("Content-Type", "text/plain; charset=utf-8");
+          return res.send(matched.content);
+        }
+        return res.json(matched);
+      }
+
+      return res.json(manifest);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // Aplica o rate limiter em todas as rotas /api/
   app.use("/api/", apiLimiter);
 

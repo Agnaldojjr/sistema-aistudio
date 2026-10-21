@@ -1,6 +1,15 @@
 import { getAccessToken } from '../firebase';
+import {
+  isAiSandboxMode,
+  getAiSandboxCalendarEvents,
+  createAiSandboxCalendarEvent,
+  deleteAiSandboxCalendarEvent,
+} from './aiSandbox';
 
 export async function listCalendarEvents(start: Date, end: Date) {
+  if (isAiSandboxMode()) {
+    return getAiSandboxCalendarEvents(start, end);
+  }
   const token = await getAccessToken();
   if (!token) throw new Error('Não autenticado');
 
@@ -98,6 +107,9 @@ export async function listCalendarEvents(start: Date, end: Date) {
 }
 
 export async function createCalendarEvent(eventData: any) {
+  if (isAiSandboxMode()) {
+    return createAiSandboxCalendarEvent(eventData);
+  }
   const token = await getAccessToken();
   if (!token) throw new Error('Não autenticado');
 
@@ -115,6 +127,9 @@ export async function createCalendarEvent(eventData: any) {
 }
 
 export async function deleteCalendarEvent(eventId: string) {
+  if (isAiSandboxMode()) {
+    return deleteAiSandboxCalendarEvent(eventId);
+  }
   const token = await getAccessToken();
   if (!token) throw new Error('Não autenticado');
 

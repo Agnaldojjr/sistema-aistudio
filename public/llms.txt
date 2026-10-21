@@ -1,0 +1,147 @@
+# Sistema Odontológico Dr. Agnaldo Ferreira — Guia de Acesso e Auditoria para IA (llms.txt)
+
+> Este documento segue o padrão `llms.txt` e fornece a qualquer Inteligência Artificial (ChatGPT, Claude, Gemini, Perplexity, DeepSeek, Cursor, Agentes Playwright) acesso completo à arquitetura, fluxos, esquema de dados e código-fonte de https://sistema-aistudio.vercel.app/.
+
+## 🔗 Links Diretos para Inspeção de IA
+- **Resumo Arquitetural + Índice de Arquivos (este arquivo, ~18 KB)**: https://sistema-aistudio.vercel.app/llms.txt
+- **Ler Qualquer Arquivo Individualmente (Ideal para IAs com limite de contexto por requisição)**: `https://sistema-aistudio.vercel.app/api/ai-context?file=src/App.tsx&raw=true`
+- **Código-Fonte Completo de Todos os Arquivos em Único Link (~2.2 MB)**: https://sistema-aistudio.vercel.app/llms-full.txt
+- **Manifesto JSON Estruturado (Árvore + Código + Rotas)**: https://sistema-aistudio.vercel.app/ai-context.json
+- **Central Visual de Inspeção & Telemetria (Sem Login)**: https://sistema-aistudio.vercel.app/ai-inspector
+- **Acesso Visual Completo ao Sistema em Modo Sandbox (Dados Fictícios)**: https://sistema-aistudio.vercel.app/?ai=true
+
+---
+
+## 🏗️ 1. Visão Geral da Arquitetura & Stack
+- **Frontend**: React 19 + TypeScript + Vite 6 + Tailwind CSS v4 + Lucide Icons + Motion.
+- **Odontograma 3D & 2D**: Three.js (`@react-three/fiber`, `@react-three/drei`) com modelos GLB anatômicos por dente + mapeamento fotográfico 2D (`PhotoEditor.tsx`).
+- **Estado Global e Sincronização**: `src/context/PatientContext.tsx` centraliza o paciente ativo, agendamentos, histórico clínico, pagamentos, orçamentos e seções do odontograma, sincronizando em tempo real com a 2ª tela de apresentação (`?mode=patient`) via `BroadcastChannel`.
+- **Banco de Dados & Persistência**:
+  - **Produção Autenticada**: Supabase (`clinic_data.crm_data` JSONB por `user_id`) + espelho preventivo em `localStorage['ag_crm_local_backup']` (`src/lib/supabaseCrm.ts`).
+  - **Armazenamento de Mídia**: Cloudflare R2 (S3-compatible) via URLs pré-assinadas (`src/lib/r2.ts`, `api/storage-*.ts`).
+  - **Modo Sandbox IA (`?ai=true` ou `/ai-inspector`)**: 100% isolado em `sessionStorage['ai_sandbox_crm_data']` (`src/lib/aiSandbox.ts`), pré-populado com pacientes, consultas, histórico clínico, orçamentos e financeiro fictícios para proteger os dados reais (LGPD).
+- **Integrações Externas**:
+  - **Google Calendar OAuth 2.0**: Sincronização bidirecional de consultas (`src/lib/calendar.ts`, `api/auth/google/refresh.ts`).
+  - **Inteligência Artificial Clínica**: Google Gemini 2.5 Flash / DeepSeek / NVIDIA NIM para sugestão de receituários (`/api/suggest-prescription`), scripts de vendas de orçamento (`/api/ai/budget-script`), leitura de orçamentos por visão computacional (`/api/extract-budget-vision`), planejamento clínico FDI (`/api/ai/suggest-plan`) e Copiloto Hermes (`/api/agent/chat`).
+
+---
+
+## 🧭 2. Mapa de Rotas e Módulos (SPA)
+Para navegar sem login usando um agente de navegador (Playwright / Operator), adicione `?ai=true` na URL:
+1. `https://sistema-aistudio.vercel.app/dashboard?ai=true` — **Painel Geral**: Consultas do dia, confirmação de WhatsApp, faturamento diário, controle de retornos (Recall) e gaveta lateral de atendimento clínico (`DashboardView.tsx`).
+2. `https://sistema-aistudio.vercel.app/crm/registration?ai=true` — **Gestão de Pacientes (CRM)**: Busca, cadastro completo, prontuário clínico, anamnese, receitas/atestados, galeria de fotos e histórico (`DentalCRMView.tsx`).
+3. `https://sistema-aistudio.vercel.app/crm/editor?ai=true` — **Mapeamento & Odontograma**: Marcação de procedimentos em fotos clínicas (Arcada Superior, Inferior, Sorriso, Panorâmica) e visualização 3D (`PhotoEditor.tsx`, `TreatmentPlanning3D/`).
+4. `https://sistema-aistudio.vercel.app/crm/negotiation?ai=true` — **Negociação & Orçamentos**: Simulação de parcelamento, descontos PIX, versionamento de propostas, contrato odontológico, PDF e script de WhatsApp com IA (`NegotiationTab.tsx`).
+5. `https://sistema-aistudio.vercel.app/financeiro?ai=true` — **Painel Financeiro**: Receitas pagas, orçamentos em aberto, deduplicação de lançamentos e filtros por meio de pagamento (`FinancialView.tsx`).
+6. `https://sistema-aistudio.vercel.app/calendar?ai=true` — **Agenda**: Grade mensal, semanal e diária integrada ao Google Calendar (`CalendarView.tsx`).
+7. `https://sistema-aistudio.vercel.app/settings?ai=true` — **Ajustes**: Dados do profissional (CRO, endereço), temas visuais e tabela de procedimentos (`SettingsView.tsx`).
+8. `https://sistema-aistudio.vercel.app/ai-inspector` — **Central de Inspeção para IA**: Explorador de código-fonte, logs de erro em tempo real e auditoria técnica (`AIInspectorView.tsx`).
+
+---
+
+## 📂 3. Árvore de Arquivos do Projeto (98 arquivos | 46.401 linhas)
+- `AGENTS.md` (Configuration, 14 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=AGENTS.md&raw=true
+- `api/agent/chat.ts` (Backend / API, 229 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fagent%2Fchat.ts&raw=true
+- `api/ai-context.ts` (Backend / API, 104 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fai-context.ts&raw=true
+- `api/ai/budget-script.ts` (Backend / API, 84 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fai%2Fbudget-script.ts&raw=true
+- `api/ai/recall.ts` (Backend / API, 75 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fai%2Frecall.ts&raw=true
+- `api/ai/suggest-plan.ts` (Backend / API, 121 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fai%2Fsuggest-plan.ts&raw=true
+- `api/auth/google/refresh.ts` (Backend / API, 80 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fauth%2Fgoogle%2Frefresh.ts&raw=true
+- `api/crm.ts` (Backend / API, 405 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fcrm.ts&raw=true
+- `api/extract-budget-vision.ts` (Backend / API, 108 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fextract-budget-vision.ts&raw=true
+- `api/hermes/name.ts` (Backend / API, 231 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fhermes%2Fname.ts&raw=true
+- `api/reminders.ts` (Backend / API, 210 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Freminders.ts&raw=true
+- `api/sentinel/apply-fix.ts` (Backend / API, 172 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fsentinel%2Fapply-fix.ts&raw=true
+- `api/sentinel/reports.ts` (Backend / API, 57 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fsentinel%2Freports.ts&raw=true
+- `api/storage-delete.ts` (Backend / API, 138 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fstorage-delete.ts&raw=true
+- `api/storage-init.ts` (Backend / API, 100 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fstorage-init.ts&raw=true
+- `api/storage-list.ts` (Backend / API, 203 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fstorage-list.ts&raw=true
+- `api/storage-upload.ts` (Backend / API, 186 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fstorage-upload.ts&raw=true
+- `api/suggest-prescription.ts` (Backend / API, 117 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fsuggest-prescription.ts&raw=true
+- `api/webhook.ts` (Backend / API, 46 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=api%2Fwebhook.ts&raw=true
+- `index.html` (Configuration, 41 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=index.html&raw=true
+- `package.json` (Configuration, 63 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=package.json&raw=true
+- `server.ts` (Backend / API, 1476 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=server.ts&raw=true
+- `src/App.tsx` (Frontend Core, 926 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FApp.tsx&raw=true
+- `src/components/AIAssistedWhatsApp.tsx` (UI Component, 160 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FAIAssistedWhatsApp.tsx&raw=true
+- `src/components/AIInspectorView.tsx` (UI Component, 729 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FAIInspectorView.tsx&raw=true
+- `src/components/AppointmentClinicalDrawer.tsx` (UI Component, 603 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FAppointmentClinicalDrawer.tsx&raw=true
+- `src/components/BrandHeader.tsx` (UI Component, 251 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FBrandHeader.tsx&raw=true
+- `src/components/CalendarView.tsx` (UI Component, 219 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FCalendarView.tsx&raw=true
+- `src/components/ClinicalAttendanceManager.tsx` (UI Component, 845 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FClinicalAttendanceManager.tsx&raw=true
+- `src/components/DashboardView.tsx` (UI Component, 2016 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FDashboardView.tsx&raw=true
+- `src/components/DentalContractModal.tsx` (UI Component, 1156 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FDentalContractModal.tsx&raw=true
+- `src/components/DentalCRMView.tsx` (UI Component, 7385 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FDentalCRMView.tsx&raw=true
+- `src/components/EventModal.tsx` (UI Component, 710 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FEventModal.tsx&raw=true
+- `src/components/FinancialView.tsx` (UI Component, 237 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FFinancialView.tsx&raw=true
+- `src/components/ImageMarkupEditor.tsx` (UI Component, 1004 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FImageMarkupEditor.tsx&raw=true
+- `src/components/MedicalDocumentModal.tsx` (UI Component, 1049 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FMedicalDocumentModal.tsx&raw=true
+- `src/components/MobileWorkspace.tsx` (UI Component, 1199 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FMobileWorkspace.tsx&raw=true
+- `src/components/NegotiationTab.tsx` (UI Component, 3167 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FNegotiationTab.tsx&raw=true
+- `src/components/PatientAnamnesisForm.tsx` (UI Component, 494 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FPatientAnamnesisForm.tsx&raw=true
+- `src/components/PatientDocumentsTab.tsx` (UI Component, 3510 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FPatientDocumentsTab.tsx&raw=true
+- `src/components/PatientGallery.tsx` (UI Component, 376 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FPatientGallery.tsx&raw=true
+- `src/components/PatientRegistrationTab.tsx` (UI Component, 525 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FPatientRegistrationTab.tsx&raw=true
+- `src/components/PatientScreen.tsx` (UI Component, 692 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FPatientScreen.tsx&raw=true
+- `src/components/PatientsModal.tsx` (UI Component, 1573 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FPatientsModal.tsx&raw=true
+- `src/components/PhotoEditor.tsx` (UI Component, 1639 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FPhotoEditor.tsx&raw=true
+- `src/components/PhotoLightboxWithEditor.tsx` (UI Component, 216 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FPhotoLightboxWithEditor.tsx&raw=true
+- `src/components/PrintableLetterhead.tsx` (UI Component, 71 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FPrintableLetterhead.tsx&raw=true
+- `src/components/ProcedureManager.tsx` (UI Component, 321 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FProcedureManager.tsx&raw=true
+- `src/components/ProposalViewer.tsx` (UI Component, 726 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FProposalViewer.tsx&raw=true
+- `src/components/SentinelDashboard.tsx` (UI Component, 218 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FSentinelDashboard.tsx&raw=true
+- `src/components/SettingsView.tsx` (UI Component, 324 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcomponents%2FSettingsView.tsx&raw=true
+- `src/constants.ts` (Frontend Core, 287 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fconstants.ts&raw=true
+- `src/context/PatientContext.tsx` (React Context / State, 498 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fcontext%2FPatientContext.tsx&raw=true
+- `src/firebase.ts` (Frontend Core, 172 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Ffirebase.ts&raw=true
+- `src/hooks/useAutoSaveBudget.ts` (Custom Hook, 274 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fhooks%2FuseAutoSaveBudget.ts&raw=true
+- `src/hooks/useReactiveLocalStorage.ts` (Custom Hook, 46 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fhooks%2FuseReactiveLocalStorage.ts&raw=true
+- `src/index.css` (Frontend Core, 709 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Findex.css&raw=true
+- `src/lib/aiSandbox.ts` (Service / Integration, 742 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Flib%2FaiSandbox.ts&raw=true
+- `src/lib/calendar.ts` (Service / Integration, 144 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Flib%2Fcalendar.ts&raw=true
+- `src/lib/cep.ts` (Service / Integration, 78 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Flib%2Fcep.ts&raw=true
+- `src/lib/imageUtils.ts` (Service / Integration, 46 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Flib%2FimageUtils.ts&raw=true
+- `src/lib/pdfBudgetParser.ts` (Service / Integration, 170 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Flib%2FpdfBudgetParser.ts&raw=true
+- `src/lib/r2.ts` (Service / Integration, 137 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Flib%2Fr2.ts&raw=true
+- `src/lib/storage.ts` (Service / Integration, 657 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Flib%2Fstorage.ts&raw=true
+- `src/lib/supabase.ts` (Service / Integration, 92 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Flib%2Fsupabase.ts&raw=true
+- `src/lib/supabaseCrm.ts` (Service / Integration, 205 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Flib%2FsupabaseCrm.ts&raw=true
+- `src/main.tsx` (Frontend Core, 45 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fmain.tsx&raw=true
+- `src/services/budgetSyncService.ts` (Frontend Core, 451 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fservices%2FbudgetSyncService.ts&raw=true
+- `src/TreatmentPlanning3D/components/AIAssistancePanel.tsx` (3D Dental Module, 148 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Fcomponents%2FAIAssistancePanel.tsx&raw=true
+- `src/TreatmentPlanning3D/components/BudgetPanel3D.tsx` (3D Dental Module, 570 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Fcomponents%2FBudgetPanel3D.tsx&raw=true
+- `src/TreatmentPlanning3D/components/DentalCanvas3D.tsx` (3D Dental Module, 148 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Fcomponents%2FDentalCanvas3D.tsx&raw=true
+- `src/TreatmentPlanning3D/components/PresentationPanel3D.tsx` (3D Dental Module, 152 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Fcomponents%2FPresentationPanel3D.tsx&raw=true
+- `src/TreatmentPlanning3D/components/SignatureCanvas.tsx` (3D Dental Module, 158 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Fcomponents%2FSignatureCanvas.tsx&raw=true
+- `src/TreatmentPlanning3D/components/ToothActionMenu.tsx` (3D Dental Module, 166 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Fcomponents%2FToothActionMenu.tsx&raw=true
+- `src/TreatmentPlanning3D/components/ToothDetailPanel.tsx` (3D Dental Module, 144 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Fcomponents%2FToothDetailPanel.tsx&raw=true
+- `src/TreatmentPlanning3D/components/ToothMesh.tsx` (3D Dental Module, 287 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Fcomponents%2FToothMesh.tsx&raw=true
+- `src/TreatmentPlanning3D/context/Planning3DContext.tsx` (3D Dental Module, 479 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Fcontext%2FPlanning3DContext.tsx&raw=true
+- `src/TreatmentPlanning3D/DentalViewer/AnatomyLegend.tsx` (3D Dental Module, 32 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2FDentalViewer%2FAnatomyLegend.tsx&raw=true
+- `src/TreatmentPlanning3D/DentalViewer/CameraSync.tsx` (3D Dental Module, 109 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2FDentalViewer%2FCameraSync.tsx&raw=true
+- `src/TreatmentPlanning3D/DentalViewer/DentalScene.tsx` (3D Dental Module, 334 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2FDentalViewer%2FDentalScene.tsx&raw=true
+- `src/TreatmentPlanning3D/DentalViewer/JawLoader.tsx` (3D Dental Module, 248 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2FDentalViewer%2FJawLoader.tsx&raw=true
+- `src/TreatmentPlanning3D/DentalViewer/LayersPanel.tsx` (3D Dental Module, 85 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2FDentalViewer%2FLayersPanel.tsx&raw=true
+- `src/TreatmentPlanning3D/DentalViewer/meshMapping.ts` (3D Dental Module, 92 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2FDentalViewer%2FmeshMapping.ts&raw=true
+- `src/TreatmentPlanning3D/DentalViewer/SelectionManager.ts` (3D Dental Module, 77 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2FDentalViewer%2FSelectionManager.ts&raw=true
+- `src/TreatmentPlanning3D/DentalViewer/StructureMesh.tsx` (3D Dental Module, 56 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2FDentalViewer%2FStructureMesh.tsx&raw=true
+- `src/TreatmentPlanning3D/DentalViewer/ToothDetailLoader.tsx` (3D Dental Module, 164 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2FDentalViewer%2FToothDetailLoader.tsx&raw=true
+- `src/TreatmentPlanning3D/DentalViewer/ToothMesh.tsx` (3D Dental Module, 618 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2FDentalViewer%2FToothMesh.tsx&raw=true
+- `src/TreatmentPlanning3D/DentalViewer/TransparencyPanel.tsx` (3D Dental Module, 56 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2FDentalViewer%2FTransparencyPanel.tsx&raw=true
+- `src/TreatmentPlanning3D/hooks/usePlanning3D.ts` (3D Dental Module, 86 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Fhooks%2FusePlanning3D.ts&raw=true
+- `src/TreatmentPlanning3D/index.tsx` (3D Dental Module, 377 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Findex.tsx&raw=true
+- `src/TreatmentPlanning3D/services/budgetEngine.ts` (3D Dental Module, 72 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Fservices%2FbudgetEngine.ts&raw=true
+- `src/TreatmentPlanning3D/services/planning3DService.ts` (3D Dental Module, 60 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Fservices%2Fplanning3DService.ts&raw=true
+- `src/TreatmentPlanning3D/types.ts` (3D Dental Module, 55 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2FTreatmentPlanning3D%2Ftypes.ts&raw=true
+- `src/types.ts` (Frontend Core, 199 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Ftypes.ts&raw=true
+- `src/vite-env.d.ts` (Frontend Core, 2 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=src%2Fvite-env.d.ts&raw=true
+- `tsconfig.json` (Configuration, 29 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=tsconfig.json&raw=true
+- `vercel.json` (Configuration, 21 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=vercel.json&raw=true
+- `vite.config.ts` (Configuration, 23 linhas) → Ler código: https://sistema-aistudio.vercel.app/api/ai-context?file=vite.config.ts&raw=true
+
+---
+
+## 🔍 4. Instruções para IAs Sugerirem Melhorias e Encontrarem Bugs
+1. **Para analisar todo o código-fonte de uma vez**: Solicite ou faça fetch de `https://sistema-aistudio.vercel.app/llms-full.txt` ou `https://sistema-aistudio.vercel.app/ai-context.json`.
+2. **Para inspecionar em navegador (Playwright / DevTools)**: Acesse `https://sistema-aistudio.vercel.app/?ai=true` ou execute no console `window.__AI_INSPECTOR__.getLogs()` e `window.__AI_INSPECTOR__.getStaticAuditFindings()`.
+3. **Ao sugerir correções**: Sempre cite o caminho exato do arquivo (ex: `src/components/DashboardView.tsx`), a função/estado afetado e forneça o diff ou bloco de código TypeScript tipado.

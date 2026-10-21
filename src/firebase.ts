@@ -1,5 +1,6 @@
 import { supabase } from './lib/supabase';
 import type { User } from '@supabase/supabase-js';
+import { isAiSandboxMode, enableAiSandboxMode, disableAiSandboxMode } from './lib/aiSandbox';
 
 let cachedAccessToken: string | null = localStorage.getItem('provider_token');
 
@@ -7,13 +8,29 @@ export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
 ) => {
+  // Modo Sandbox para Inspeção de IA (100% dados fictícios isolados em sessionStorage, sem tocar no Supabase)
+  if (isAiSandboxMode()) {
+    enableAiSandboxMode();
+    const sandboxUser: any = {
+      id: 'ai-sandbox-inspector',
+      email: 'ai-inspector@sandbox.local',
+      user_metadata: { full_name: 'Modo Sandbox IA (Dados Fictícios)' },
+      aud: 'sandbox',
+      role: 'sandbox_inspector'
+    };
+    setTimeout(() => {
+      if (onAuthSuccess) onAuthSuccess(sandboxUser, 'sandbox-mock-token');
+    }, 50);
+    return () => {};
+  }
+
+  // Regra AGENTS.md: NUNCA habilitar bypass_auth fora de NODE_ENV=development
   const isDev = import.meta.env.DEV;
-  const isBypassEnabled = import.meta.env.VITE_ENABLE_AUTH_BYPASS === 'true';
   const hasBypassParam = typeof window !== 'undefined' && 
     (new URLSearchParams(window.location.search).get('bypass_auth') === 'true' || 
      localStorage.getItem('bypass_auth') === 'true');
 
-  if ((isDev || isBypassEnabled) && hasBypassParam) {
+  if (isDev && hasBypassParam) {
     if (typeof window !== 'undefined') {
       localStorage.setItem('bypass_auth', 'true');
     }
@@ -143,6 +160,7 @@ export const getAccessToken = async (): Promise<string | null> => {
 };
 
 export const logout = async () => {
+  disableAiSandboxMode();
   await supabase.auth.signOut();
   cachedAccessToken = null;
   localStorage.removeItem('provider_token');
