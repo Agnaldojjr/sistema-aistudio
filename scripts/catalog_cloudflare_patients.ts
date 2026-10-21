@@ -218,7 +218,12 @@ async function run() {
 
     if (patientRecord) {
       // Atualizar dados existentes enriquecendo
-      if (patientRecord.name === folder || patientRecord.name.startsWith('1')) {
+      if (
+        patientRecord.name === folder ||
+        patientRecord.name.startsWith('1') ||
+        patientRecord.name.startsWith('PAT ') ||
+        patientRecord.name.startsWith('PACIENTE ')
+      ) {
         patientRecord.name = cleanName;
       }
       if (!patientRecord.photoUrl && profilePhotoUrl) {
