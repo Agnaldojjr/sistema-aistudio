@@ -958,6 +958,620 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
     localStorage.setItem('ag_whatsapp_api_token', whatsappApiToken);
   }, [whatsappApiToken]);
 
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
+
+  // Compilação do documento PDF com explicação detalhada e separação por fases
+  const buildBudgetPdfDocument = async (): Promise<{ doc: jsPDF; cleanFileName: string }> => {
+    const doc = new jsPDF({
+      orientation: 'p',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const safePatientName = patientName || 'Paciente';
+    const cleanFileName = `Orcamento_${safePatientName.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
+
+    // 1. Barra de Topo da Clínica
+    doc.setFillColor(78, 17, 25); // #4E1119 bordô escuro
+    doc.rect(0, 0, 210, 13, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('CLÍNICA ODONTOLÓGICA DR. AGNALDO FERREIRA — ODONTOLOGIA AVANÇADA', 15, 8.5);
+
+    // Título Principal
+    doc.setTextColor(78, 17, 25);
+    doc.setFontSize(12.5);
+    doc.setFont('Helvetica', 'bold');
+    doc.text("PLANO DE TRATAMENTO & CONDIÇÕES DE PAGAMENTO", 15, 23);
+
+    // Caixa de Identificação: Paciente e Consultório
+    doc.setDrawColor(213, 203, 179); // #D5CBB3
+    doc.setFillColor(255, 255, 255);
+    doc.rect(15, 26, 180, 32);
+
+    // Coluna Esquerda: Paciente
+    doc.setFontSize(7.5);
+    doc.setFont('Helvetica', 'bold');
+    doc.setTextColor(180, 140, 77); // #C09553
+    doc.text("DADOS DO PACIENTE", 19, 31.5);
+
+    doc.setFontSize(8);
+    doc.setTextColor(80, 80, 80);
+    doc.text("PACIENTE:", 19, 37);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(20, 20, 20);
+    doc.text(patientName ? patientName.toUpperCase() : 'NÃO INFORMADO', 38, 37);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setTextColor(80, 80, 80);
+    doc.text("CONTATO:", 19, 43);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(20, 20, 20);
+    doc.text(pd.mobile || pd.phone || 'Não informado', 38, 43);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setTextColor(80, 80, 80);
+    doc.text("DATA:", 19, 49);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(20, 20, 20);
+    doc.text(new Date().toLocaleDateString('pt-BR'), 38, 49);
+
+    // Divisória Vertical
+    doc.setDrawColor(230, 222, 201);
+    doc.line(98, 29, 98, 55);
+
+    // Coluna Direita: Cirurgião Dentista e Consultório
+    doc.setFontSize(7.5);
+    doc.setFont('Helvetica', 'bold');
+    doc.setTextColor(180, 140, 77);
+    doc.text("RESPONSÁVEL TÉCNICO & CONSULTÓRIO", 102, 31.5);
+
+    doc.setFontSize(7.5);
+    doc.setFont('Helvetica', 'bold');
+    doc.setTextColor(80, 80, 80);
+    doc.text("DENTISTA:", 102, 37);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(20, 20, 20);
+    doc.text(`${clinicSettings.doctorName || 'Dr. Agnaldo Ferreira'} — ${clinicSettings.cro || 'CROMG 58714'}`, 120, 37);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setTextColor(80, 80, 80);
+    doc.text("ESPEC:", 102, 42);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(20, 20, 20);
+    doc.text(clinicSettings.doctorRole || 'Cirurgião-Dentista Clínico Geral', 120, 42);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setTextColor(80, 80, 80);
+    doc.text("LOCAL:", 102, 47);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(20, 20, 20);
+    const splitAddr = doc.splitTextToSize(clinicSettings.address || 'Rua dos Goitacazes, 375, Sala 1001 - Centro, BH', 70);
+    doc.text(splitAddr.slice(0, 1), 120, 47);
+
+    if (clinicSettings.referencePoint) {
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(80, 80, 80);
+      doc.text("REF:", 102, 52);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(20, 20, 20);
+      const splitRef = doc.splitTextToSize(clinicSettings.referencePoint || 'Em frente ao Shopping Cidade', 70);
+      doc.text(splitRef.slice(0, 1), 120, 52);
+    }
+
+    let currentY = 62;
+
+    // Observação do Orçamento (Ex: "* Orçamento feito sem radiografia-visu...")
+    if (proposal.notes && proposal.notes.trim()) {
+      doc.setFillColor(254, 243, 199); // #FEF3C7 amber-100
+      doc.setDrawColor(245, 158, 11);
+      doc.setLineWidth(0.25);
+      const noteText = `* ${proposal.notes.trim()}`;
+      const splitNotes = doc.splitTextToSize(noteText, 172);
+      const noteH = (splitNotes.length * 3.6) + 4.5;
+      doc.roundedRect(15, currentY, 180, noteH, 1.5, 1.5, 'FD');
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(146, 64, 14); // amber-800
+      doc.text(splitNotes, 19, currentY + 3.8);
+      currentY += noteH + 3.5;
+    }
+
+    // --- SEÇÃO 1: PROCEDIMENTOS DA ETAPA ATUAL (INCLUSOS NO ORÇAMENTO) ---
+    const activeItems = resolvedBudgetItems.filter((i) => i.effectiveIncluded);
+
+    doc.setFontSize(9.5);
+    doc.setFont('Helvetica', 'bold');
+    doc.setTextColor(78, 17, 25);
+    doc.text("DIAGNÓSTICO DE MAPEAMENTO CLÍNICO (ETAPA ATUAL — INCLUSA NO VALOR)", 15, currentY + 3);
+
+    doc.setFontSize(7.5);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Total Mapeado: ${activeItems.length} itens`, 160, currentY + 3);
+
+    doc.setDrawColor(78, 17, 25);
+    doc.setLineWidth(0.4);
+    doc.line(15, currentY + 5, 195, currentY + 5);
+    currentY += 7.5;
+
+    if (activeItems.length === 0) {
+      doc.setFontSize(8);
+      doc.setFont('Helvetica', 'italic');
+      doc.setTextColor(120, 120, 120);
+      doc.text("Nenhum procedimento selecionado na etapa atual.", 17, currentY + 4);
+      currentY += 8;
+    } else {
+      // Agrupar itens da etapa atual pelas fases clínicas (Fase 1, Fase 2, Fase 3)
+      activeStages.forEach((st) => {
+        const stageItems = activeItems.filter((i) => i.stageId === st.id);
+        if (stageItems.length === 0) return;
+
+        if (currentY > 255) {
+          doc.addPage();
+          currentY = 20;
+        }
+
+        // Faixa de cabeçalho da Fase com explicação
+        doc.setFillColor(250, 248, 245);
+        doc.setDrawColor(213, 203, 179);
+        doc.setLineWidth(0.2);
+        doc.rect(15, currentY, 180, 8, 'FD');
+
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(78, 17, 25);
+        doc.text(st.label.toUpperCase(), 18, currentY + 3.8);
+
+        if (st.subtitle) {
+          doc.setFont('Helvetica', 'normal');
+          doc.setFontSize(6.8);
+          doc.setTextColor(110, 110, 110);
+          const stageSub = doc.splitTextToSize(`— ${st.subtitle}`, 115);
+          doc.text(stageSub[0], 75, currentY + 3.8);
+        }
+
+        const stageSum = stageItems.reduce((acc, it) => acc + it.price, 0);
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(78, 17, 25);
+        doc.text(`Subtotal: ${formatCurrency(stageSum)}`, 160, currentY + 5.5);
+
+        currentY += 8.8;
+
+        // Cabeçalho da tabela desta fase
+        doc.setFillColor(245, 245, 245);
+        doc.rect(15, currentY, 180, 4.8, 'F');
+        doc.setFontSize(7);
+        doc.setFont('Helvetica', 'bold');
+        doc.setTextColor(90, 90, 90);
+        doc.text("Dente", 18, currentY + 3.2);
+        doc.text("Procedimento Clínico Mapeado", 45, currentY + 3.2);
+        doc.text("Valor Original", 165, currentY + 3.2);
+        currentY += 5.3;
+
+        // Linhas de procedimento desta fase
+        stageItems.forEach((item) => {
+          if (currentY > 265) {
+            doc.addPage();
+            currentY = 20;
+          }
+          doc.setFontSize(7.5);
+          doc.setFont('Helvetica', 'normal');
+          doc.setTextColor(30, 30, 30);
+          const toothStr = item.toothNumber === 0 ? 'Geral' : `Dente ${item.toothNumber}`;
+          doc.text(toothStr, 18, currentY + 3);
+
+          let procName = item.procedureName;
+          if (procName.length > 60) procName = procName.substring(0, 57) + "...";
+          doc.text(procName, 45, currentY + 3);
+
+          doc.setFont('Helvetica', 'bold');
+          doc.text(formatCurrency(item.price), 165, currentY + 3);
+
+          doc.setDrawColor(235, 235, 235);
+          doc.setLineWidth(0.1);
+          doc.line(15, currentY + 4.3, 195, currentY + 4.3);
+          currentY += 5;
+        });
+
+        currentY += 1.5;
+      });
+
+      // Total da Etapa Atual
+      if (currentY > 260) {
+        doc.addPage();
+        currentY = 20;
+      }
+      doc.setFillColor(250, 248, 245);
+      doc.setDrawColor(78, 17, 25);
+      doc.setLineWidth(0.3);
+      doc.rect(15, currentY, 180, 6.5, 'FD');
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(78, 17, 25);
+      doc.text("VALOR TOTAL DA ETAPA ATUAL:", 18, currentY + 4.5);
+      doc.text(formatCurrency(activeStageGrossTotal), 165, currentY + 4.5);
+      currentY += 8.5;
+    }
+
+    // Observações específicas de dentes (se houver)
+    const markersWithNotes = sections.flatMap((s) => s.markers).filter((m) => m.notes && m.notes.trim() !== '');
+    if (markersWithNotes.length > 0) {
+      if (currentY > 255) {
+        doc.addPage();
+        currentY = 20;
+      }
+      doc.setFontSize(7.5);
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(180, 140, 77);
+      doc.text("OBSERVAÇÕES DO EXAME CLÍNICO:", 17, currentY + 3);
+      currentY += 4.5;
+      markersWithNotes.forEach((m) => {
+        if (currentY > 265) {
+          doc.addPage();
+          currentY = 20;
+        }
+        doc.setFontSize(7);
+        doc.setFont('Helvetica', 'bold');
+        doc.setTextColor(78, 17, 25);
+        doc.text(`Dente ${m.toothNumber}:`, 19, currentY + 2.5);
+        doc.setFont('Helvetica', 'italic');
+        doc.setTextColor(60, 60, 60);
+        const splitNote = doc.splitTextToSize(`"${m.notes}"`, 155);
+        doc.text(splitNote, 36, currentY + 2.5);
+        currentY += (splitNote.length * 3) + 1.5;
+      });
+      currentY += 2;
+    }
+
+    // --- SEÇÃO 2: PLANEJAMENTO DE ETAPAS FUTURAS (NÃO INCLUSO NO VALOR ATUAL) ---
+    const deferredItems = resolvedBudgetItems.filter((i) => !i.effectiveIncluded);
+    if (deferredItems.length > 0) {
+      if (currentY > 235) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      doc.setFontSize(8.5);
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(146, 64, 14); // amber-800
+      doc.text("PLANEJAMENTO DE ETAPAS FUTURAS (PARA EXECUÇÃO POSTERIOR — NÃO INCLUSO NO VALOR ATUAL)", 15, currentY + 3.5);
+
+      doc.setFontSize(7.5);
+      doc.text(`Subtotal Futuro: ${formatCurrency(deferredStagesTotal)}`, 150, currentY + 3.5);
+
+      doc.setDrawColor(245, 158, 11);
+      doc.setLineWidth(0.3);
+      doc.line(15, currentY + 5.5, 195, currentY + 5.5);
+      currentY += 7.5;
+
+      doc.setFontSize(6.8);
+      doc.setFont('Helvetica', 'italic');
+      doc.setTextColor(120, 90, 40);
+      const futureDisclaimer = "* Os procedimentos abaixo foram diagnosticados no mapeamento clínico, mas foram programados para execução em momento posterior (etapas 2 e 3). Não compõem o valor contratado nesta proposta inicial.";
+      const splitFuture = doc.splitTextToSize(futureDisclaimer, 178);
+      doc.text(splitFuture, 15, currentY + 1);
+      currentY += (splitFuture.length * 3) + 3;
+
+      activeStages.forEach((st) => {
+        const stageDeferred = deferredItems.filter((i) => i.stageId === st.id);
+        if (stageDeferred.length === 0) return;
+
+        if (currentY > 255) {
+          doc.addPage();
+          currentY = 20;
+        }
+
+        // Cabeçalho da fase futura com subtítulo explicativo
+        doc.setFillColor(254, 243, 199); // light amber
+        doc.setDrawColor(245, 158, 11);
+        doc.setLineWidth(0.15);
+        doc.rect(15, currentY, 180, 7.5, 'FD');
+
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(146, 64, 14);
+        doc.text(st.label.toUpperCase(), 18, currentY + 3.8);
+
+        if (st.subtitle) {
+          doc.setFont('Helvetica', 'normal');
+          doc.setFontSize(6.5);
+          doc.setTextColor(120, 100, 60);
+          const subSplit = doc.splitTextToSize(`— ${st.subtitle}`, 115);
+          doc.text(subSplit[0], 75, currentY + 3.8);
+        }
+
+        const stageSum = stageDeferred.reduce((acc, it) => acc + it.price, 0);
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(146, 64, 14);
+        doc.text(`Subtotal: ${formatCurrency(stageSum)}`, 160, currentY + 5);
+
+        currentY += 8.2;
+
+        // Cabeçalho da tabela futura
+        doc.setFillColor(250, 250, 250);
+        doc.rect(15, currentY, 180, 4.5, 'F');
+        doc.setFontSize(6.8);
+        doc.setFont('Helvetica', 'bold');
+        doc.setTextColor(100, 100, 100);
+        doc.text("Dente", 18, currentY + 3);
+        doc.text("Procedimento Previsto", 45, currentY + 3);
+        doc.text("Valor Estimado", 165, currentY + 3);
+        currentY += 5;
+
+        stageDeferred.forEach((item) => {
+          if (currentY > 265) {
+            doc.addPage();
+            currentY = 20;
+          }
+          doc.setFontSize(7);
+          doc.setFont('Helvetica', 'normal');
+          doc.setTextColor(60, 60, 60);
+          const toothStr = item.toothNumber === 0 ? 'Geral' : `Dente ${item.toothNumber}`;
+          doc.text(toothStr, 18, currentY + 3);
+
+          let procName = item.procedureName;
+          if (procName.length > 60) procName = procName.substring(0, 57) + "...";
+          doc.text(procName, 45, currentY + 3);
+
+          doc.setFont('Helvetica', 'normal');
+          doc.text(formatCurrency(item.price), 165, currentY + 3);
+
+          doc.setDrawColor(240, 240, 240);
+          doc.setLineWidth(0.1);
+          doc.line(15, currentY + 4.2, 195, currentY + 4.2);
+          currentY += 4.8;
+        });
+
+        currentY += 1.5;
+      });
+    }
+
+    // --- SEÇÃO 3: IMAGENS DE MAPEAMENTO VISUAL (se houver fotos com marcação) ---
+    const sectionsWithImages: { title: string; subtitle?: string; description?: string; dataUrl: string }[] = [];
+    for (const sec of sections) {
+      if (sec.image) {
+        try {
+          const dataUrl = await drawMarkersOnImage(sec, procedures);
+          if (dataUrl) {
+            sectionsWithImages.push({
+              title: sec.title,
+              subtitle: sec.subtitle,
+              description: sec.description,
+              dataUrl
+            });
+          }
+        } catch (e) {
+          console.error("Erro ao desenhar dentes marcados no PDF:", e);
+        }
+      }
+    }
+
+    if (sectionsWithImages.length > 0) {
+      doc.addPage();
+      doc.setFillColor(78, 17, 25);
+      doc.rect(0, 0, 210, 13, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.text(('MAPEAMENTO VISUAL DOS DENTES / DIAGNÓSTICO').toUpperCase(), 15, 8.5);
+
+      const imgWidth = 82;
+      const imgHeight = 46.12;
+      const gapX = 10;
+      const startY = 20;
+      const rowHeight = 72;
+
+      for (let i = 0; i < sectionsWithImages.length; i++) {
+        const item = sectionsWithImages[i];
+        const localIdx = i % 6;
+
+        if (i > 0 && localIdx === 0) {
+          doc.addPage();
+          doc.setFillColor(78, 17, 25);
+          doc.rect(0, 0, 210, 13, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFont('Helvetica', 'bold');
+          doc.setFontSize(9.5);
+          doc.text(('MAPEAMENTO VISUAL DOS DENTES / DIAGNÓSTICO (CONT.)').toUpperCase(), 15, 8.5);
+        }
+
+        const col = localIdx % 2;
+        const row = Math.floor(localIdx / 2);
+        const imgX = 15 + col * (imgWidth + gapX);
+        const itemY = startY + row * rowHeight;
+
+        doc.setFontSize(8);
+        doc.setTextColor(78, 17, 25);
+        doc.setFont('Helvetica', 'bold');
+        doc.text(item.title.toUpperCase(), imgX, itemY);
+
+        const textToShow = item.description || item.subtitle;
+        if (textToShow) {
+          doc.setFontSize(6.5);
+          doc.setTextColor(100, 100, 100);
+          doc.setFont('Helvetica', 'normal');
+          const lines = doc.splitTextToSize(textToShow, imgWidth);
+          doc.text(lines.slice(0, 2), imgX, itemY + 3.5);
+        }
+
+        doc.addImage(item.dataUrl, 'JPEG', imgX, itemY + 6, imgWidth, imgHeight);
+      }
+
+      doc.addPage();
+      currentY = 20;
+    } else {
+      if (currentY > 195) {
+        doc.addPage();
+        currentY = 20;
+      } else {
+        currentY += 4;
+      }
+    }
+
+    // --- SEÇÃO 4: PLANO FINANCEIRO ACORDADO & CONDIÇÕES ---
+    const selectedSims = selectedPlanIndices.slice().sort().map(idx => simulations[idx]);
+
+    selectedSims.forEach((sim, idx) => {
+      if (currentY + 52 > 270) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      doc.setFillColor(250, 248, 245);
+      doc.rect(15, currentY + 3, 180, 48, 'F');
+      doc.setDrawColor(213, 203, 179);
+      doc.rect(15, currentY + 3, 180, 48);
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(78, 17, 25);
+      const planTitle = selectedSims.length > 1
+        ? `PLANO FINANCEIRO ACORDADO - OPÇÃO ${idx + 1} (${sim.name.toUpperCase()})`
+        : `PLANO FINANCEIRO ACORDADO (${sim.name.toUpperCase()})`;
+      doc.text(planTitle, 20, currentY + 10);
+
+      doc.setFontSize(8);
+      doc.setTextColor(60, 60, 60);
+
+      if (sim.method !== 'credito_parcelado') {
+        let methodText = "";
+        if (sim.method === 'pix') methodText = "PIX";
+        else if (sim.method === 'pix_5') methodText = "PIX (com 5% de Desconto)";
+        else if (sim.method === 'debito') methodText = "Débito";
+        else methodText = "Crédito à vista (1x)";
+
+        doc.text(`Forma de Pagamento: À Vista no ${methodText}`, 20, currentY + 18);
+        if (sim.method === 'pix' || sim.method === 'pix_5') {
+          doc.text(`Pagamento Único: ${formatCurrency(sim.custoTotal)} via PIX`, 20, currentY + 24);
+        } else {
+          doc.text(`Pagamento Único: ${formatCurrency(sim.cobradoCard)} via Cartão`, 20, currentY + 24);
+        }
+        if (sim.pixDiscountVal > 0) {
+          doc.setTextColor(16, 120, 60);
+          doc.text(`Desconto Concedido no PIX (5%): -${formatCurrency(sim.pixDiscountVal)}`, 20, currentY + 30);
+          doc.setTextColor(60, 60, 60);
+        } else {
+          doc.text(`Prazo: Pagamento Único à Vista`, 20, currentY + 30);
+        }
+      } else {
+        doc.text(`Condição Selecionada: ${sim.name}`, 20, currentY + 18);
+        doc.text(`Valor de Entrada (PIX / Dinheiro): ${formatCurrency(sim.entrada)}`, 20, currentY + 24);
+        if (sim.cobradoCard === 0) {
+          doc.text(`Saldo Parcelado: R$ 0,00 (quitado na entrada)`, 20, currentY + 30);
+        } else {
+          doc.text(`Saldo Restante na Maquininha: ${sim.installments}x de ${formatCurrency(sim.valorParcela)} sem juros no cartão`, 20, currentY + 30);
+        }
+      }
+
+      // Total investido
+      doc.setFontSize(11);
+      doc.setTextColor(78, 17, 25);
+      doc.setFont('Helvetica', 'bold');
+      doc.text(`INVESTIMENTO TOTAL: ${formatCurrency(sim.custoTotal)}`, 20, currentY + 42);
+
+      currentY += 53;
+    });
+
+    // Termos de validade e notas de rodapé
+    doc.setFontSize(7);
+    doc.setTextColor(110, 110, 110);
+    doc.setFont('Helvetica', 'normal');
+    const feeDisclaimer = "* ATENÇÃO: Valores expressos em moeda nacional. As taxas informadas são valores para simulação praticada pela maquininha Ton. Orçamento com validade de 30 dias a partir da data de emissão.";
+    const splitDisclaimer = doc.splitTextToSize(feeDisclaimer, 180);
+    doc.text(splitDisclaimer, 15, currentY + 3);
+    currentY += (splitDisclaimer.length * 3.2) + 6;
+
+    if (currentY + 25 > 275) {
+      doc.addPage();
+      currentY = 25;
+    } else {
+      currentY += 8;
+    }
+
+    // Assinaturas
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.3);
+    doc.line(20, currentY, 90, currentY);
+    doc.line(120, currentY, 190, currentY);
+
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont('Helvetica', 'bold');
+    doc.text("ASSINATURA DO CIRURGIÃO DENTISTA", 20, currentY + 4);
+    doc.setFont('Helvetica', 'normal');
+    doc.text((clinicSettings.doctorName || 'Dr. Agnaldo Ferreira').toUpperCase(), 20, currentY + 7.5);
+    doc.text(clinicSettings.cro || 'CROMG 58714', 20, currentY + 11);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.text("ASSINATURA DO PACIENTE / RESPONSÁVEL", 120, currentY + 4);
+    doc.setFont('Helvetica', 'normal');
+    doc.text((patientName || 'PACIENTE').toUpperCase(), 120, currentY + 7.5);
+    doc.text(pd.cpf ? `CPF: ${pd.cpf}` : 'Paciente ou Responsável Legal', 120, currentY + 11);
+
+    // Rodapé institucional
+    doc.setFillColor(78, 17, 25);
+    doc.rect(0, 287, 210, 10, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7.5);
+    doc.setFont('Helvetica', 'normal');
+    doc.text("Documento gerado eletronicamente - Planejador Odontológico Integrado Dr. Agnaldo Ferreira", 15, 293);
+
+    // Metadados estruturados para reimportação
+    try {
+      const budgetMetadata = {
+        system: "Planejador Odontológico Integrado Dr. Agnaldo Ferreira",
+        type: "AG_ODONTO_BUDGET",
+        version: 2,
+        createdAt: new Date().toISOString(),
+        patientName: patientName || '',
+        patientId: selectedPatient?.id || null,
+        total: chosenSim?.custoTotal || 0,
+        activeStageTotal: activeStageGrossTotal,
+        deferredTotal: deferredStagesTotal,
+        items: activeItems.map(item => ({
+          toothNumber: item.toothNumber,
+          procedureName: item.procedureName,
+          price: item.price,
+          stageId: item.stageId,
+        })),
+        deferredItems: deferredItems.map(item => ({
+          toothNumber: item.toothNumber,
+          procedureName: item.procedureName,
+          price: item.price,
+          stageId: item.stageId,
+        }))
+      };
+      doc.setProperties({
+        title: "Plano de Tratamento e Orçamento",
+        subject: "Planejador Odontológico Integrado Dr. Agnaldo Ferreira",
+        author: clinicSettings.doctorName || 'Dr. Agnaldo Ferreira',
+        keywords: JSON.stringify(budgetMetadata)
+      });
+    } catch (metaErr) {
+      console.warn("Aviso ao embutir metadados no PDF:", metaErr);
+    }
+
+    return { doc, cleanFileName };
+  };
+
+  const handleDownloadPdf = async () => {
+    setIsDownloadingPdf(true);
+    try {
+      const { doc, cleanFileName } = await buildBudgetPdfDocument();
+      doc.save(cleanFileName);
+    } catch (err: any) {
+      console.error('Erro ao baixar PDF:', err);
+      alert(`Falha ao gerar o PDF: ${err.message || 'Erro desconhecido'}`);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
   const handleSendWhatsappPdf = async () => {
     setIsSendingPdf(true);
     setSuccessStatus(false);
@@ -970,344 +1584,13 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
     };
 
     try {
-      log("⏳ 1/5 - Iniciando compilação do orçamento odontológico...");
+      log("⏳ 1/5 - Compilando orçamento odontológico estruturado por fases...");
       
-      // Initialize jsPDF
-      const doc = new jsPDF({
-        orientation: 'p',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      // Simple, beautiful branding spacing and elements
-      doc.setFillColor(78, 17, 25); // Deep blood/maroon theme
-      doc.rect(0, 0, 210, 15, 'F');
-
-      // Title & Clinic Header
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text(('CLÍNICA ODONTOLÓGICA DIGITAL').toUpperCase(), 15, 9);
-
-      doc.setTextColor(100, 100, 100);
-      doc.setFontSize(14);
-      doc.setFont('Helvetica', 'bold');
-      doc.text("PLANO DE TRATAMENTO E ORÇAMENTO", 15, 30);
-
-      // Patient details box
-      doc.setDrawColor(213, 203, 179); // #D5CBB3 elegant border
-      doc.rect(15, 35, 180, 28);
-      
-      doc.setFontSize(9);
-      doc.setFont('Helvetica', 'bold');
-      doc.setTextColor(60, 60, 60);
-      doc.text("PACIENTE:", 20, 42);
-      doc.setFont('Helvetica', 'normal');
-      doc.text(patientName || 'Não Informado', 42, 42);
-
-      doc.setFont('Helvetica', 'bold');
-      doc.text("CONTATO:", 20, 48);
-      doc.setFont('Helvetica', 'normal');
-      doc.text(pd.mobile || pd.phone || 'Não Informado', 42, 48);
-
-      doc.setFont('Helvetica', 'bold');
-      doc.text("DATA DO ORÇAMENTO:", 20, 54);
-      doc.setFont('Helvetica', 'normal');
-      doc.text(new Date().toLocaleDateString('pt-BR'), 63, 54);
-
-      doc.setFont('Helvetica', 'bold');
-      doc.text("CIRURGIÃO DENTISTA:", 110, 42);
-      doc.setFont('Helvetica', 'normal');
-      doc.text(clinicSettings.doctorName || 'Dr. Agnaldo Ferreira', 152, 42);
-
-      doc.setFont('Helvetica', 'bold');
-      doc.text("REGISTRO / CRO:", 110, 48);
-      doc.setFont('Helvetica', 'normal');
-      doc.text(clinicSettings.cro || 'CRO-SP 12345', 142, 48);
-
-      // Section of procedures
-      doc.setFontSize(11);
-      doc.setFont('Helvetica', 'bold');
-      doc.setTextColor(78, 17, 25);
-      doc.text("PROCEDIMENTOS CLÍNICOS PLANEJADOS", 15, 75);
-
-      // Drawn table line
-      doc.setDrawColor(78, 17, 25);
-      doc.setLineWidth(0.5);
-      doc.line(15, 78, 195, 78);
-
-      doc.setFontSize(8);
-      doc.setFont('Helvetica', 'bold');
-      doc.setTextColor(80, 80, 80);
-      doc.text("Dente/Região", 17, 83);
-      doc.text("Procedimento", 45, 83);
-      doc.text("Valor Unitário", 165, 83);
-
-      doc.setFont('Helvetica', 'normal');
-      doc.setLineWidth(0.1);
-      doc.setDrawColor(220, 220, 220);
-      doc.line(15, 86, 195, 86);
-
-      let currentY = 91;
-      const flatList: any[] = [];
-      sections.forEach(sec => {
-        sec.markers.forEach(marker => {
-          if (marker.procedureInstances && marker.procedureInstances.length > 0) {
-            marker.procedureInstances.forEach((inst: any) => {
-              if (inst.includeFinancial !== false) {
-                flatList.push({
-                  tooth: marker.toothNumber || sec.title || 'Geral',
-                  name: inst.name,
-                  price: inst.price
-                });
-              }
-            });
-          } else {
-            marker.procedures.forEach(pid => {
-              const proc = procedures.find((p) => p.id === pid);
-              if (proc) {
-                flatList.push({
-                  tooth: marker.toothNumber || sec.title || 'Geral',
-                  name: proc.name,
-                  price: proc.price
-                });
-              }
-            });
-          }
-        });
-      });
-
-      flatList.forEach((item, idx) => {
-        if (currentY > 260) {
-          doc.addPage();
-          currentY = 20;
-        }
-        doc.setFontSize(8);
-        doc.text(item.tooth.toString(), 17, currentY);
-        
-        let displayName = item.name;
-        if (displayName.length > 60) {
-          displayName = displayName.substring(0, 57) + "...";
-        }
-        doc.text(displayName, 45, currentY);
-        
-        const costStr = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price);
-        doc.text(costStr, 165, currentY);
-
-        doc.line(15, currentY + 2, 195, currentY + 2);
-        currentY += 5.8;
-      });
-
-      // compile images with markers and loose photos
-      const sectionsWithImages: { title: string; subtitle?: string; description?: string; dataUrl: string }[] = [];
-      for (const sec of sections) {
-        if (sec.image) {
-          try {
-            const dataUrl = await drawMarkersOnImage(sec, procedures);
-            if (dataUrl) {
-              sectionsWithImages.push({
-                title: sec.title,
-                subtitle: sec.subtitle,
-                description: sec.description,
-                dataUrl
-              });
-            }
-          } catch (e) {
-            console.error("Erro ao desenhar dentes marcados no PDF:", e);
-          }
-        }
-      }
-
-      if (sectionsWithImages.length > 0) {
-        doc.addPage();
-        
-        // Title for the images page
-        doc.setFillColor(78, 17, 25);
-        doc.rect(0, 0, 210, 15, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFont('Helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.text(('MAPEAMENTO VISUAL DOS DENTES / DIAGNÓSTICO').toUpperCase(), 15, 9);
-
-        const imgWidth = 82;
-        const imgHeight = 46.12; // 82 * 9/16
-        const gapX = 10;
-        const startY = 25;
-        const rowHeight = 75; // 75mm per row (3 rows = 225mm)
-        
-        for (let i = 0; i < sectionsWithImages.length; i++) {
-          const item = sectionsWithImages[i];
-          const localIdx = i % 6;
-          
-          if (i > 0 && localIdx === 0) {
-            doc.addPage();
-            doc.setFillColor(78, 17, 25);
-            doc.rect(0, 0, 210, 15, 'F');
-            doc.setTextColor(255, 255, 255);
-            doc.setFont('Helvetica', 'bold');
-            doc.setFontSize(10);
-            doc.text(('MAPEAMENTO VISUAL DOS DENTES / DIAGNÓSTICO (CONT.)').toUpperCase(), 15, 9);
-          }
-          
-          const col = localIdx % 2;
-          const row = Math.floor(localIdx / 2);
-          
-          const imgX = 15 + col * (imgWidth + gapX);
-          const itemY = startY + row * rowHeight;
-          
-          // Title
-          doc.setFontSize(8);
-          doc.setTextColor(78, 17, 25);
-          doc.setFont('Helvetica', 'bold');
-          doc.text(item.title.toUpperCase(), imgX, itemY);
-          
-          // Description or Subtitle
-          const textToShow = item.description || item.subtitle;
-          if (textToShow) {
-            doc.setFontSize(6.5);
-            doc.setTextColor(100, 100, 100);
-            doc.setFont('Helvetica', 'normal');
-            const lines = doc.splitTextToSize(textToShow, imgWidth);
-            doc.text(lines.slice(0, 2), imgX, itemY + 3.5);
-          }
-          
-          // Add image
-          doc.addImage(item.dataUrl, 'JPEG', imgX, itemY + 6, imgWidth, imgHeight);
-        }
-        
-        doc.addPage();
-        currentY = 20;
-      } else {
-        // Total and simulations
-        if (currentY > 210) {
-          doc.addPage();
-          currentY = 25;
-        }
-      }
-
-      // Simulation details
-      const selectedSims = selectedPlanIndices.slice().sort().map(idx => simulations[idx]);
-      
-      selectedSims.forEach((sim, idx) => {
-        doc.setFillColor(250, 248, 245);
-        doc.rect(15, currentY + 5, 180, 48, 'F');
-        doc.setDrawColor(213, 203, 179);
-        doc.rect(15, currentY + 5, 180, 48);
-
-        doc.setFont('Helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(78, 17, 25);
-        doc.text(selectedSims.length > 1 ? `PLANO FINANCEIRO ACORDADO - OPÇÃO ${idx + 1}` : "PLANO FINANCEIRO ACORDADO", 20, currentY + 12);
-
-        doc.setFontSize(8);
-        doc.setTextColor(60, 60, 60);
-        
-        if (sim.method !== 'credito_parcelado') {
-          let methodText = "";
-          if (sim.method === 'pix') methodText = "PIX";
-          else if (sim.method === 'pix_5') methodText = "PIX (com 5% de Desconto)";
-          else if (sim.method === 'debito') methodText = "Débito";
-          else methodText = "Crédito à vista (1x)";
-
-          doc.text(`Opção Selecionada: À Vista no ${methodText}`, 20, currentY + 20);
-          if (sim.method === 'pix' || sim.method === 'pix_5') {
-            doc.text(`Pagamento Único: ${formatCurrency(sim.custoTotal)} via Pix`, 20, currentY + 26);
-          } else {
-            doc.text(`Pagamento Único: ${formatCurrency(sim.cobradoCard)} via Cartão`, 20, currentY + 26);
-          }
-          doc.text(`Prazo: À Vista`, 20, currentY + 32);
-        } else {
-          doc.text(`Opção Selecionada: ${sim.name} (Entrada de ${formatCurrency(sim.entrada)})`, 20, currentY + 20);
-          if (sim.cobradoCard === 0) {
-            doc.text(`Valor Restante Parcelado: Nenhum saldo financiado`, 20, currentY + 26);
-            doc.text(`Parcelamento Sugerido: Pagamento único, sem parcelas`, 20, currentY + 32);
-          } else {
-            doc.text(`Valor Restante Parcelado: ${formatCurrency(sim.cobradoCard)}`, 20, currentY + 26);
-            doc.text(`Parcelamento Sugerido: ${sim.installments}x de ${formatCurrency(sim.valorParcela)} sem juros no cartão`, 20, currentY + 32);
-          }
-        }
-
-        // Big font for total
-        doc.setFontSize(12);
-        doc.setTextColor(78, 17, 25);
-        doc.setFont('Helvetica', 'bold');
-        doc.text(`INVESTIMENTO TOTAL: ${formatCurrency(sim.custoTotal)}`, 20, currentY + 44);
-
-        currentY += 55;
-
-        if (currentY > 210 && idx < selectedSims.length - 1) {
-          doc.addPage();
-          currentY = 25;
-        }
-      });
-
-      // Disclaimer about fees
-      doc.setFontSize(7.5);
-      doc.setTextColor(100, 100, 100);
-      doc.setFont('Helvetica', 'normal');
-      const feeDisclaimer = "* ATENÇÃO: As taxas informadas são valores aproximados para simulação. O valor praticado pela maquininha deve ser consultado e conferido no dia de efetuar o pagamento.";
-      const splitDisclaimer = doc.splitTextToSize(feeDisclaimer, 180);
-      doc.text(splitDisclaimer, 15, currentY + 6);
-      currentY += (splitDisclaimer.length * 3.5) + 6;
-
-      // Quebra limpa de página caso a assinatura não caiba na página atual
-      if (currentY + 22 > 275) {
-        doc.addPage();
-        currentY = 25;
-      } else {
-        currentY += 10;
-      }
-
-      // Signatures
-      doc.setDrawColor(180, 180, 180);
-      doc.line(20, currentY, 90, currentY);
-      doc.line(120, currentY, 190, currentY);
-
-      doc.setFontSize(7);
-      doc.setTextColor(120, 120, 120);
-      doc.setFont('Helvetica', 'bold');
-      doc.text("ASSINATURA DO CIRURGIÃO DENTISTA", 20, currentY + 4);
-      doc.text((clinicSettings.doctorName || 'Dr. Agnaldo Ferreira').toUpperCase(), 20, currentY + 8);
-
-      doc.text("ASSINATURA DO PACIENTE / RESPONSÁVEL", 120, currentY + 4);
-      doc.text((patientName || 'PACIENTE').toUpperCase(), 120, currentY + 8);
-
-      // Bottom footer bar
-      doc.setFillColor(78, 17, 25);
-      doc.rect(0, 287, 210, 10, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.text("Documento gerado eletronicamente - Planejador Odontológico Integrado Dr. Agnaldo Ferreira", 15, 292);
-
-      // Embutir metadados estruturados para reimportação instantânea e determinística sem IA
-      try {
-        const budgetMetadata = {
-          system: "Planejador Odontológico Integrado Dr. Agnaldo Ferreira",
-          type: "AG_ODONTO_BUDGET",
-          version: 1,
-          createdAt: new Date().toISOString(),
-          patientName: patientName || '',
-          patientId: selectedPatient?.id || null,
-          total: chosenSim?.custoTotal || 0,
-          items: flatList.map(item => ({
-            toothNumber: typeof item.tooth === 'number' ? item.tooth : (parseInt(String(item.tooth), 10) || null),
-            toothRaw: String(item.tooth),
-            procedureName: item.name,
-            price: Number(item.price) || 0
-          }))
-        };
-        doc.setProperties({
-          title: "Plano de Tratamento e Orçamento",
-          subject: "Planejador Odontológico Integrado",
-          author: clinicSettings.doctorName || 'Dr. Agnaldo Ferreira',
-          keywords: JSON.stringify(budgetMetadata)
-        });
-      } catch (metaErr) {
-        console.warn("Aviso ao embutir metadados no PDF:", metaErr);
-      }
+      const { doc, cleanFileName } = await buildBudgetPdfDocument();
 
       // Output as Blob
       const pdfBlob = doc.output('blob');
-      log("✅ PDF estruturado com sucesso localmente!");
+      log("✅ PDF gerado com sucesso, separado e explicado por fases!");
 
       const localUrl = URL.createObjectURL(pdfBlob);
       setLocalPdfUrl(localUrl);
@@ -1315,8 +1598,6 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       log("☁️ 2/5 - Iniciando upload seguro do PDF para o armazenamento em nuvem...");
       
       const safePatientName = patientName || 'Paciente_Anonimo';
-      const cleanFileName = `Orcamento_${safePatientName.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
-      
       let pdfLink = '';
       try {
         await uploadPatientFileToSupabase(selectedPatient?.id || safePatientName, pdfBlob, cleanFileName, 'Orcamentos');
@@ -1598,13 +1879,24 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           </button>
 
           <button
+            type="button"
+            onClick={handleDownloadPdf}
+            disabled={isDownloadingPdf}
+            className="flex items-center justify-center gap-2 bg-[#FAF8F5] hover:bg-[#F5EFE3] text-[#8B0000] border-2 border-[#8B0000]/30 hover:border-[#8B0000] font-bold text-xs px-5 py-3 rounded-xl transition-all shadow-sm hover:shadow-md cursor-pointer select-none active:scale-95"
+            title="Baixar o arquivo PDF explicativo e separado por fases diretamente"
+          >
+            {isDownloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+            <span>{isDownloadingPdf ? 'Gerando...' : 'Baixar PDF'}</span>
+          </button>
+
+          <button
             id="btn-print-negotiation"
             type="button"
             onClick={handlePrint}
             className="flex items-center justify-center gap-2 bg-[#C09553] hover:bg-[#A97E3B] text-[#FAF8F5] font-bold text-xs px-6 py-3 rounded-xl transition-all shadow-md hover:shadow-lg cursor-pointer select-none group active:scale-95"
           >
             <Printer className="w-4 h-4 group-hover:scale-110 transition-transform" />
-            <span>Exportar PDF</span>
+            <span>Exportar PDF / Imprimir</span>
           </button>
         </div>
       </div>
@@ -2352,85 +2644,146 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
           </div>
         </div>
 
-        {/* Procedure List Summary Table (Very Compact to fit 1 page) */}
+        {/* Procedure List Summary Table separated by Active Phases */}
         <div className="space-y-3">
           <div className="flex justify-between items-center border-b border-zinc-100 pb-1">
             <h4 className="text-[10px] font-bold text-[#8B0000] uppercase tracking-wider">
-              Diagnóstico de Mapeamento Clínico (Procedimentos Necessários)
+              Diagnóstico de Mapeamento Clínico (Etapa Atual — Inclusa no Orçamento)
             </h4>
             <span className="text-[10px] font-mono text-zinc-500 font-bold">
-              Total Mapeado: {proceduresListOnMapeamento.length} itens
+              Total Mapeado Atual: {resolvedBudgetItems.filter(i => i.effectiveIncluded).length} itens
             </span>
           </div>
 
-          {proceduresListOnMapeamento.length === 0 ? (
+          {resolvedBudgetItems.filter(i => i.effectiveIncluded).length === 0 ? (
             <div className="py-4 text-center text-zinc-400 italic text-xs bg-zinc-50 rounded-lg">
-              Nenhum dente ou procedimento foi mapeado no fluxo anterior.
+              Nenhum procedimento selecionado na etapa atual.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse font-sans text-xs">
-                <thead>
-                  <tr className="border-b border-[#E6DEC9]/40 bg-[#FAF8F5] text-[#8B0000]">
-                    <th className="py-1 px-2.5 font-bold text-[10px] uppercase w-16">Dente</th>
-                    <th className="py-1 px-2.5 font-bold text-[10px] uppercase">Procedimento Clínico Mapeado</th>
-                    <th className="py-1 px-2.5 font-bold text-[10px] uppercase text-right w-24">Valor Original</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
-                  {proceduresListOnMapeamento.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-zinc-50">
-                      <td className="py-1 px-2.5 font-mono text-xs text-zinc-900 font-bold">
-                        {item.toothNumber === 0 ? 'Geral' : `Dente ${item.toothNumber}`}
-                      </td>
-                      <td className="py-1 px-2.5 text-zinc-700 font-medium truncate max-w-[280px]">
-                        <span>{item.procedureName}</span>
-                        {item.quadrantTitle && (
-                          <span className="ml-2 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-[#FAF8F5] border border-[#E6DEC9] text-[#8B0000]">
-                            {item.quadrantTitle}
+            <div className="space-y-3">
+              {activeStages.map((st) => {
+                const stageActiveItems = resolvedBudgetItems.filter(
+                  (i) => i.effectiveIncluded && i.stageId === st.id
+                );
+                if (stageActiveItems.length === 0) return null;
+                const stageTotal = stageActiveItems.reduce((acc, it) => acc + it.price, 0);
+
+                return (
+                  <div key={st.id} className="border border-[#E6DEC9] rounded-xl overflow-hidden bg-white shadow-2xs">
+                    <div className="bg-[#FAF8F5] px-3 py-1.5 border-b border-[#E6DEC9]/60 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded text-white"
+                          style={{ backgroundColor: st.color || '#8B0000' }}
+                        >
+                          {st.label}
+                        </span>
+                        {st.subtitle && (
+                          <span className="text-[10px] text-zinc-500 italic">
+                            — {st.subtitle}
                           </span>
                         )}
-                      </td>
-                      <td className="py-1 px-2.5 text-right font-mono text-zinc-800 font-extrabold text-[11px]">
-                        {formatCurrency(item.price)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-[#8B0000] shrink-0">
+                        Subtotal {st.label.split(':')[0]}: {formatCurrency(stageTotal)}
+                      </span>
+                    </div>
+
+                    <table className="w-full text-left border-collapse font-sans text-xs">
+                      <thead>
+                        <tr className="border-b border-[#E6DEC9]/30 bg-zinc-50/70 text-zinc-500 text-[9.5px]">
+                          <th className="py-1 px-3 font-bold uppercase w-16">Dente</th>
+                          <th className="py-1 px-3 font-bold uppercase">Procedimento Clínico Mapeado</th>
+                          <th className="py-1 px-3 font-bold uppercase text-right w-24">Valor Original</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {stageActiveItems.map((item, idx) => (
+                          <tr key={`${item.sectionId}-${item.markerId}-${item.procedureId}-${idx}`} className="hover:bg-zinc-50/70">
+                            <td className="py-1.5 px-3 font-mono text-xs text-zinc-900 font-bold">
+                              {item.toothNumber === 0 ? 'Geral' : `Dente ${item.toothNumber}`}
+                            </td>
+                            <td className="py-1.5 px-3 text-zinc-800 font-medium truncate max-w-[280px]">
+                              <span>{item.procedureName}</span>
+                            </td>
+                            <td className="py-1.5 px-3 text-right font-mono text-zinc-900 font-extrabold text-[11px]">
+                              {formatCurrency(item.price)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
         {/* Etapas Futuras Planejadas (2º Momento — Não Incluso no Valor Atual) */}
         {deferredProceduresList.length > 0 && (
-          <div className="mt-4 bg-amber-50/40 border border-dashed border-[#D5CBB3] rounded-xl p-3 space-y-2 no-print-break">
-            <div className="flex items-center justify-between">
-              <span className="text-[9.5px] font-bold uppercase tracking-wider text-amber-900">
-                Planejamento de Etapas Futuras (Para Execução Posterior — Não Incluso no Valor Atual)
-              </span>
-              <span className="text-[10px] font-mono font-bold text-amber-900">
+          <div className="mt-4 bg-amber-50/40 border border-dashed border-[#D5CBB3] rounded-xl p-3.5 space-y-3 no-print-break">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-amber-200/60 pb-2">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-900 block">
+                  Planejamento de Etapas Futuras (Para Execução Posterior — Não Incluso no Valor Atual)
+                </span>
+                <p className="text-[10px] text-amber-800/80 italic mt-0.5">
+                  Procedimentos diagnosticados para realização futura em momentos subsequentes.
+                </p>
+              </div>
+              <span className="text-[11px] font-mono font-extrabold text-amber-900 shrink-0">
                 Subtotal Futuro: {formatCurrency(deferredStagesTotal)}
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px]">
-              {deferredProceduresList.map((df, idx) => (
-                <div
-                  key={`${df.id}-${idx}`}
-                  className="flex items-center justify-between bg-white/80 border border-amber-200/60 rounded px-2 py-1 text-zinc-600"
-                >
-                  <span className="truncate">
-                    <strong className="font-mono text-zinc-800">
-                      {df.toothNumber === 0 ? 'Geral' : `D${df.toothNumber}`}
-                    </strong>{' '}
-                    — {df.procedureName}{' '}
-                    <span className="text-[9px] text-amber-800 font-bold">({df.stageLabel})</span>
-                  </span>
-                  <span className="font-mono font-semibold text-zinc-500 ml-2 shrink-0">
-                    {formatCurrency(df.price)}
-                  </span>
-                </div>
-              ))}
+
+            <div className="space-y-2.5">
+              {activeStages.map((st) => {
+                const stageDeferredItems = resolvedBudgetItems.filter(
+                  (i) => !i.effectiveIncluded && i.stageId === st.id
+                );
+                if (stageDeferredItems.length === 0) return null;
+                const stageSub = stageDeferredItems.reduce((acc, it) => acc + it.price, 0);
+
+                return (
+                  <div key={st.id} className="bg-white/90 border border-amber-200/70 rounded-lg p-2.5 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] border-b border-amber-100 pb-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-amber-900 uppercase">
+                          {st.label}
+                        </span>
+                        {st.subtitle && (
+                          <span className="text-zinc-500 italic text-[9.5px]">
+                            — {st.subtitle}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-mono font-bold text-amber-900">
+                        Subtotal {st.label.split(':')[0]}: {formatCurrency(stageSub)}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px]">
+                      {stageDeferredItems.map((df, idx) => (
+                        <div
+                          key={`${df.sectionId}-${df.markerId}-${df.procedureId}-${idx}`}
+                          className="flex items-center justify-between bg-zinc-50/80 border border-zinc-200/60 rounded px-2 py-1 text-zinc-600"
+                        >
+                          <span className="truncate">
+                            <strong className="font-mono text-zinc-800">
+                              {df.toothNumber === 0 ? 'Geral' : `D${df.toothNumber}`}
+                            </strong>{' '}
+                            — {df.procedureName}
+                          </span>
+                          <span className="font-mono font-semibold text-zinc-600 ml-2 shrink-0">
+                            {formatCurrency(df.price)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -3304,6 +3657,16 @@ Qualquer dúvida ou para confirmar o início, me envie uma mensagem por aqui!`;
       </div>
 
       <div className="mt-8 mb-16 flex flex-col sm:flex-row gap-4 justify-center print:hidden">
+        <button
+          type="button"
+          onClick={handleDownloadPdf}
+          disabled={isDownloadingPdf}
+          className="flex items-center justify-center gap-2 bg-[#FAF8F5] hover:bg-[#F5EFE3] text-[#8B0000] border-2 border-[#8B0000] font-bold text-sm px-7 py-4 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+        >
+          {isDownloadingPdf ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
+          <span>{isDownloadingPdf ? 'Gerando PDF...' : 'Baixar PDF'}</span>
+        </button>
+
         <button
           onClick={handlePrint}
           className="flex items-center justify-center gap-2 bg-[#8B0000] hover:bg-[#6c1b26] text-white font-bold text-sm px-8 py-4 rounded-xl transition-all shadow-md cursor-pointer"

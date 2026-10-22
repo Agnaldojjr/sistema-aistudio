@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Coins, TrendingUp, CheckCircle2 } from 'lucide-react';
-import { PhotoSection, Procedure, TreatmentProposal } from '../types';
+import { PhotoSection, Procedure, TreatmentProposal, ClinicalStage } from '../types';
 import { TON_RATES, DEBIT_RATES } from './NegotiationTab';
+import { DEFAULT_CLINICAL_STAGES, getDefaultStageForProcedure } from '../constants';
 
 const formatCurrency = (val: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -127,22 +128,90 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
   const customNetDesiredRaw = useReactiveLocalStorage<string | null>('ag_neg_custom_net', null);
   const customNetDesired = customNetDesiredRaw !== null ? parseFloat(customNetDesiredRaw as string) : null;
 
-  // Calculate gross total
-  const calculatedGrossTotal = useMemo(() => {
-    return sections.reduce((secSum, sec) => {
-      return secSum + sec.markers.reduce((markSum, marker) => {
-        if (marker.procedureInstances && marker.procedureInstances.length > 0) {
-          return markSum + marker.procedureInstances.reduce((procSum, inst) => {
-            return procSum + (inst.includeFinancial !== false ? inst.price : 0);
-          }, 0);
-        }
-        return markSum + marker.procedures.reduce((procSum, pid) => {
+  // Etapas clínicas do orçamento (Urgência, Reabilitação, Estética)
+  const activeStages: ClinicalStage[] = useMemo(() => {
+    if (Array.isArray(proposal?.stages) && proposal.stages.length > 0) {
+      return proposal.stages;
+    }
+    return DEFAULT_CLINICAL_STAGES;
+  }, [proposal?.stages]);
+
+  // Lista unificada de todos os procedimentos mapeados com status de Etapa e Inclusão Individual
+  const resolvedBudgetItems = useMemo(() => {
+    const items: Array<{
+      sectionId: string;
+      markerId: string;
+      toothNumber: number;
+      procedureId: string;
+      procedureName: string;
+      price: number;
+      stageId: string;
+      stageEnabled: boolean;
+      itemIncluded: boolean;
+      effectiveIncluded: boolean;
+    }> = [];
+    const stageEnabledMap = new Map<string, boolean>();
+    activeStages.forEach((st) => stageEnabledMap.set(st.id, st.enabled !== false));
+
+    (sections || []).forEach((sec) => {
+      (sec.markers || []).forEach((marker) => {
+        const excludedSet = new Set(marker.excludedProcedures || []);
+        (marker.procedures || []).forEach((pid) => {
           const proc = procedures.find((p) => p.id === pid);
-          return procSum + (proc ? proc.price : 0);
-        }, 0);
-      }, 0);
-    }, 0);
-  }, [sections, procedures]);
+          if (!proc) return;
+          const inst = marker.procedureInstances?.find((i) => i.procedureId === pid);
+          const price =
+            marker.customPrices?.[pid] !== undefined
+              ? marker.customPrices[pid]
+              : inst?.price !== undefined
+              ? inst.price
+              : proc.price;
+          const stageId =
+            marker.procedureStages?.[pid] ||
+            inst?.stageId ||
+            proc.defaultStageId ||
+            getDefaultStageForProcedure(proc.name, proc.id);
+          const stageEnabled = stageEnabledMap.get(stageId) ?? true;
+          const itemIncluded =
+            !excludedSet.has(pid) && (inst ? inst.includeFinancial !== false : true);
+
+          items.push({
+            sectionId: sec.id,
+            markerId: marker.id,
+            toothNumber: marker.toothNumber || 0,
+            procedureId: pid,
+            procedureName: proc.name,
+            price,
+            stageId,
+            stageEnabled,
+            itemIncluded,
+            effectiveIncluded: stageEnabled && itemIncluded,
+          });
+        });
+      });
+    });
+
+    return items;
+  }, [sections, procedures, activeStages]);
+
+  const activeStageGrossTotal = useMemo(
+    () =>
+      resolvedBudgetItems
+        .filter((i) => i.effectiveIncluded)
+        .reduce((acc, i) => acc + i.price, 0),
+    [resolvedBudgetItems]
+  );
+
+  const deferredStagesTotal = useMemo(
+    () =>
+      resolvedBudgetItems
+        .filter((i) => !i.effectiveIncluded)
+        .reduce((acc, i) => acc + i.price, 0),
+    [resolvedBudgetItems]
+  );
+
+  // Calculate gross total
+  const calculatedGrossTotal = activeStageGrossTotal;
 
   const desiredNet = customNetDesired !== null && !isNaN(customNetDesired) ? customNetDesired : calculatedGrossTotal;
 
@@ -534,44 +603,157 @@ export default function PatientScreen({ hideSimulation = false, hideProcedures =
           })}
         </div>
 
-        {/* Procedures Table */}
+        {/* Procedures Table Separated by Phases */}
         {!hideProcedures && (
-          <div className="bg-white border border-[#E6DEC9] rounded-2xl p-6 shadow-sm">
-            <div className="flex justify-between items-center border-b border-zinc-100 pb-3 mb-4">
-              <h4 className="text-sm font-bold text-[#4E1119] uppercase tracking-wider">
-                Diagnóstico de Mapeamento Clínico
-              </h4>
-              <span className="text-xs font-mono text-zinc-500 font-bold">
-                Total Mapeado: {proceduresListOnMapeamento.length} itens
-              </span>
+          <div className="space-y-6">
+            {/* ETAPA ATUAL */}
+            <div className="bg-white border border-[#E6DEC9] rounded-2xl p-6 shadow-sm space-y-4">
+              <div className="flex justify-between items-center border-b border-zinc-100 pb-3">
+                <div>
+                  <h4 className="text-sm font-bold text-[#4E1119] uppercase tracking-wider">
+                    Diagnóstico de Mapeamento Clínico (Etapa Atual — Inclusa)
+                  </h4>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Procedimentos selecionados para execução prioritária neste orçamento.
+                  </p>
+                </div>
+                <span className="text-xs font-mono text-zinc-600 font-bold bg-[#FAF8F5] border border-[#E6DEC9] px-2.5 py-1 rounded-lg">
+                  Total Mapeado: {resolvedBudgetItems.filter(i => i.effectiveIncluded).length} itens
+                </span>
+              </div>
+
+              {resolvedBudgetItems.filter(i => i.effectiveIncluded).length === 0 ? (
+                <div className="py-6 text-center text-zinc-400 italic text-sm">
+                  Nenhum procedimento selecionado na etapa atual.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {activeStages.map((st) => {
+                    const stageActiveItems = resolvedBudgetItems.filter(
+                      (i) => i.effectiveIncluded && i.stageId === st.id
+                    );
+                    if (stageActiveItems.length === 0) return null;
+                    const stageTotal = stageActiveItems.reduce((acc, it) => acc + it.price, 0);
+
+                    return (
+                      <div key={st.id} className="border border-[#E6DEC9] rounded-xl overflow-hidden bg-white shadow-2xs">
+                        <div className="bg-[#FAF8F5] px-4 py-2 border-b border-[#E6DEC9]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded text-white"
+                              style={{ backgroundColor: st.color || '#4E1119' }}
+                            >
+                              {st.label}
+                            </span>
+                            {st.subtitle && (
+                              <span className="text-xs text-zinc-500 italic">
+                                — {st.subtitle}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs font-mono font-bold text-[#4E1119] shrink-0">
+                            Subtotal {st.label.split(':')[0]}: {formatCurrency(stageTotal)}
+                          </span>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse font-sans text-sm">
+                            <thead>
+                              <tr className="border-b border-[#E6DEC9]/40 bg-zinc-50/70 text-zinc-500 text-xs">
+                                <th className="py-2 px-4 font-bold uppercase w-28">Dente</th>
+                                <th className="py-2 px-4 font-bold uppercase">Procedimento</th>
+                                <th className="py-2 px-4 font-bold uppercase text-right w-32">Valor</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100">
+                              {stageActiveItems.map((item, idx) => (
+                                <tr key={`${item.sectionId}-${item.markerId}-${item.procedureId}-${idx}`} className="hover:bg-zinc-50/60">
+                                  <td className="py-2.5 px-4 font-mono text-xs text-zinc-900 font-bold">
+                                    {item.toothNumber === 0 ? 'Geral' : `Dente ${item.toothNumber}`}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-zinc-800 font-medium">
+                                    {item.procedureName}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right font-mono text-zinc-900 font-bold text-xs">
+                                    {formatCurrency(item.price)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {proceduresListOnMapeamento.length === 0 ? (
-              <div className="py-6 text-center text-zinc-400 italic text-sm">
-                Nenhum procedimento foi mapeado.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse font-sans text-sm">
-                  <thead>
-                    <tr className="border-b border-[#E6DEC9]/40 bg-[#FAF8F5] text-[#4E1119]">
-                      <th className="py-2.5 px-3 font-bold text-xs uppercase w-20">Dente</th>
-                      <th className="py-2.5 px-3 font-bold text-xs uppercase">Procedimento</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {proceduresListOnMapeamento.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-zinc-50">
-                        <td className="py-2.5 px-3 font-mono text-xs text-zinc-900 font-bold">
-                          Dente {item.toothNumber}
-                        </td>
-                        <td className="py-2.5 px-3 text-zinc-700 font-medium">
-                          {item.procedureName}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* ETAPAS FUTURAS */}
+            {deferredStagesTotal > 0 && (
+              <div className="bg-amber-50/40 border border-dashed border-[#D5CBB3] rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/60 pb-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-900 uppercase tracking-wider">
+                      Planejamento de Etapas Futuras (Para Execução Posterior — Não Incluso)
+                    </h4>
+                    <p className="text-xs text-amber-800/80 italic mt-0.5">
+                      Procedimentos diagnosticados no mapeamento para realização em momento futuro.
+                    </p>
+                  </div>
+                  <span className="text-sm font-mono font-extrabold text-amber-900 shrink-0 bg-white border border-amber-200 px-3 py-1 rounded-lg">
+                    Subtotal Futuro: {formatCurrency(deferredStagesTotal)}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {activeStages.map((st) => {
+                    const stageDeferredItems = resolvedBudgetItems.filter(
+                      (i) => !i.effectiveIncluded && i.stageId === st.id
+                    );
+                    if (stageDeferredItems.length === 0) return null;
+                    const stageSub = stageDeferredItems.reduce((acc, it) => acc + it.price, 0);
+
+                    return (
+                      <div key={st.id} className="bg-white/90 border border-amber-200/70 rounded-xl p-3.5 space-y-2">
+                        <div className="flex items-center justify-between text-xs border-b border-amber-100 pb-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-amber-900 uppercase">
+                              {st.label}
+                            </span>
+                            {st.subtitle && (
+                              <span className="text-zinc-500 italic text-[11px]">
+                                — {st.subtitle}
+                              </span>
+                            )}
+                          </div>
+                          <span className="font-mono font-bold text-amber-900">
+                            Subtotal {st.label.split(':')[0]}: {formatCurrency(stageSub)}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {stageDeferredItems.map((df, idx) => (
+                            <div
+                              key={`${df.sectionId}-${df.markerId}-${df.procedureId}-${idx}`}
+                              className="flex items-center justify-between bg-zinc-50/80 border border-zinc-200/60 rounded-lg px-2.5 py-1.5 text-zinc-600"
+                            >
+                              <span className="truncate">
+                                <strong className="font-mono text-zinc-800">
+                                  {df.toothNumber === 0 ? 'Geral' : `D${df.toothNumber}`}
+                                </strong>{' '}
+                                — {df.procedureName}
+                              </span>
+                              <span className="font-mono font-semibold text-zinc-700 ml-2 shrink-0">
+                                {formatCurrency(df.price)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
